@@ -16,7 +16,7 @@ namespace
 class MidiExportTests : public juce::UnitTest
 {
 public:
-    MidiExportTests() : juce::UnitTest ("MidiExport") {}
+    MidiExportTests() : juce::UnitTest ("MidiExport", "Godoken") {}
 
     void runTest() override
     {
@@ -127,7 +127,7 @@ static MidiExportTests midiExportTests;
 int main()
 {
     juce::UnitTestRunner runner;
-    runner.runTests ({ &midiExportTests });
+    runner.runTestsInCategory ("Godoken");
 
     for (int i = 0; i < runner.getNumResults(); ++i)
         if (runner.getResult (i)->failures > 0)

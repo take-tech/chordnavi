@@ -6,8 +6,9 @@ GodokenProcessor::GodokenProcessor()
 {
 }
 
-void GodokenProcessor::prepareToPlay (double, int)
+void GodokenProcessor::prepareToPlay (double sampleRate, int)
 {
+    previewSynth.prepare (sampleRate);
 }
 
 bool GodokenProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
@@ -19,7 +20,7 @@ bool GodokenProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
 void GodokenProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
 {
     juce::ScopedNoDenormals noDenormals;
-    buffer.clear();   // 試聴シンセはマイルストーン5で実装
+    previewSynth.render (buffer);
 }
 
 juce::AudioProcessorEditor* GodokenProcessor::createEditor()

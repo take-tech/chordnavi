@@ -23,6 +23,7 @@ Source/
   PluginProcessor.h/.cpp
   PluginEditor.h/.cpp         … WebBrowserComponent を載せる
   MidiExport.h/.cpp           … コード列 → .mid ファイル生成、外部ドラッグ
+  PreviewSynth.h/.cpp         … 試聴用の簡易シンセ（三角波＋エンベロープ、ロックフリーのキュー）
 ui/
   index.html                  … プロトタイプを分割・整理したもの
   app.js / theory.js / midi.js / audio.js / staff.js / style.css
@@ -81,6 +82,6 @@ WebView上のマウス操作から外部ドラッグを開始できるかはOS�
 ## ルール
 
 - 音楽理論のデータ（スケール・コード・進行）は `theory.js` に集約し、UIコードと混ぜない。
-- MIDI生成ロジックには単体テストを書く（ヘッダ、デルタタイム、ノートオン／オフの対応）。
+- MIDI生成ロジックには単体テストを書く（ヘッダ、デルタタイム、ノートオン／オフの対応）。試聴シンセにもテストあり（`tests/`、ターゲット `MidiExportTests`）。
 - 大きな設計変更や方式の切り替えは、実装前に提案して確認を取る。
 - コミットはマイルストーン単位を目安に、日本語のメッセージで。

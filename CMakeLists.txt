@@ -54,6 +54,7 @@ target_sources(GodokenNavigator PRIVATE
     Source/PluginProcessor.cpp
     Source/PluginEditor.cpp
     Source/MidiExport.cpp
+    Source/PreviewSynth.cpp
 )
 
 target_compile_definitions(GodokenNavigator PUBLIC
@@ -83,7 +84,9 @@ juce_add_console_app(MidiExportTests PRODUCT_NAME "MidiExportTests")
 
 target_sources(MidiExportTests PRIVATE
     tests/MidiExportTests.cpp
+    tests/PreviewSynthTests.cpp
     Source/MidiExport.cpp
+    Source/PreviewSynth.cpp
 )
 
 target_include_directories(MidiExportTests PRIVATE Source)

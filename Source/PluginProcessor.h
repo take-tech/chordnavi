@@ -1,6 +1,7 @@
 #pragma once
 
 #include <juce_audio_processors/juce_audio_processors.h>
+#include "PreviewSynth.h"
 
 class GodokenProcessor : public juce::AudioProcessor
 {
@@ -32,6 +33,11 @@ public:
     void getStateInformation (juce::MemoryBlock&) override {}
     void setStateInformation (const void*, int) override {}
 
+    // 試聴（メッセージスレッドから呼ぶ）
+    PreviewSynth& getPreviewSynth() { return previewSynth; }
+
 private:
+    PreviewSynth previewSynth;
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (GodokenProcessor)
 };

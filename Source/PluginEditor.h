@@ -38,6 +38,11 @@ private:
     void saveMidi (const juce::Array<juce::var>& args,
                    juce::WebBrowserComponent::NativeFunctionCompletion completion);
 
+    // JS: playChords({ chords, interval, duration }) — interval 秒ごとに各コードを duration 秒鳴らす
+    void playChords (const juce::Array<juce::var>& args,
+                     juce::WebBrowserComponent::NativeFunctionCompletion completion);
+
+    GodokenProcessor& processorRef;
     std::unique_ptr<juce::FileChooser> fileChooser;
     GodokenWebView webView;
 

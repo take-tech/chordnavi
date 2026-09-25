@@ -72,6 +72,7 @@ namespace
 
 GodokenEditor::GodokenEditor (GodokenProcessor& p)
     : AudioProcessorEditor (&p),
+      processorRef (p),
       webView (juce::WebBrowserComponent::Options{}
                    .withNativeIntegrationEnabled (true)
                    .withKeepPageLoadedWhenBrowserIsHidden()
@@ -83,6 +84,10 @@ GodokenEditor::GodokenEditor (GodokenProcessor& p)
                    .withNativeFunction ("saveMidi", [this] (const auto& args, auto completion)
                                         {
                                             saveMidi (args, std::move (completion));
+                                        })
+                   .withNativeFunction ("playChords", [this] (const auto& args, auto completion)
+                                        {
+                                            playChords (args, std::move (completion));
                                         }))
 {
     addAndMakeVisible (webView);
@@ -184,4 +189,19 @@ void GodokenEditor::saveMidi (const juce::Array<juce::var>& args,
                                    ? "saved:" + file.getFullPathName()
                                    : juce::String ("error: failed to write file")));
     });
+}
+
+void GodokenEditor::playChords (const juce::Array<juce::var>& args,
+                                juce::WebBrowserComponent::NativeFunctionCompletion completion)
+{
+    const auto request  = args.isEmpty() ? juce::var() : args[0];
+    const auto chords   = parseChords (request["chords"]);
+    const auto interval = juce::jlimit (0.05, 10.0, (double) request.getProperty ("interval", 0.9));
+    const auto duration = juce::jlimit (0.05, 10.0, (double) request.getProperty ("duration", 1.1));
+
+    int queued = 0;
+    for (size_t i = 0; i < chords.size(); ++i)
+        queued += processorRef.getPreviewSynth().queue (MidiExport::voicing (chords[i]), (double) i * interval, duration) ? 1 : 0;
+
+    completion (juce::var (queued));
 }
