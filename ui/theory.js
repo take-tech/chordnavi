@@ -211,7 +211,8 @@ const DETECT_ORDER=['','m','7','M7','m7','m7b5','dim','dim7','aug','sus4','7sus4
 
 /**
  * MIDI ノート番号の集合 → コード候補（良い順、最大 limit 件）。
- * 最低音をベースとし、ルート≠ベースなら分数コードにする。5度を省略した形も低い優先度で候補にする
+ * 最低音をベースとし、ルート≠ベースなら分数コードにする。5度を省略した形も低い優先度で候補にする。
+ * 最低音がコードの外の音なら、残りの音でできたコードの分数コード（オンコード、例：D/G）も候補にする
  */
 export function detectChords(midiNotes,limit=4){
   const notes=[...new Set(midiNotes)].sort((a,b)=>a-b);
@@ -229,6 +230,17 @@ export function detectChords(midiNotes,limit=4){
       if(root!==bass)penalty+=2;
       found.push({root,q,...(root!==bass?{bass}:{}),score:penalty*100+order});
     });
+  }
+  // 分数コード（オンコード）：一番低い音を除いた残りがコードになっていて、ベースがその構成音でない形（例：D/G）
+  const upper=[...new Set(notes.slice(1).map(mod12))];
+  if(upper.length>=3&&!upper.includes(bass)){
+    for(const root of upper){
+      DETECT_ORDER.forEach((q,order)=>{
+        const tones=[...new Set(CHORD[q].iv.map(i=>mod12(root+i)))];
+        if(!same(tones,upper))return;
+        found.push({root,q,bass,score:400+order});
+      });
+    }
   }
   return found.sort((a,b)=>a.score-b.score).slice(0,limit).map(({score,...c})=>c);
 }
