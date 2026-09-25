@@ -1,6 +1,6 @@
 import {
   MAJ_LABEL,MIN_LABEL,SIG,SCALES,PROGRESSIONS,DIATONIC,WHEEL_CELLS,
-  mod12,tonicOf,isFlatKey,noteName,keyName as keyNameOf,degLabel,chordName as chordNameOf,chordDeg,
+  mod12,tonicOf,isFlatKey,noteName,keyName as keyNameOf,degLabel,chordName as chordNameOf,chordDeg,chordRootName,
   chordPcs,scaleById,spellChordTone,variantsOf,chordAt,sameChord,voicing,keySignature,
   progressionChords,progressionDegrees,BEATS_PER_BAR,detectChords,VARIANT_FILE,
   CHORD,spellScaleTone,spellChordInterval,convertChordSize
@@ -54,7 +54,8 @@ const useFlat=()=>isFlatKey(state.idx);
 const nn=pc=>noteName(pc,useFlat());
 const scaleObj=()=>scaleById(state.scale);
 const keyName=()=>keyNameOf(state.idx,state.mode);
-const chordName=ch=>chordNameOf(ch,useFlat());
+const chordName=ch=>chordNameOf(ch,useFlat(),tonic());
+const rootName=ch=>chordRootName(ch,useFlat(),tonic());
 /* ---------- テンポ（DAW 同期） ---------- */
 // DAW 上では既定で DAW のテンポに合わせる。Standalone・ブラウザでは同期ボタン自体を出さない
 let hostBpm=0;
@@ -190,7 +191,7 @@ function noteInfo(pc){
   const sel=shownChord(), pcs=sel?chordPcs(sel):null;
   const inChord=pcs?pcs.includes(pc):false;
   const chordRoot=sel&&pc===sel.root;
-  const name=inChord?spellChordTone(pc,sel.root,useFlat()):nn(pc);
+  const name=inChord?spellChordTone(pc,sel.root,useFlat(),rootName(sel)):nn(pc);
   const label=state.label==='name'?name:(inChord&&!inScale?degLabel(iv,null):degLabel(iv,sc));
   return {iv,inScale,inChord,chordRoot,isRoot:iv===0,name,label,chordMode:!!pcs};
 }
@@ -263,9 +264,9 @@ function renderStaffView(){
   }
   if(shownChord()){
     // 選択中（試聴中は鳴っている）コード：MIDI と同じボイシングを和音で表示（綴りはコードの音程から）
-    const ch=shownChord(), rootName=nn(ch.root), ivs=CHORD[ch.q].iv;
+    const ch=shownChord(), rn=rootName(ch), ivs=CHORD[ch.q].iv;
     const spell=pc=>{const iv=ivs.find(i=>mod12(ch.root+i)===pc);
-      return (iv!=null&&spellChordInterval(ch.root,rootName,iv,ch.q))||noteInfo(pc).name;};
+      return (iv!=null&&spellChordInterval(ch.root,rn,iv,ch.q))||noteInfo(pc).name;};
     const notes=voicing(ch).map(midi=>{
       const pc=mod12(midi), n=noteInfo(pc), ds=dotStyle(n), name=spell(pc);
       return {midi,name,label:state.label==='name'?name:n.label,fill:ds.fill,op:ds.op,col:0};
@@ -459,7 +460,7 @@ function renderEditBar(chords,{t,orig,bars,where}){
   };
   // ルート：主音から半音ずつ12音。分数コードはベースとの距離を保つ
   const root=document.createElement('select');root.title='ルート';
-  for(let off=0;off<12;off++){const op=document.createElement('option');op.value=off;op.textContent=nn(t+off);root.appendChild(op);}
+  for(let off=0;off<12;off++){const op=document.createElement('option');op.value=off;op.textContent=rootName({root:mod12(t+off),off});root.appendChild(op);}
   root.value=ch.off;
   root.onchange=()=>{const off=+root.value;setItem([off,ch.q,ch.boff!=null?mod12(ch.boff+off-ch.off):undefined]);};
   bar.appendChild(root);

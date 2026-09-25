@@ -102,7 +102,7 @@ PROGRESSIONS.push(...[
   {mode:'major',name:'I–IIIm–IV–V',file:'I-IIIm-IV-V',c:[[0,''],[4,'m'],[5,''],[7,'']],v:[{name:'7th',c:[[0,'M7'],[4,'m7'],[5,'M7'],[7,'7']]},{name:'2拍ずつ',c:[[[0,''],[4,'m']],[[5,''],[7,'']]]}]},
   {mode:'major',name:'IV–V–VIm（偽終止）',file:'DeceptiveCadence',c:[[5,''],[7,''],[9,'m'],[9,'m']],v:[{name:'7th',c:[[5,'M7'],[7,'7'],[9,'m7'],[9,'m7']]},{name:'2拍ずつ',c:[[[5,''],[7,'']],[9,'m'],[9,'m']]}]},
   {mode:'major',name:'逆循環',file:'ReverseCycle',c:[[2,'m7'],[7,'7'],[0,'M7'],[9,'m7']],v:[{name:'2拍ずつ',c:[[[2,'m7'],[7,'7']],[[0,'M7'],[9,'m7']]]},{name:'VI7版',c:[[2,'m7'],[7,'7'],[0,'M7'],[9,'7']]}]},
-  {mode:'major',name:'ボサノバ進行',file:'BossaNova',c:[[0,'M7'],[2,'7'],[2,'m7'],[7,'7']],v:[{name:'8小節',c:[[0,'M7'],[0,'M7'],[2,'7'],[2,'7'],[2,'m7'],[1,'7'],[0,'M7'],[0,'M7']]},{name:'裏コード',c:[[0,'M7'],[2,'7'],[2,'m7'],[1,'7']]}]},
+  {mode:'major',name:'ボサノバ進行',file:'BossaNova',c:[[0,'M7'],[2,'7'],[2,'m7'],[7,'7']],v:[{name:'8小節',c:[[0,'M7'],[0,'M7'],[2,'7'],[2,'7'],[2,'m7'],[1,'7'],[0,'M7'],[1,'7']]},{name:'裏コード',c:[[0,'M7'],[2,'7'],[2,'m7'],[1,'7']]}]},
   {mode:'major',name:'ドミナントの連鎖',file:'DominantChain',c:[[4,'7'],[9,'7'],[2,'7'],[7,'7'],[0,'M7'],[0,'M7']],v:[{name:'2拍ずつ',c:[[[4,'7'],[9,'7']],[[2,'7'],[7,'7']],[0,'M7'],[0,'M7']]},{name:'IIm7版',c:[[4,'7'],[9,'7'],[2,'m7'],[7,'7'],[0,'M7'],[0,'M7']]}]},
   {mode:'major',name:'I–♭VII–IV–I（ミクソリディアン）',file:'Mixolydian',c:[[0,''],[10,''],[5,''],[0,'']],v:[{name:'I–♭VII–IV',c:[[0,''],[10,''],[5,''],[5,'']]},{name:'2拍ずつ',c:[[[0,''],[10,'']],[[5,''],[0,'']]]}]},
   {mode:'major',name:'♭VI–♭VII–I',file:'bVI-bVII-I',c:[[8,''],[10,''],[0,''],[0,'']],v:[{name:'♭VI・♭VII',c:[[[8,''],[10,'']],[0,'']]},{name:'7th',c:[[8,'M7'],[10,'7'],[0,'M7'],[0,'M7']]}]},
@@ -188,7 +188,21 @@ export const noteName=(pc,flat)=>(flat?FLAT:SHARP)[mod12(pc)];
 export const keyName=(idx,mode)=>mode==='major'?MAJ_LABEL[idx]:MIN_LABEL[idx];
 export const degLabel=(iv,sc)=>(sc&&sc.alt&&sc.alt[iv])||DEG[iv];
 export const hasBass=ch=>ch.bass!=null&&ch.bass!==ch.root;
-export const chordName=(ch,flat)=>noteName(ch.root,flat)+CHORD[ch.q].s+(hasBass(ch)?'/'+spellChordTone(ch.bass,ch.root,flat):'');
+// コードのルートの綴り。キーの外から借りたコード（♭II・♭VI・♭VII・♯IV など）は度数から綴る
+// （例：C キーの ♭VII は A♯ ではなく B♭）。ダイアトニックのコードはプロトタイプどおりキーの表記のまま。
+// E♯・B♯・C♭・F♭ やダブルシャープ／フラットになる場合は、実用上わかりやすいキーの表記に戻す
+const DEGREE_NUM=[1,2,2,3,3,4,4,5,6,6,7,7];
+const AWKWARD=['E♯','B♯','C♭','F♭'];
+export function chordRootName(ch,flat,tonic){
+  const plain=noteName(ch.root,flat);
+  if(ch.off==null||tonic==null||!/[♭♯]/.test(ROMAN[ch.off]))return plain;
+  const s=spellWithLetter(ch.root,shiftLetter(noteName(tonic,flat),DEGREE_NUM[ch.off]-1));
+  return !s||/𝄫|𝄪/u.test(s)||AWKWARD.includes(s)?plain:s;
+}
+export const chordName=(ch,flat,tonic)=>{
+  const root=chordRootName(ch,flat,tonic);
+  return root+CHORD[ch.q].s+(hasBass(ch)?'/'+spellChordTone(ch.bass,ch.root,flat,root):'');
+};
 export const chordDeg=(off,q,boff)=>ROMAN[off]+CHORD[q].s+(boff!=null?'/'+ROMAN[boff]:'');
 export const chordPcs=ch=>{const pcs=CHORD[ch.q].iv.map(x=>mod12(ch.root+x));return hasBass(ch)&&!pcs.includes(ch.bass)?[...pcs,ch.bass]:pcs;};
 export const sameChord=(a,b)=>!!a&&!!b&&a.root===b.root&&a.q===b.q&&(a.bass??a.root)===(b.bass??b.root);
@@ -233,10 +247,11 @@ export const keySignature=idx=>idx<=6?{acc:'♯',count:idx}:{acc:'♭',count:12-
 export const scaleById=id=>SCALES.find(s=>s.id===id);
 
 // コード構成音はコードのルート基準で綴る（例：C7の7度はB♭）
-export function spellChordTone(pc,root,flat){
+export function spellChordTone(pc,root,flat,rootName=noteName(root,flat)){
   const nn=p=>noteName(p,flat);
+  if(pc===root)return rootName;
   if(SHARP[pc]===FLAT[pc])return nn(pc);
-  const ci=mod12(pc-root), rootName=nn(root), rootFlat=rootName.includes('♭');
+  const ci=mod12(pc-root), rootFlat=rootName.includes('♭');
   if([3,6,10].includes(ci))return rootFlat||!rootName.includes('♯')?FLAT[pc]:nn(pc);
   if([4,7,11].includes(ci))return rootFlat?FLAT[pc]:SHARP[pc];
   return nn(pc);
