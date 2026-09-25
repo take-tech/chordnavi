@@ -142,7 +142,8 @@ public:
         beginTest ("Safe file names");
         {
             expectEquals (MidiExport::safeFileName (juce::String::fromUTF8 ("F♯m7♭5")), juce::String ("F#m7b5"));
-            expectEquals (MidiExport::safeFileName (juce::String::fromUTF8 ("C_王道進行")), juce::String::fromUTF8 ("C_王道進行"));
+            expectEquals (MidiExport::safeFileName ("C_Canon_BassLine_half"), juce::String ("C_Canon_BassLine_half"));
+            expectEquals (MidiExport::safeFileName (juce::String::fromUTF8 ("C_王道")), juce::String ("C___"));   // 日本語は使わない
             expectEquals (MidiExport::safeFileName ("../etc/passwd"), juce::String ("___etc_passwd"));
             expectEquals (MidiExport::safeFileName (juce::String::fromUTF8 ("I–V–VIm–IV")), juce::String ("I_V_VIm_IV"));
         }

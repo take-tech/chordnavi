@@ -25,7 +25,7 @@ namespace MidiExport
 
     juce::MemoryBlock buildMidi (const std::vector<Chord>& chords, double bpm);
 
-    // ♯→#、♭→b に置換し、ファイル名に使えない文字を _ にする（プロトタイプの safe() と同じ）
+    // ♯→#、♭→b に置換し、英数字と _ # - 以外（日本語を含む）を _ にする
     juce::String safeFileName (const juce::String& name);
 
     // 一時フォルダに <safeName>.mid を書き出して返す。失敗時は存在しない File を返す

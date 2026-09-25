@@ -2,7 +2,7 @@ import {
   MAJ_LABEL,MIN_LABEL,SIG,SCALES,PROGRESSIONS,DIATONIC,WHEEL_CELLS,
   mod12,tonicOf,isFlatKey,noteName,keyName as keyNameOf,degLabel,chordName as chordNameOf,chordDeg,
   chordPcs,scaleById,spellChordTone,variantsOf,chordAt,sameChord,voicing,keySignature,
-  progressionChords,progressionDegrees,BEATS_PER_BAR,detectChords,
+  progressionChords,progressionDegrees,BEATS_PER_BAR,detectChords,VARIANT_FILE,
   CHORD,spellScaleTone,spellChordInterval,convertChordSize
 } from './theory.js';
 import {renderStaff} from './staff.js';
@@ -361,7 +361,8 @@ function renderProgs(){
   // リズム½：各コードの長さを半分に（1小節→2拍、2拍→1拍）
   const rate=state.half?.5:1;
   const chords=progressionChords(t,v.c).map(c=>({...c,beats:c.beats*rate}));
-  const title=`${nn(t)}${state.mode==='minor'?'m':''}_${p.name}${vi>0?'_'+v.name:''}${state.half?'_リズム半分':''}`;
+  // ファイル名は英字のみ（例：C_Canon_BassLine_half）
+  const title=`${nn(t)}${state.mode==='minor'?'m':''}_${p.file}${vi>0?'_'+VARIANT_FILE[v.name]:''}${state.half?'_half':''}`;
   document.getElementById('progName').textContent=p.name+(vi>0?`（${v.name}）`:'');
   document.getElementById('progDeg').textContent=v.c.length>8?`${v.c.length}小節`:progressionDegrees(v.c);
   progChords=chords;progTitle=title;

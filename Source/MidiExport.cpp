@@ -109,10 +109,9 @@ juce::String safeFileName (const juce::String& name)
 
     for (auto c : replaced)
     {
+        // ファイル名は英数字と _ # - のみ（日本語などは使わない）
         const bool ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
-                        || c == '_' || c == '#' || c == '-'
-                        || (c >= 0x3040 && c <= 0x30ff)   // ひらがな・カタカナ
-                        || (c >= 0x4e00 && c <= 0x9fff);  // 漢字（例：C_王道進行）
+                        || c == '_' || c == '#' || c == '-';
         out += ok ? c : juce::juce_wchar ('_');
     }
 
