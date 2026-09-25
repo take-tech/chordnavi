@@ -336,14 +336,70 @@ function renderTab(){
     g.addEventListener('pointerdown',e=>{e.preventDefault();playNotes(c.v.notes,state.timbre);});
   });
 }
+/* ---------- コード図（横向き：上が1弦、左がナット側） ---------- */
+function renderChart(){
+  const svg=document.getElementById('tab');svg.innerHTML='';
+  const W=895,H=180,L=20,R=885;
+  svg.setAttribute('viewBox',`0 0 ${W} ${H}`);
+  const {mode,cols}=tabColumns();
+  if(!cols.length){txt(svg,W/2,H/2,'このコードの形が見つかりません',{fill:'#6A7390','font-size':13});return;}
+  const cw=(R-L)/cols.length, small=cols.length>8;
+  // 表示するフレット数・弦の間隔・1フレットの幅（コードが少ないほど大きく描く）
+  const FRETS=4, SG=19;
+  const top=mode==='chord'?44:38;
+  const fw=Math.min(mode==='chord'?42:small?14:34,(cw-(small?14:40))/FRETS);
+  cols.forEach((c,i)=>{
+    const x0=L+i*cw, cx=x0+cw/2, g=el('g',{class:'col'},svg);
+    el('rect',{class:'colbg',x:x0,y:0,width:cw,height:H,fill:c.playing?'#F6D6DF':'transparent'},g);
+    txt(g,cx,14,c.title,{fill:c.playing?'#C4456A':'#1E2742','font-size':small?11:14,'font-weight':700});
+    if(c.sub)txt(g,cx,30,c.sub,{fill:'#6A7390','font-size':10});
+    if(!c.v)return;
+    const v=c.v, fretted=v.frets.filter(f=>f!=null&&f>0);
+    const lo=fretted.length?Math.min(...fretted):1, hi=fretted.length?Math.max(...fretted):1;
+    const start=hi<=FRETS?1:lo;                        // ローポジションはナットから
+    const gx=cx-fw*FRETS/2+(small?3:6), sy=s=>top+s*SG;
+    // 地・フレット・弦（6弦ほど太く）
+    el('rect',{x:gx,y:sy(0),width:fw*FRETS,height:sy(5)-sy(0),fill:'#fff'},g);
+    for(let k=0;k<=FRETS;k++)el('line',{x1:gx+k*fw,y1:sy(0),x2:gx+k*fw,y2:sy(5),stroke:k===0&&start===1?'#1E2742':'#9AA2B8',
+      'stroke-width':k===0&&start===1?(small?3:5):1.2},g);
+    for(let s=0;s<6;s++)el('line',{x1:gx,y1:sy(s),x2:gx+fw*FRETS,y2:sy(s),stroke:'#5B6275','stroke-width':.8+s*.28},g);
+    if(start>1)txt(g,gx+fw/2,sy(5)+(small?11:14),`${start}fr`,{fill:'#1E2742','font-size':small?9:12,'font-weight':700});
+    // 開放（○）・ミュート（×）
+    for(let s=0;s<6;s++){
+      const f=v.frets[s], x=gx-(small?6:9);
+      if(f==null)txt(g,x,sy(s),'×',{fill:'#6A7390','font-size':small?9:11});
+      else if(f===0)el('circle',{cx:x,cy:sy(s),r:small?2.6:3.5,fill:'none',stroke:'#1E2742','stroke-width':1.2},g);
+    }
+    const fx=f=>gx+(f-start+.5)*fw, r=Math.min(fw*.36,SG*.36);
+    // セーハ：一番低いフレットを 2 本以上の弦で押さえるときは太い棒でつなぐ
+    const atLo=[];v.frets.forEach((f,s)=>{if(f===lo&&f>0)atLo.push(s);});
+    const barre=atLo.length>=2;
+    if(barre){
+      const s0=Math.min(...atLo), s1=Math.max(...atLo);
+      el('rect',{x:fx(lo)-r,y:sy(s0)-r,width:r*2,height:sy(s1)-sy(s0)+r*2,rx:r,fill:'#1E2742'},g);
+    }
+    v.frets.forEach((f,s)=>{
+      if(f==null||f===0||(barre&&f===lo&&s!==v.bassString))return;
+      el('circle',{cx:fx(f),cy:sy(s),r,fill:s===v.bassString?'#E3A21A':'#1E2742',stroke:s===v.bassString&&barre&&f===lo?'#fff':'none','stroke-width':1},g);
+    });
+    if(mode==='chord')txt(g,cx,H-8,'クリックで試聴',{fill:'#9AA2B8','font-size':9});
+    g.addEventListener('pointerdown',e=>{e.preventDefault();playNotes(v.notes,state.timbre);});
+  });
+}
+
 function renderFretPanel(){
-  const tab=state.fbView==='tab';
+  const tab=state.fbView!=='fb';
   document.getElementById('fb').toggleAttribute('hidden',tab);
   document.getElementById('tab').toggleAttribute('hidden',!tab);
   const showArea=tab&&!(state.sel&&!playback&&!state.pick);
   document.getElementById('tabAreaSeg').toggleAttribute('hidden',!showArea);
   document.getElementById('fbLegend').textContent=tab?'上が1弦・オレンジはベース（最低音）':'レギュラーチューニング・上が1弦';
-  if(tab)renderTab();else renderFretboard();
+  // 見出し（進行名は renderProgs の後で確定している）
+  const label=state.fbView==='chart'?'コード図':'TAB';
+  document.getElementById('fbTitle').textContent=tab
+    ?(state.sel&&!playback&&!state.pick?`${label}：${chordName(state.sel)} の3ポジション`:`${label}：${document.getElementById('progName').textContent||'コード進行'}`)
+    :`ギター指板：${nn(tonic())} ${scaleObj().name}`;
+  if(state.fbView==='chart')renderChart();else if(tab)renderTab();else renderFretboard();
 }
 
 function renderFretboard(){
@@ -622,9 +678,7 @@ function render(){
   const sc=scaleObj(), notes=sc.iv.map(i=>nn(tonic()+i)).join(' ');
   document.getElementById('kbTitle').textContent=`${state.view==='staff'?'五線譜':'鍵盤'}：${nn(tonic())} ${sc.name}`;
   document.getElementById('scaleNotes').textContent=notes;
-  document.getElementById('fbTitle').textContent=state.fbView==='tab'
-    ?(state.sel&&!playback&&!state.pick?`TAB：${chordName(state.sel)} の3ポジション`:`TAB：${document.getElementById('progName').textContent||'コード進行'}`)
-    :`ギター指板：${nn(tonic())} ${sc.name}`;
+
   const si=document.getElementById('selInfo');
   const shown=shownChord();
   if(shown&&!state.pick){si.classList.add('on');document.getElementById('selName').textContent=`${chordName(shown)}（${chordDeg(shown.off,shown.q,shown.boff)}）`;}
@@ -657,7 +711,7 @@ function applySaved(saved){
   pick('label',oneOf(['name','degree']));
   pick('view',oneOf(['kb','staff']));
   pick('dia',oneOf(['7','3']));
-  pick('fbView',oneOf(['fb','tab']));
+  pick('fbView',oneOf(['fb','chart','tab']));
   pick('tabArea',oneOf(Object.keys(TAB_AREAS)));
   pick('timbre',oneOf(TIMBRES.map(t=>t.id)));
   pick('loop',bool);pick('half',bool);
