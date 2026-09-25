@@ -6,7 +6,7 @@
 #define MyAppName "ChordNavi"
 #define MyAppVersion GetEnv("CHORDNAVI_VERSION")
 #if MyAppVersion == ""
-#define MyAppVersion "1.0.2"
+#define MyAppVersion "1.0.3"
 #endif
 #define MyAppPublisher "Ranze"
 #define MyAppURL "https://github.com/take-tech/chordnavi"
