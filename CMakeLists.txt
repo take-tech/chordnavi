@@ -1,9 +1,13 @@
 cmake_minimum_required(VERSION 3.22)
+
+# macOS の設定は project() より前に置く（配布用に Intel / Apple Silicon 両対応のユニバーサルバイナリ）
+set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING "")
+set(CMAKE_OSX_ARCHITECTURES "arm64;x86_64" CACHE STRING "")
+
 project(ChordNavi VERSION 0.1.0)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING "")
 
 # JUCE 8（ローカルに JUCE があれば -DFETCHCONTENT_SOURCE_DIR_JUCE=<path> で再利用可）
 include(FetchContent)

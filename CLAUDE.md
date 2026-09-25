@@ -115,6 +115,10 @@ cp -R "build-release/ChordNavi_artefacts/Release/AU/ChordNavi.component" ~/Libra
 auval -v aumu Gdkn Rnze
 ```
 
+- 配布用 `.pkg`：`./scripts/package_macos.sh`（`build-release/packages/ChordNavi-<ver>-macOS.pkg`。VST3・AU・Standalone を入れる。バージョンは CMake の `project(... VERSION)`、または環境変数 `CHORDNAVI_VERSION`）。署名・公証は環境変数（`MACOS_APP_SIGN_IDENTITY` など）があるときだけ。
+- ビルドは Intel／Apple Silicon のユニバーサル（`CMAKE_OSX_ARCHITECTURES`、macOS 11 以降）。
+- タグ `v*` を push すると `.github/workflows/release.yml` が `.pkg` をビルドして GitHub Release に添付する。
+
 - 音源（aumu）なので MIDI 入力を受ける設定にしている（`NEEDS_MIDI_INPUT TRUE`。auval の MIDI テストに必要）。受けた MIDI は今は使わない。
 - UI をブラウザで確認するときは `ui/` を HTTP で配信して開く（JUCE ブリッジが無いときは WebAudio・DAW同期なしで動く）。
 
