@@ -26,6 +26,9 @@ public:
     bool queue (const std::vector<int>& notes, double delaySeconds, double durationSeconds,
                 Timbre timbre = Timbre::triangle, bool stopOthers = false);
 
+    // 鳴っている音をフェードアウトし、予約中の音を取り消す
+    bool stopAll();
+
     // バッファを上書きで書き込む（全チャンネル同じ信号）
     void render (juce::AudioBuffer<float>& buffer);
 

@@ -91,6 +91,10 @@ GodokenEditor::GodokenEditor (GodokenProcessor& p)
                    .withNativeFunction ("playChords", [this] (const auto& args, auto completion)
                                         {
                                             playChords (args, std::move (completion));
+                                        })
+                   .withNativeFunction ("stopPreview", [this] (const auto&, auto completion)
+                                        {
+                                            completion (juce::var (processorRef.getPreviewSynth().stopAll()));
                                         }))
 {
     addAndMakeVisible (webView);

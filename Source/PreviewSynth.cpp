@@ -74,6 +74,18 @@ bool PreviewSynth::queue (const std::vector<int>& notes, double delaySeconds, do
     return true;
 }
 
+bool PreviewSynth::stopAll()
+{
+    const auto scope = fifo.write (1);
+    if (scope.blockSize1 + scope.blockSize2 == 0)
+        return false;
+
+    auto& r = requests[(size_t) (scope.blockSize1 > 0 ? scope.startIndex1 : scope.startIndex2)];
+    r.numNotes   = 0;
+    r.stopOthers = true;
+    return true;
+}
+
 PreviewSynth::Voice& PreviewSynth::findFreeVoice()
 {
     // 空きボイスが無ければ一番古いボイスを使う

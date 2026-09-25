@@ -7,13 +7,36 @@ import {
 } from './theory.js';
 import {renderStaff} from './staff.js';
 import {attachMidiDrag,saveMidi} from './midi.js';
-import {playChord as play1,playProgression as playN,TIMBRES} from './audio.js';
+import {playChord as play1,playProgression as playN,stopPreview,TIMBRES} from './audio.js';
 
 /* ---------- 状態 ---------- */
 const state={idx:0,mode:'major',scale:'major',label:'name',view:'kb',dia:'7',sel:null,prog:{major:0,minor:0},vari:{major:0,minor:0},timbre:'triangle'};
 const tonic=()=>tonicOf(state.idx,state.mode);
-const playChord=ch=>play1(ch,state.timbre);
-const playProgression=chords=>playN(chords,state.timbre,bpm());
+const playChord=ch=>{stopPlayback(false);play1(ch,state.timbre);};
+
+/* ---------- 進行の試聴と、鳴っているコードの表示 ---------- */
+// playback: { chords, index, timers }。index は今鳴っているコード（-1 は鳴る前）
+let playback=null;
+function playProgression(chords){
+  stopPlayback(false);
+  const beat=60/bpm(), timers=[];
+  playback={chords,index:-1,timers};
+  let t=0;
+  chords.forEach((ch,i)=>{
+    timers.push(setTimeout(()=>{playback.index=i;render();},t*1000));
+    t+=(ch.beats??BEATS_PER_BAR)*beat;
+  });
+  timers.push(setTimeout(()=>{playback=null;render();},t*1000));
+  playN(chords,state.timbre,bpm());
+}
+// 表示を止める（silence なら音も止める）。キー・進行を変えたときは音も止めて表示とずれないようにする
+function stopPlayback(silence){
+  if(!playback)return;
+  playback.timers.forEach(clearTimeout);playback=null;
+  if(silence)stopPreview();
+}
+// 鍵盤・指板・五線譜に表示するコード：試聴中は鳴っているコード、それ以外は選択中のコード
+const shownChord=()=>playback&&playback.index>=0?playback.chords[playback.index]:state.sel;
 const useFlat=()=>isFlatKey(state.idx);
 const nn=pc=>noteName(pc,useFlat());
 const scaleObj=()=>scaleById(state.scale);
@@ -109,13 +132,14 @@ bindSeg('diaSeg','dia',()=>{
   if(state.sel){state.sel=convertChordSize(state.sel,state.dia,state.mode);playChord(state.sel);}
   render();
 });
-document.getElementById('selClear').addEventListener('click',()=>{state.sel=null;render();});
+document.getElementById('selClear').addEventListener('click',()=>{stopPlayback(true);state.sel=null;render();});
 const timbreSel=document.getElementById('timbre');
 for(const t of TIMBRES){const o=document.createElement('option');o.value=t.id;o.textContent=t.name;timbreSel.appendChild(o);}
 timbreSel.addEventListener('change',()=>{state.timbre=timbreSel.value;});
 
 function setKey(i,m){
   if(m!==state.mode){state.scale=m==='major'?'major':'nminor';}
+  stopPlayback(true);
   state.idx=i;state.mode=m;state.sel=null;
   rotateTo(i);render();
 }
@@ -124,10 +148,10 @@ function setKey(i,m){
 function noteInfo(pc){
   const t=tonic(), sc=scaleObj(), iv=mod12(pc-t);
   const inScale=sc.iv.includes(iv);
-  const pcs=state.sel?chordPcs(state.sel):null;
+  const sel=shownChord(), pcs=sel?chordPcs(sel):null;
   const inChord=pcs?pcs.includes(pc):false;
-  const chordRoot=state.sel&&pc===state.sel.root;
-  const name=inChord?spellChordTone(pc,state.sel.root,useFlat()):nn(pc);
+  const chordRoot=sel&&pc===sel.root;
+  const name=inChord?spellChordTone(pc,sel.root,useFlat()):nn(pc);
   const label=state.label==='name'?name:(inChord&&!inScale?degLabel(iv,null):degLabel(iv,sc));
   return {iv,inScale,inChord,chordRoot,isRoot:iv===0,name,label,chordMode:!!pcs};
 }
@@ -166,9 +190,9 @@ function renderKeyboard(){
 /* ---------- 五線譜 ---------- */
 function renderStaffView(){
   const svg=document.getElementById('staff'), t=tonic(), sig=keySignature(state.idx);
-  if(state.sel){
-    // 選択中のコード：MIDI と同じボイシングを和音で表示（綴りはコードの音程から）
-    const ch=state.sel, rootName=nn(ch.root), ivs=CHORD[ch.q].iv;
+  if(shownChord()){
+    // 選択中（試聴中は鳴っている）コード：MIDI と同じボイシングを和音で表示（綴りはコードの音程から）
+    const ch=shownChord(), rootName=nn(ch.root), ivs=CHORD[ch.q].iv;
     const spell=pc=>{const iv=ivs.find(i=>mod12(ch.root+i)===pc);
       return (iv!=null&&spellChordInterval(ch.root,rootName,iv,ch.q))||noteInfo(pc).name;};
     const notes=voicing(ch).map(midi=>{
@@ -228,29 +252,35 @@ function renderProgs(){
   const list=PROGRESSIONS.filter(p=>p.mode===state.mode), cur=state.prog[state.mode];
   const pills=document.getElementById('pills');pills.innerHTML='';
   list.forEach((p,i)=>{const b=document.createElement('button');b.textContent=p.name;b.setAttribute('aria-pressed',i===cur);
-    b.onclick=()=>{state.prog[state.mode]=i;state.vari[state.mode]=0;state.sel=null;render();};pills.appendChild(b);});
+    b.onclick=()=>{stopPlayback(true);state.prog[state.mode]=i;state.vari[state.mode]=0;state.sel=null;render();};pills.appendChild(b);});
   const p=list[cur], t=tonic(), vars=variantsOf(p), vi=Math.min(state.vari[state.mode],vars.length-1), v=vars[vi];
   const vbox=document.getElementById('variants');vbox.innerHTML='';
   if(vars.length>1){
     vbox.append('派生：');
     vars.forEach((x,i)=>{const b=document.createElement('button');b.textContent=x.name;b.setAttribute('aria-pressed',i===vi);
-      b.onclick=()=>{state.vari[state.mode]=i;state.sel=null;render();};vbox.appendChild(b);});
+      b.onclick=()=>{stopPlayback(true);state.vari[state.mode]=i;state.sel=null;render();};vbox.appendChild(b);});
   }
   const chords=progressionChords(t,v.c);
   const title=`${nn(t)}${state.mode==='minor'?'m':''}_${p.name}${vi>0?'_'+v.name:''}`;
   document.getElementById('progName').textContent=p.name+(vi>0?`（${v.name}）`:'');
   document.getElementById('progDeg').textContent=v.c.length>8?`${v.c.length}小節`:progressionDegrees(v.c);
   progChords=chords;progTitle=title;
+  // 幅は拍数で決める（1小節＝4マス、2拍のコードは半分の幅）
   const box=document.getElementById('chips');box.innerHTML='';
-  box.style.gridTemplateColumns=`repeat(${Math.min(8,Math.max(4,chords.length<=8?chords.length:6))},1fr)`;
-  chords.forEach(ch=>box.appendChild(makeChip(ch)));
+  box.style.gridTemplateColumns=`repeat(${Math.min(8,Math.max(4,v.c.length))*BEATS_PER_BAR},1fr)`;
+  chords.forEach((ch,i)=>{
+    const chip=makeChip(ch);
+    chip.style.gridColumn=`span ${ch.beats??BEATS_PER_BAR}`;
+    if(playback&&playback.index===i)chip.classList.add('playing');
+    box.appendChild(chip);
+  });
 }
 function makeChip(ch){
   const b=document.createElement('button');b.className='chip';
   if(sameChord(state.sel,ch))b.classList.add('sel');
   b.innerHTML='<span class="n"></span><span class="d"></span>';
   b.querySelector('.n').textContent=chordName(ch);
-  b.querySelector('.d').textContent=chordDeg(ch.off,ch.q,ch.boff)+(ch.beats&&ch.beats<BEATS_PER_BAR?`（${ch.beats}拍）`:'');
+  b.querySelector('.d').textContent=chordDeg(ch.off,ch.q,ch.boff);
   b.title='クリックで試聴／DAWへドラッグでMIDI';
   b.onclick=()=>{playChord(ch);state.sel={...ch};render();};
   // 単体のドラッグは拍数に関わらず1小節
@@ -285,7 +315,8 @@ function render(){
   document.getElementById('scaleNotes').textContent=notes;
   document.getElementById('fbTitle').textContent=`ギター指板：${nn(tonic())} ${sc.name}`;
   const si=document.getElementById('selInfo');
-  if(state.sel){si.classList.add('on');document.getElementById('selName').textContent=`${chordName(state.sel)}（${chordDeg(state.sel.off,state.sel.q,state.sel.boff)}）`;}
+  const shown=shownChord();
+  if(shown){si.classList.add('on');document.getElementById('selName').textContent=`${chordName(shown)}（${chordDeg(shown.off,shown.q,shown.boff)}）`;}
   else si.classList.remove('on');
   renderKeyPanel();renderFretboard();renderProgs();renderDiatonic();
 }

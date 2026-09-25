@@ -128,6 +128,20 @@ public:
             expectEquals (synth.getNumActiveVoices(), 1);
         }
 
+        beginTest ("stopAll silences playing and pending voices");
+        {
+            PreviewSynth synth;
+            synth.prepare (sr);
+            expect (synth.queue ({ 48, 52, 55 }, 0.0, 2.0, Timbre::organ));
+            expect (synth.queue ({ 50, 53, 57 }, 1.0, 2.0, Timbre::organ));
+            renderSeconds (synth, 0.2);
+            expect (synth.stopAll());
+            renderSeconds (synth, 0.1);                         // 10ms のフェードを含む
+            expectEquals (synth.getNumActiveVoices(), 0);
+            expectEquals (renderSeconds (synth, 1.0), 0.0f);    // 予約していた2つ目も鳴らない
+            expectEquals (synth.getNumActiveVoices(), 0);
+        }
+
         beginTest ("Rejects empty requests");
         {
             PreviewSynth synth;

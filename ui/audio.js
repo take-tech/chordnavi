@@ -28,6 +28,13 @@ function play(events,timbre){
   events.forEach(({ch,start,dur})=>webAudioChord(ch,start,dur));
 }
 
+// 試聴中の音と予約をすべて止める
+const nativeStop=juce?juce.getNativeFunction('stopPreview'):null;
+export function stopPreview(){
+  if(nativeStop)nativeStop().catch(err=>console.error(err));
+  else if(ac){ac.close();ac=null;}
+}
+
 export function playChord(ch,timbre){play([{ch,start:0,dur:SINGLE_DUR}],timbre);}
 
 // 進行は MIDI と同じ長さ：各コードの拍数 × テンポ
