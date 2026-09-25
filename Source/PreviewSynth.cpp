@@ -2,15 +2,44 @@
 
 #include <cmath>
 
+namespace
+{
+    constexpr double twoPi = juce::MathConstants<double>::twoPi;
+
+    // 1サンプルごとに掛けると seconds 秒で 0.001 倍（-60dB）になる係数
+    float decayPerSample (double seconds, double sampleRate)
+    {
+        return (float) std::pow (0.001, 1.0 / juce::jmax (1.0, seconds * sampleRate));
+    }
+
+    double noteToFrequency (int note)
+    {
+        return 440.0 * std::pow (2.0, (note - 69) / 12.0);
+    }
+
+    // 低い音ほど長く鳴る（note==ref で base 秒）
+    double pitchDecaySeconds (int note, double base, int ref, double lo, double hi)
+    {
+        return juce::jlimit (lo, hi, base * std::pow (2.0, -(note - ref) / 24.0));
+    }
+}
+
 void PreviewSynth::prepare (double newSampleRate)
 {
     sampleRate = newSampleRate > 0 ? newSampleRate : 44100.0;
 
+    // ギターの遅延線（最低 25Hz まで）はここで確保し、オーディオスレッドでは確保しない
+    const auto delaySize = (size_t) (sampleRate / 25.0) + 4;
+
     for (auto& v : voices)
+    {
         v.active = false;
+        v.delay.assign (delaySize, 0.0f);
+    }
 }
 
-bool PreviewSynth::queue (const std::vector<int>& notes, double delaySeconds, double durationSeconds)
+bool PreviewSynth::queue (const std::vector<int>& notes, double delaySeconds, double durationSeconds,
+                          Timbre timbre, bool stopOthers)
 {
     if (notes.empty() || durationSeconds <= attackSeconds)
         return false;
@@ -25,42 +54,225 @@ bool PreviewSynth::queue (const std::vector<int>& notes, double delaySeconds, do
         r.notes[(size_t) i] = juce::jlimit (0, 127, notes[(size_t) i]);
     r.delaySeconds    = juce::jmax (0.0, delaySeconds);
     r.durationSeconds = durationSeconds;
+    r.timbre          = timbre;
+    r.stopOthers      = stopOthers;
     return true;
 }
 
-void PreviewSynth::startVoices (const Request& r)
+PreviewSynth::Voice& PreviewSynth::findFreeVoice()
 {
-    const auto length   = (juce::int64) (r.durationSeconds * sampleRate);
-    const auto attack   = attackSeconds * sampleRate;
-    // WebAudio の exponentialRampToValueAtTime と同じく、アタック後に peak → 0.001 へ指数減衰
-    const auto decay    = (float) std::pow (0.001 / peakGain, 1.0 / juce::jmax (1.0, (double) length - attack));
+    // 空きボイスが無ければ一番古いボイスを使う
+    auto* target = &voices[0];
+    for (auto& v : voices)
+    {
+        if (! v.active) return v;
+        if (v.age > target->age) target = &v;
+    }
+    return *target;
+}
+
+void PreviewSynth::handleRequest (const Request& r)
+{
+    if (r.stopOthers)
+    {
+        const auto fade = (juce::int64) (fadeSeconds * sampleRate);
+
+        for (auto& v : voices)
+        {
+            if (! v.active) continue;
+            if (v.startIn > 0)       v.active = false;        // まだ鳴っていない予約は取り消し
+            else if (v.fadeLeft < 0) v.fadeLeft = fade;
+        }
+    }
+
+    const auto startIn = (juce::int64) (r.delaySeconds * sampleRate);
+    const auto length  = (juce::int64) (r.durationSeconds * sampleRate);
 
     for (int n = 0; n < r.numNotes; ++n)
     {
-        // 空きボイスが無ければ一番古いボイスを使う
-        auto* target = &voices[0];
-        for (auto& v : voices)
+        // ギターは低い弦から順に少しずらして鳴らす（ストローク）
+        const auto strum = r.timbre == Timbre::guitar ? (juce::int64) (n * strumSeconds * sampleRate) : 0;
+        startVoice (findFreeVoice(), r.notes[(size_t) n], startIn + strum, juce::jmax<juce::int64> (1, length - strum), r.timbre);
+    }
+}
+
+void PreviewSynth::startVoice (Voice& v, int note, juce::int64 startIn, juce::int64 length, Timbre timbre)
+{
+    // 遅延線のメモリは使い回す（オーディオスレッドで確保・解放しない）
+    auto delay = std::move (v.delay);
+    v = Voice{};
+    v.delay = std::move (delay);
+
+    const auto freq = noteToFrequency (note);
+    v.active  = true;
+    v.timbre  = timbre;
+    v.startIn = startIn;
+    v.length  = length;
+
+    switch (timbre)
+    {
+        case Timbre::triangle:
         {
-            if (! v.active) { target = &v; break; }
-            if (v.age > target->age) target = &v;
+            // WebAudio の exponentialRampToValueAtTime と同じく、アタック後に peak → 0.001 へ指数減衰
+            const auto attack = attackSeconds * sampleRate;
+            v.phaseInc  = freq / sampleRate;
+            v.decayRate = (float) std::pow (0.001 / peakGain, 1.0 / juce::jmax (1.0, (double) length - attack));
+            break;
         }
 
-        const auto freq = 440.0 * std::pow (2.0, (r.notes[(size_t) n] - 69) / 12.0);
-        *target = {};
-        target->active    = true;
-        target->phaseInc  = freq / sampleRate;
-        target->startIn   = (juce::int64) (r.delaySeconds * sampleRate);
-        target->length    = length;
-        target->decayRate = decay;
+        case Timbre::piano:
+        {
+            // わずかに不協和な倍音（弦の硬さ）を重ね、高い倍音ほど早く減衰させる
+            constexpr double inharmonicity = 0.0004;
+            const auto t1 = pitchDecaySeconds (note, 4.0, 36, 0.8, 6.0);
+            float sum = 0;
+
+            for (int k = 0; k < maxPartials; ++k)
+            {
+                const auto n  = k + 1;
+                const auto fn = n * freq * std::sqrt (1.0 + inharmonicity * n * n);
+                if (fn >= 0.45 * sampleRate) break;
+
+                v.pInc[(size_t) k]   = fn / sampleRate;
+                v.pAmp[(size_t) k]   = 1.0f / std::pow ((float) n, 1.2f);
+                v.pDecay[(size_t) k] = decayPerSample (t1 / (1.0 + 0.8 * k), sampleRate);
+                sum += v.pAmp[(size_t) k];
+                v.numPartials = n;
+            }
+
+            for (int k = 0; k < v.numPartials; ++k)
+                v.pAmp[(size_t) k] *= peakGain * 1.4f / sum;
+
+            v.releaseRate = decayPerSample (0.12, sampleRate);
+            break;
+        }
+
+        case Timbre::electricPiano:
+        {
+            // 1:1 の FM。モジュレーションの深さが素早く減って柔らかい音になる
+            v.phaseInc      = freq / sampleRate;
+            v.gain          = peakGain * 1.1f;
+            v.decayRate     = decayPerSample (pitchDecaySeconds (note, 3.0, 48, 1.0, 5.0), sampleRate);
+            v.modIndex      = 2.2f;
+            v.modIndexDecay = (float) std::exp (-1.0 / (0.3 * sampleRate));
+            v.releaseRate   = decayPerSample (0.15, sampleRate);
+            break;
+        }
+
+        case Timbre::guitar:
+        {
+            // Karplus-Strong：ノイズで弾いた遅延線を平均化フィルタで回す
+            const auto size   = (int) v.delay.size();
+            const auto loop   = juce::jlimit (2.0, (double) size - 3, sampleRate / freq - 0.5);  // 平均化で 0.5 サンプル遅れる分を引く
+            v.delayInt  = (int) loop;
+            v.delayFrac = (float) (loop - v.delayInt);
+            v.loss      = (float) std::pow (10.0, -3.0 / (pitchDecaySeconds (note, 3.0, 40, 1.0, 5.0) * freq));
+            v.releaseRate = decayPerSample (0.08, sampleRate);
+
+            std::fill (v.delay.begin(), v.delay.end(), 0.0f);
+            float lp = 0;
+            for (int k = 1; k <= v.delayInt + 2; ++k)
+            {
+                lp = 0.5f * lp + 0.5f * (random.nextFloat() * 2.0f - 1.0f);
+                v.delay[(size_t) (size - k)] = lp * peakGain * 2.0f;
+            }
+            v.writePos = 0;
+            break;
+        }
     }
+}
+
+float PreviewSynth::renderSample (Voice& v)
+{
+    float out = 0;
+    const bool held = v.age < v.length;
+
+    switch (v.timbre)
+    {
+        case Timbre::triangle:
+        {
+            if (! held) { v.active = false; return 0; }
+
+            const auto attack = (juce::int64) (attackSeconds * sampleRate);
+            if (v.age < attack)
+                v.gain = peakGain * (float) v.age / (float) juce::jmax<juce::int64> (1, attack);
+            else
+                v.gain = (v.age == attack ? peakGain : v.gain * v.decayRate);
+
+            out = (float) (4.0 * std::abs (v.phase - 0.5) - 1.0) * v.gain;
+            v.phase += v.phaseInc;
+            if (v.phase >= 1.0) v.phase -= 1.0;
+            break;
+        }
+
+        case Timbre::piano:
+        {
+            for (int k = 0; k < v.numPartials; ++k)
+            {
+                auto& ph = v.pPhase[(size_t) k];
+                out += (float) std::sin (twoPi * ph) * v.pAmp[(size_t) k];
+                v.pAmp[(size_t) k] *= v.pDecay[(size_t) k];
+                ph += v.pInc[(size_t) k];
+                if (ph >= 1.0) ph -= 1.0;
+            }
+
+            const auto attack = 0.003 * sampleRate;
+            if ((double) v.age < attack) out *= (float) ((double) v.age / attack);
+            break;
+        }
+
+        case Timbre::electricPiano:
+        {
+            const auto mod = std::sin (twoPi * v.modPhase) * (v.modIndex + 0.25f);
+            out = (float) std::sin (twoPi * v.phase + mod) * v.gain;
+            v.gain     *= v.decayRate;
+            v.modIndex *= v.modIndexDecay;
+            v.phase    += v.phaseInc;  if (v.phase >= 1.0)    v.phase -= 1.0;
+            v.modPhase += v.phaseInc;  if (v.modPhase >= 1.0) v.modPhase -= 1.0;
+
+            const auto attack = 0.002 * sampleRate;
+            if ((double) v.age < attack) out *= (float) ((double) v.age / attack);
+            break;
+        }
+
+        case Timbre::guitar:
+        {
+            const auto size = (int) v.delay.size();
+            const auto a = v.delay[(size_t) ((v.writePos - v.delayInt + size) % size)];
+            const auto b = v.delay[(size_t) ((v.writePos - v.delayInt - 1 + size) % size)];
+            const auto tap = a + v.delayFrac * (b - a);
+            out = v.loss * 0.5f * (tap + v.prevTap);
+            v.prevTap = tap;
+            v.delay[(size_t) v.writePos] = out;
+            v.writePos = (v.writePos + 1) % size;
+            break;
+        }
+    }
+
+    // 押さえている時間が過ぎたらダンパーで止める（三角波は上で終了済み）
+    if (! held)
+    {
+        v.release *= v.releaseRate;
+        out *= v.release;
+        if (v.release < 0.001f) v.active = false;
+    }
+
+    if (v.fadeLeft >= 0)
+    {
+        out *= (float) v.fadeLeft / (float) juce::jmax (1.0, fadeSeconds * sampleRate);
+        if (--v.fadeLeft < 0) v.active = false;
+    }
+
+    ++v.age;
+    return out;
 }
 
 void PreviewSynth::render (juce::AudioBuffer<float>& buffer)
 {
     {
         const auto scope = fifo.read (fifo.getNumReady());
-        for (int i = 0; i < scope.blockSize1; ++i) startVoices (requests[(size_t) (scope.startIndex1 + i)]);
-        for (int i = 0; i < scope.blockSize2; ++i) startVoices (requests[(size_t) (scope.startIndex2 + i)]);
+        for (int i = 0; i < scope.blockSize1; ++i) handleRequest (requests[(size_t) (scope.startIndex1 + i)]);
+        for (int i = 0; i < scope.blockSize2; ++i) handleRequest (requests[(size_t) (scope.startIndex2 + i)]);
     }
 
     const int numSamples = buffer.getNumSamples();
@@ -70,31 +282,13 @@ void PreviewSynth::render (juce::AudioBuffer<float>& buffer)
         return;
 
     auto* out = buffer.getWritePointer (0);
-    const auto attackSamples = (juce::int64) (attackSeconds * sampleRate);
 
     for (auto& v : voices)
     {
-        if (! v.active)
-            continue;
-
-        for (int s = 0; s < numSamples; ++s)
+        for (int s = 0; s < numSamples && v.active; ++s)
         {
             if (v.startIn > 0) { --v.startIn; continue; }
-
-            if (v.age >= v.length) { v.active = false; break; }
-
-            if (v.age < attackSamples)
-                v.gain = peakGain * (float) v.age / (float) juce::jmax<juce::int64> (1, attackSamples);
-            else
-                v.gain = (v.age == attackSamples ? peakGain : v.gain * v.decayRate);
-
-            // 三角波（-1〜1）
-            const auto tri = (float) (4.0 * std::abs (v.phase - 0.5) - 1.0);
-            out[s] += tri * v.gain;
-
-            v.phase += v.phaseInc;
-            if (v.phase >= 1.0) v.phase -= 1.0;
-            ++v.age;
+            out[s] += renderSample (v);
         }
     }
 

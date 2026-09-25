@@ -1,5 +1,26 @@
 #include "PreviewSynth.h"
 
+namespace
+{
+    using Timbre = PreviewSynth::Timbre;
+    constexpr double sr = 48000.0;
+    constexpr int block = 4800;   // 0.1 秒
+
+    float renderSeconds (PreviewSynth& synth, double seconds, float* peakOut = nullptr)
+    {
+        juce::AudioBuffer<float> buf (2, block);
+        float peak = 0, last = 0;
+        for (int i = 0; i < (int) std::round (seconds * sr / block); ++i)
+        {
+            synth.render (buf);
+            last = buf.getMagnitude (0, block);
+            peak = juce::jmax (peak, last);
+        }
+        if (peakOut != nullptr) *peakOut = peak;
+        return last;
+    }
+}
+
 class PreviewSynthTests : public juce::UnitTest
 {
 public:
@@ -7,38 +28,34 @@ public:
 
     void runTest() override
     {
-        constexpr double sr = 48000.0;
-
         beginTest ("Silent when nothing is queued");
         {
             PreviewSynth synth;
             synth.prepare (sr);
             juce::AudioBuffer<float> buf (2, 512);
-            buf.applyGain (0.0f);
+            buf.clear();
             buf.setSample (0, 0, 1.0f);   // 前の内容は上書きされること
             synth.render (buf);
             expectEquals (buf.getMagnitude (0, 512), 0.0f);
         }
 
-        beginTest ("Chord sounds, stays within range, and ends after its duration");
+        beginTest ("Triangle: sounds, stays within range, and ends after its duration");
         {
             PreviewSynth synth;
             synth.prepare (sr);
             expect (synth.queue ({ 36, 48, 52, 55 }, 0.0, 0.5));
 
-            juce::AudioBuffer<float> buf (2, 4800);   // 0.1 秒
+            juce::AudioBuffer<float> buf (2, block);
             synth.render (buf);
             expectEquals (synth.getNumActiveVoices(), 4);
-            expect (buf.getMagnitude (0, 4800) > 0.05f);
-            expect (buf.getMagnitude (0, 4800) <= 4 * PreviewSynth::peakGain + 1.0e-4f);
+            expect (buf.getMagnitude (0, block) > 0.05f);
+            expect (buf.getMagnitude (0, block) <= 4 * PreviewSynth::peakGain + 1.0e-4f);
 
-            // 左右同じ信号
-            for (int i = 0; i < 4800; i += 97)
-                expectEquals (buf.getSample (1, i), buf.getSample (0, i));
+            for (int i = 0; i < block; i += 97)
+                expectEquals (buf.getSample (1, i), buf.getSample (0, i));   // 左右同じ
 
-            for (int i = 0; i < 5; ++i) synth.render (buf);   // 合計 0.6 秒
+            expectEquals (renderSeconds (synth, 0.5), 0.0f);
             expectEquals (synth.getNumActiveVoices(), 0);
-            expectEquals (buf.getMagnitude (0, 4800), 0.0f);
         }
 
         beginTest ("Delayed chord starts after its delay");
@@ -46,25 +63,56 @@ public:
             PreviewSynth synth;
             synth.prepare (sr);
             expect (synth.queue ({ 60 }, 0.2, 0.5));
-
-            juce::AudioBuffer<float> buf (1, 4800);
-            synth.render (buf);  synth.render (buf);            // 0〜0.2 秒
-            expectEquals (buf.getMagnitude (0, 4800), 0.0f);
-            synth.render (buf);                                  // 0.2〜0.3 秒
-            expect (buf.getMagnitude (0, 4800) > 0.05f);
+            expectEquals (renderSeconds (synth, 0.2), 0.0f);
+            expect (renderSeconds (synth, 0.1) > 0.05f);
         }
 
-        beginTest ("Envelope decays toward 0.001 of peak");
+        beginTest ("Triangle envelope decays toward 0.001 of peak");
         {
             PreviewSynth synth;
             synth.prepare (sr);
             expect (synth.queue ({ 69 }, 0.0, 1.0));
-
-            juce::AudioBuffer<float> buf (1, 2400);   // 50ms ずつ
+            juce::AudioBuffer<float> buf (1, 2400);
             synth.render (buf);
             const auto early = buf.getMagnitude (0, 2400);
             for (int i = 0; i < 18; ++i) synth.render (buf);   // 0.95〜1.0 秒
             expect (buf.getMagnitude (0, 2400) < early * 0.05f);
+        }
+
+        for (auto [timbre, name] : { std::pair { Timbre::piano, "piano" },
+                                     std::pair { Timbre::electricPiano, "electric piano" },
+                                     std::pair { Timbre::guitar, "guitar" } })
+        {
+            beginTest (juce::String ("Timbre ") + name + ": audible, bounded, released after duration");
+            PreviewSynth synth;
+            synth.prepare (sr);
+            expect (synth.queue ({ 36, 48, 52, 55 }, 0.0, 0.9, timbre));
+
+            float peak = 0;
+            const auto last = renderSeconds (synth, 0.8, &peak);
+            logMessage (juce::String ("  peak level: ") + juce::String (peak, 3));
+            expect (peak > 0.03f, "too quiet: " + juce::String (peak));
+            expect (peak < 1.0f, "too loud: " + juce::String (peak));
+            expect (last > 0.0f);
+
+            renderSeconds (synth, 0.5);   // 0.9 秒で離してリリース
+            expectEquals (synth.getNumActiveVoices(), 0);
+        }
+
+        beginTest ("stopOthers fades out playing voices and cancels pending ones");
+        {
+            PreviewSynth synth;
+            synth.prepare (sr);
+            // 進行の試聴：1つ目は今、2つ目は 0.9 秒後
+            expect (synth.queue ({ 36, 48, 52, 55 }, 0.0, 0.9, Timbre::piano, true));
+            expect (synth.queue ({ 43, 55, 59, 62 }, 0.9, 0.9, Timbre::piano));
+            renderSeconds (synth, 0.3);
+            expectEquals (synth.getNumActiveVoices(), 8);
+
+            // 別の進行を試聴：前の音は 10ms でフェードし、予約も消える
+            expect (synth.queue ({ 38 }, 0.0, 0.9, Timbre::piano, true));
+            renderSeconds (synth, 0.1);
+            expectEquals (synth.getNumActiveVoices(), 1);
         }
 
         beginTest ("Rejects empty requests");

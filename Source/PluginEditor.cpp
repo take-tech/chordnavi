@@ -199,9 +199,17 @@ void GodokenEditor::playChords (const juce::Array<juce::var>& args,
     const auto interval = juce::jlimit (0.05, 10.0, (double) request.getProperty ("interval", 0.9));
     const auto duration = juce::jlimit (0.05, 10.0, (double) request.getProperty ("duration", 1.1));
 
+    const auto name   = request["timbre"].toString();
+    const auto timbre = name == "piano"         ? PreviewSynth::Timbre::piano
+                      : name == "electricPiano" ? PreviewSynth::Timbre::electricPiano
+                      : name == "guitar"        ? PreviewSynth::Timbre::guitar
+                                                : PreviewSynth::Timbre::triangle;
+
+    // 新しい試聴を始めるときは、鳴っている音・予約中の音を止める（先頭のコードで一度だけ）
     int queued = 0;
     for (size_t i = 0; i < chords.size(); ++i)
-        queued += processorRef.getPreviewSynth().queue (MidiExport::voicing (chords[i]), (double) i * interval, duration) ? 1 : 0;
+        queued += processorRef.getPreviewSynth().queue (MidiExport::voicing (chords[i]), (double) i * interval,
+                                                        duration, timbre, i == 0) ? 1 : 0;
 
     completion (juce::var (queued));
 }

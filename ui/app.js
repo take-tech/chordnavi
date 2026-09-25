@@ -6,11 +6,13 @@ import {
 } from './theory.js';
 import {renderStaff} from './staff.js';
 import {attachMidiDrag,saveMidi} from './midi.js';
-import {playChord,playProgression} from './audio.js';
+import {playChord as play1,playProgression as playN,TIMBRES} from './audio.js';
 
 /* ---------- 状態 ---------- */
-const state={idx:0,mode:'major',scale:'major',label:'name',view:'kb',dia:'7',sel:null,prog:{major:0,minor:0},vari:{major:0,minor:0}};
+const state={idx:0,mode:'major',scale:'major',label:'name',view:'kb',dia:'7',sel:null,prog:{major:0,minor:0},vari:{major:0,minor:0},timbre:'triangle'};
 const tonic=()=>tonicOf(state.idx,state.mode);
+const playChord=ch=>play1(ch,state.timbre);
+const playProgression=chords=>playN(chords,state.timbre);
 const useFlat=()=>isFlatKey(state.idx);
 const nn=pc=>noteName(pc,useFlat());
 const scaleObj=()=>scaleById(state.scale);
@@ -105,6 +107,9 @@ bindSeg('diaSeg','dia',()=>{
   render();
 });
 document.getElementById('selClear').addEventListener('click',()=>{state.sel=null;render();});
+const timbreSel=document.getElementById('timbre');
+for(const t of TIMBRES){const o=document.createElement('option');o.value=t.id;o.textContent=t.name;timbreSel.appendChild(o);}
+timbreSel.addEventListener('change',()=>{state.timbre=timbreSel.value;});
 
 function setKey(i,m){
   if(m!==state.mode){state.scale=m==='major'?'major':'nminor';}
@@ -234,10 +239,7 @@ function renderProgs(){
   document.getElementById('progDeg').textContent=v.c.length>8?`${v.c.length}小節`:v.c.map(([o,q,bo])=>chordDeg(o,q,bo)).join(' – ');
   progChords=chords;progTitle=title;
   const box=document.getElementById('chips');box.innerHTML='';
-  // 9コード以上（12小節ブルース等）は派生形の行ぶんの高さを空けるため1行に並べる
-  const dense=chords.length>8;
-  box.classList.toggle('dense',dense);
-  box.style.gridTemplateColumns=`repeat(${dense?chords.length:Math.max(4,chords.length)},1fr)`;
+  box.style.gridTemplateColumns=`repeat(${Math.min(8,Math.max(4,chords.length<=8?chords.length:6))},1fr)`;
   chords.forEach(ch=>box.appendChild(makeChip(ch)));
 }
 function makeChip(ch){
