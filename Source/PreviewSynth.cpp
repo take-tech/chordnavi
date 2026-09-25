@@ -22,6 +22,21 @@ namespace
     {
         return juce::jlimit (lo, hi, base * std::pow (2.0, -(note - ref) / 24.0));
     }
+
+    // 帯域制限したノコギリ波（PolyBLEP）
+    float polyBlepSaw (double t, double dt)
+    {
+        auto v = 2.0 * t - 1.0;
+        if (t < dt)            { const auto x = t / dt;         v -= x + x - x * x - 1.0; }
+        else if (t > 1.0 - dt) { const auto x = (t - 1.0) / dt; v -= x * x + x + x + 1.0; }
+        return (float) v;
+    }
+
+    void advance (double& phase, double inc)
+    {
+        phase += inc;
+        if (phase >= 1.0) phase -= 1.0;
+    }
 }
 
 void PreviewSynth::prepare (double newSampleRate)
@@ -159,6 +174,44 @@ void PreviewSynth::startVoice (Voice& v, int note, juce::int64 startIn, juce::in
             break;
         }
 
+        case Timbre::organ:
+        {
+            // ドローバー風に倍音を重ねる（16' 8' 4' 2 2/3' 2'）。押さえている間は減衰しない
+            constexpr std::array<std::pair<double, float>, 5> drawbars {{ { 0.5, 0.6f }, { 1.0, 1.0f }, { 2.0, 0.6f }, { 3.0, 0.4f }, { 4.0, 0.3f } }};
+            float sum = 0;
+
+            for (const auto& [ratio, amp] : drawbars)
+            {
+                if (ratio * freq >= 0.45 * sampleRate) break;
+                const auto k = (size_t) v.numPartials++;
+                v.pInc[k]   = ratio * freq / sampleRate;
+                v.pAmp[k]   = amp;
+                v.pDecay[k] = 1.0f;
+                sum += amp;
+            }
+
+            for (int k = 0; k < v.numPartials; ++k)
+                v.pAmp[(size_t) k] *= peakGain * 1.2f / sum;
+
+            v.attackSamples = (juce::int64) (0.005 * sampleRate);
+            v.releaseRate   = decayPerSample (0.06, sampleRate);
+            break;
+        }
+
+        case Timbre::pad:
+        {
+            // わずかにずらした2本のノコギリ波をローパスで丸め、ゆっくり立ち上げる
+            constexpr double detuneCents = 6.0;
+            v.phaseInc  = freq * std::pow (2.0,  detuneCents / 1200.0) / sampleRate;
+            v.phaseInc2 = freq * std::pow (2.0, -detuneCents / 1200.0) / sampleRate;
+            v.phase2    = 0.37;
+            v.lpCoeff   = (float) (1.0 - std::exp (-twoPi * 1800.0 / sampleRate));
+            v.gain      = peakGain * 0.95f;
+            v.attackSamples = (juce::int64) (0.15 * sampleRate);
+            v.releaseRate   = decayPerSample (0.3, sampleRate);
+            break;
+        }
+
         case Timbre::guitar:
         {
             // Karplus-Strong：ノイズで弾いた遅延線を平均化フィルタで回す
@@ -206,6 +259,7 @@ float PreviewSynth::renderSample (Voice& v)
         }
 
         case Timbre::piano:
+        case Timbre::organ:
         {
             for (int k = 0; k < v.numPartials; ++k)
             {
@@ -216,8 +270,20 @@ float PreviewSynth::renderSample (Voice& v)
                 if (ph >= 1.0) ph -= 1.0;
             }
 
-            const auto attack = 0.003 * sampleRate;
+            const auto attack = v.timbre == Timbre::organ ? (double) v.attackSamples : 0.003 * sampleRate;
             if ((double) v.age < attack) out *= (float) ((double) v.age / attack);
+            break;
+        }
+
+        case Timbre::pad:
+        {
+            const auto saw = 0.5f * (polyBlepSaw (v.phase, v.phaseInc) + polyBlepSaw (v.phase2, v.phaseInc2));
+            v.lpState += v.lpCoeff * (saw - v.lpState);
+            out = v.lpState * v.gain;
+            advance (v.phase, v.phaseInc);
+            advance (v.phase2, v.phaseInc2);
+
+            if (v.age < v.attackSamples) out *= (float) v.age / (float) v.attackSamples;
             break;
         }
 

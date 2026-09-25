@@ -5,11 +5,11 @@
 #include <vector>
 
 // 試聴用の簡易シンセ。三角波はプロトタイプの playChord() と同じ音色・エンベロープ。
-// queue()／stopAll() はメッセージスレッド、render() はオーディオスレッドから呼ぶ（ロックフリーの単一生産者・単一消費者）
+// queue() はメッセージスレッド、render() はオーディオスレッドから呼ぶ（ロックフリーの単一生産者・単一消費者）
 class PreviewSynth
 {
 public:
-    enum class Timbre { triangle, piano, electricPiano, guitar };
+    enum class Timbre { triangle, piano, electricPiano, guitar, organ, pad };
 
     static constexpr int maxNotesPerChord = 8;
     static constexpr int maxVoices        = 64;
@@ -58,9 +58,13 @@ private:
         double modPhase = 0;                          // エレピのモジュレータ
         float modIndex = 0, modIndexDecay = 1.0f;
 
-        std::array<double, maxPartials> pPhase {}, pInc {};   // ピアノの倍音
+        std::array<double, maxPartials> pPhase {}, pInc {};   // ピアノ・オルガンの倍音
         std::array<float, maxPartials> pAmp {}, pDecay {};
         int numPartials = 0;
+        juce::int64 attackSamples = 0;
+
+        double phase2 = 0, phaseInc2 = 0;             // パッドの2本目（デチューン）
+        float lpState = 0, lpCoeff = 1.0f;
 
         std::vector<float> delay;     // ギター（Karplus-Strong）の遅延線。prepare() で確保
         int writePos = 0, delayInt = 0;

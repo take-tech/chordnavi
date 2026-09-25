@@ -203,6 +203,8 @@ void GodokenEditor::playChords (const juce::Array<juce::var>& args,
     const auto timbre = name == "piano"         ? PreviewSynth::Timbre::piano
                       : name == "electricPiano" ? PreviewSynth::Timbre::electricPiano
                       : name == "guitar"        ? PreviewSynth::Timbre::guitar
+                      : name == "organ"         ? PreviewSynth::Timbre::organ
+                      : name == "pad"           ? PreviewSynth::Timbre::pad
                                                 : PreviewSynth::Timbre::triangle;
 
     // 新しい試聴を始めるときは、鳴っている音・予約中の音を止める（先頭のコードで一度だけ）

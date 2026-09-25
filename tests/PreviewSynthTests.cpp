@@ -81,7 +81,9 @@ public:
 
         for (auto [timbre, name] : { std::pair { Timbre::piano, "piano" },
                                      std::pair { Timbre::electricPiano, "electric piano" },
-                                     std::pair { Timbre::guitar, "guitar" } })
+                                     std::pair { Timbre::guitar, "guitar" },
+                                     std::pair { Timbre::organ, "organ" },
+                                     std::pair { Timbre::pad, "pad" } })
         {
             beginTest (juce::String ("Timbre ") + name + ": audible, bounded, released after duration");
             PreviewSynth synth;
@@ -97,6 +99,17 @@ public:
 
             renderSeconds (synth, 0.5);   // 0.9 秒で離してリリース
             expectEquals (synth.getNumActiveVoices(), 0);
+        }
+
+        for (auto [timbre, name] : { std::pair { Timbre::organ, "organ" }, std::pair { Timbre::pad, "pad" } })
+        {
+            beginTest (juce::String ("Timbre ") + name + ": sustains without decay while held");
+            PreviewSynth synth;
+            synth.prepare (sr);
+            expect (synth.queue ({ 48, 52, 55 }, 0.0, 2.0, timbre));
+            const auto early = renderSeconds (synth, 0.3);
+            const auto late  = renderSeconds (synth, 1.5);   // 1.7〜1.8 秒
+            expectWithinAbsoluteError (late, early, early * 0.25f);
         }
 
         beginTest ("stopOthers fades out playing voices and cancels pending ones");

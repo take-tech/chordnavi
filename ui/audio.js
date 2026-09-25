@@ -12,7 +12,9 @@ export const TIMBRES=[
   {id:'triangle',name:'シンプル（三角波）'},
   {id:'piano',name:'ピアノ'},
   {id:'electricPiano',name:'エレピ'},
-  {id:'guitar',name:'ギター'}
+  {id:'guitar',name:'ギター'},
+  {id:'organ',name:'オルガン（減衰なし）'},
+  {id:'pad',name:'パッド（減衰なし）'}
 ];
 
 // 呼ぶたびにそれまでの試聴は止まる（C++ 側）
