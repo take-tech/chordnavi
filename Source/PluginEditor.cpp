@@ -54,10 +54,20 @@ namespace
         return chords;
     }
 
+    PreviewSynth::Timbre timbreFromName (const juce::String& name)
+    {
+        return name == "piano"         ? PreviewSynth::Timbre::piano
+             : name == "electricPiano" ? PreviewSynth::Timbre::electricPiano
+             : name == "guitar"        ? PreviewSynth::Timbre::guitar
+             : name == "organ"         ? PreviewSynth::Timbre::organ
+             : name == "pad"           ? PreviewSynth::Timbre::pad
+                                       : PreviewSynth::Timbre::triangle;
+    }
+
     struct MidiRequest
     {
         std::vector<MidiExport::Chord> chords;
-        int bpm = 120;
+        double bpm = 120.0;
         juce::String name;
     };
 
@@ -67,7 +77,7 @@ namespace
         MidiRequest r;
         r.chords = parseChords (request["chords"]);
         if (request.hasProperty ("bpm"))
-            r.bpm = (int) request["bpm"];
+            r.bpm = (double) request["bpm"];
         r.name = request["name"].toString();
         return r;
     }
@@ -95,6 +105,14 @@ GodokenEditor::GodokenEditor (GodokenProcessor& p)
                    .withNativeFunction ("stopPreview", [this] (const auto&, auto completion)
                                         {
                                             completion (juce::var (processorRef.getPreviewSynth().stopAll()));
+                                        })
+                   .withNativeFunction ("playNotes", [this] (const auto& args, auto completion)
+                                        {
+                                            playNotes (args, std::move (completion));
+                                        })
+                   .withNativeFunction ("getHostInfo", [this] (const auto&, auto completion)
+                                        {
+                                            completion (hostInfo());
                                         }))
 {
     addAndMakeVisible (webView);
@@ -106,6 +124,27 @@ GodokenEditor::GodokenEditor (GodokenProcessor& p)
     setSize (baseWidth, baseHeight);
 
     webView.goToURL (juce::WebBrowserComponent::getResourceProviderRoot());
+
+    if (! processorRef.isStandalone())
+        startTimerHz (5);
+}
+
+juce::var GodokenEditor::hostInfo() const
+{
+    auto* obj = new juce::DynamicObject();
+    obj->setProperty ("standalone", processorRef.isStandalone());
+    obj->setProperty ("bpm", processorRef.getHostBpm());
+    return juce::var (obj);
+}
+
+void GodokenEditor::timerCallback()
+{
+    const auto bpm = processorRef.getHostBpm();
+    if (! juce::exactlyEqual (bpm, lastSentBpm))
+    {
+        lastSentBpm = bpm;
+        webView.emitEventIfBrowserIsVisible ("hostTempo", hostInfo());
+    }
 }
 
 void GodokenEditor::resized()
@@ -205,13 +244,7 @@ void GodokenEditor::playChords (const juce::Array<juce::var>& args,
     const auto list    = request["chords"];
     const auto chords  = parseChords (list);
 
-    const auto name   = request["timbre"].toString();
-    const auto timbre = name == "piano"         ? PreviewSynth::Timbre::piano
-                      : name == "electricPiano" ? PreviewSynth::Timbre::electricPiano
-                      : name == "guitar"        ? PreviewSynth::Timbre::guitar
-                      : name == "organ"         ? PreviewSynth::Timbre::organ
-                      : name == "pad"           ? PreviewSynth::Timbre::pad
-                                                : PreviewSynth::Timbre::triangle;
+    const auto timbre = timbreFromName (request["timbre"].toString());
 
     // 各コードの開始時刻 start・長さ dur（秒）は JS 側でテンポと拍数から計算済み。
     // 新しい試聴を始めるときは、鳴っている音・予約中の音を止める（先頭のコードで一度だけ）
@@ -225,4 +258,18 @@ void GodokenEditor::playChords (const juce::Array<juce::var>& args,
     }
 
     completion (juce::var (queued));
+}
+
+void GodokenEditor::playNotes (const juce::Array<juce::var>& args,
+                               juce::WebBrowserComponent::NativeFunctionCompletion completion)
+{
+    const auto request = args.isEmpty() ? juce::var() : args[0];
+    std::vector<int> notes;
+
+    if (auto* arr = request["notes"].getArray())
+        for (const auto& n : *arr)
+            notes.push_back (juce::jlimit (0, 127, (int) n));
+
+    const auto dur = juce::jlimit (0.05, 10.0, (double) request.getProperty ("dur", 1.0));
+    completion (juce::var (processorRef.getPreviewSynth().queue (notes, 0.0, dur, timbreFromName (request["timbre"].toString()))));
 }

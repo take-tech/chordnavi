@@ -28,6 +28,14 @@ function play(events,timbre){
   events.forEach(({ch,start,dur})=>webAudioChord(ch,start,dur));
 }
 
+// 鍵盤・指板のクリック：1音だけ鳴らす（他の試聴は止めない）
+const nativeNotes=juce?juce.getNativeFunction('playNotes'):null;
+const NOTE_DUR=1.0;
+export function playNote(midi,timbre){
+  if(nativeNotes){nativeNotes({notes:[midi],dur:NOTE_DUR,timbre}).catch(err=>console.error(err));return;}
+  webAudioNotes([midi],0,NOTE_DUR);
+}
+
 // 試聴中の音と予約をすべて止める
 const nativeStop=juce?juce.getNativeFunction('stopPreview'):null;
 export function stopPreview(){
@@ -44,10 +52,11 @@ export function playProgression(chords,timbre,bpm){
 }
 
 let ac=null;
-function webAudioChord(ch,when,dur){
+function webAudioChord(ch,when,dur){webAudioNotes(voicing(ch),when,dur);}
+function webAudioNotes(notes,when,dur){
   ac=ac||new (window.AudioContext||window.webkitAudioContext)();
   const t=ac.currentTime+when;
-  for(const n of voicing(ch)){
+  for(const n of notes){
     const o=ac.createOscillator(),g=ac.createGain();
     o.type='triangle';o.frequency.value=440*Math.pow(2,(n-69)/12);
     g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.12,t+.02);g.gain.exponentialRampToValueAtTime(.001,t+dur);

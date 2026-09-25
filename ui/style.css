@@ -74,6 +74,16 @@ svg text{font-family:inherit}
 .hint{font-size:11px;color:var(--muted);margin:auto 0 0;padding-top:6px}
 .bpm{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
 .bpm select{width:auto;padding:3px 6px;font-size:12px}
+.bpm input:disabled{background:var(--panel);color:var(--muted)}
+.sync{font:inherit;font-size:11px;border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:4px;padding:3px 8px;cursor:pointer}
+.sync[aria-pressed=true]{background:var(--ink);border-color:var(--ink);color:#fff}
+.sync[hidden]{display:none}
+/* 鍵盤・指板：押すと鳴る */
+#kb circle,#kb text,#fb circle,#fb text{pointer-events:none}
+#kb [data-note]{cursor:pointer}
+#kb [data-note]:active{filter:brightness(.85)}
+#fb .hit{fill:transparent;cursor:pointer}
+#fb .hit:active{fill:rgba(30,39,66,.15)}
 /* WebView 内：テキスト選択と WebKit 標準のドラッグを無効化（MIDIドラッグはネイティブで行う） */
 body{-webkit-user-select:none;user-select:none}
 input,select{-webkit-user-select:auto;user-select:auto}

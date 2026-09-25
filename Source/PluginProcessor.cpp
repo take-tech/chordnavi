@@ -20,6 +20,12 @@ bool GodokenProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
 void GodokenProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
 {
     juce::ScopedNoDenormals noDenormals;
+
+    if (auto* playHead = getPlayHead())
+        if (const auto position = playHead->getPosition())
+            if (const auto bpm = position->getBpm())
+                hostBpm.store (*bpm);
+
     previewSynth.render (buffer);
 }
 

@@ -16,7 +16,8 @@ public:
 };
 
 class GodokenEditor : public juce::AudioProcessorEditor,
-                      public juce::DragAndDropContainer
+                      public juce::DragAndDropContainer,
+                      private juce::Timer
 {
 public:
     static constexpr int baseWidth  = 1280;
@@ -42,6 +43,15 @@ private:
     // 呼ぶたびにそれまでの試聴は止める
     void playChords (const juce::Array<juce::var>& args,
                      juce::WebBrowserComponent::NativeFunctionCompletion completion);
+
+    // JS: playNotes({ notes: [midi...], dur, timbre }) — 鍵盤・指板のクリック。他の試聴は止めない
+    void playNotes (const juce::Array<juce::var>& args,
+                    juce::WebBrowserComponent::NativeFunctionCompletion completion);
+
+    // DAW のテンポが変わったら JS へ "hostTempo" イベントで通知する
+    void timerCallback() override;
+    juce::var hostInfo() const;
+    double lastSentBpm = -1.0;
 
     GodokenProcessor& processorRef;
     std::unique_ptr<juce::FileChooser> fileChooser;

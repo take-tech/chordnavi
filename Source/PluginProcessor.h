@@ -36,7 +36,13 @@ public:
     // 試聴（メッセージスレッドから呼ぶ）
     PreviewSynth& getPreviewSynth() { return previewSynth; }
 
+    // DAW のテンポ（取得できていなければ 0）。Standalone では常に 0
+    double getHostBpm() const { return hostBpm.load(); }
+    bool isStandalone() const { return wrapperType == wrapperType_Standalone; }
+
 private:
+    std::atomic<double> hostBpm { 0.0 };
+
     PreviewSynth previewSynth;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (GodokenProcessor)

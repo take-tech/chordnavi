@@ -7,10 +7,11 @@ import {
 } from './theory.js';
 import {renderStaff} from './staff.js';
 import {attachMidiDrag,saveMidi} from './midi.js';
-import {playChord as play1,playProgression as playN,stopPreview,TIMBRES} from './audio.js';
+import {playChord as play1,playProgression as playN,playNote,stopPreview,TIMBRES} from './audio.js';
+import {getHostInfo,onHostTempo} from './host.js';
 
 /* ---------- 状態 ---------- */
-const state={idx:0,mode:'major',scale:'major',label:'name',view:'kb',dia:'7',sel:null,prog:{major:0,minor:0},vari:{major:0,minor:0},timbre:'organ',loop:false};
+const state={idx:0,mode:'major',scale:'major',label:'name',view:'kb',dia:'7',sel:null,prog:{major:0,minor:0},vari:{major:0,minor:0},timbre:'organ',loop:false,syncTempo:false};
 const tonic=()=>tonicOf(state.idx,state.mode);
 const playChord=ch=>{stopPlayback(false);play1(ch,state.timbre);};
 
@@ -46,9 +47,29 @@ const nn=pc=>noteName(pc,useFlat());
 const scaleObj=()=>scaleById(state.scale);
 const keyName=()=>keyNameOf(state.idx,state.mode);
 const chordName=ch=>chordNameOf(ch,useFlat());
-const bpm=()=>Math.min(240,Math.max(40,Math.round(+document.getElementById('bpm').value)||120));
+/* ---------- テンポ（DAW 同期） ---------- */
+// DAW 上では既定で DAW のテンポに合わせる。Standalone・ブラウザでは同期ボタン自体を出さない
+let hostBpm=0;
+const inputBpm=()=>Math.min(240,Math.max(40,Math.round(+document.getElementById('bpm').value)||120));
+const syncing=()=>state.syncTempo&&hostBpm>0;
+const bpm=()=>syncing()?Math.min(300,Math.max(20,hostBpm)):inputBpm();
+const host=await getHostInfo();
+if(!host.standalone){
+  hostBpm=host.bpm||0;
+  state.syncTempo=true;
+  document.getElementById('bpmSync').hidden=false;
+  onHostTempo(info=>{hostBpm=info.bpm||0;renderTempo();});
+}
+document.getElementById('bpmSync').onclick=()=>{state.syncTempo=!state.syncTempo;renderTempo();};
+function renderTempo(){
+  const input=document.getElementById('bpm'), btn=document.getElementById('bpmSync');
+  btn.setAttribute('aria-pressed',!!state.syncTempo);
+  btn.title=state.syncTempo&&!hostBpm?'DAWのテンポをまだ取得できていません（DAWで再生すると取得されます）':'DAWのテンポに合わせる';
+  input.disabled=syncing();
+  if(syncing())input.value=Math.round(hostBpm*10)/10;
+}
 // 範囲外・空欄の入力は確定時に 40〜240 に丸めて表示し直す
-document.getElementById('bpm').addEventListener('change',e=>{e.target.value=bpm();});
+document.getElementById('bpm').addEventListener('change',e=>{e.target.value=inputBpm();});
 
 const NS='http://www.w3.org/2000/svg';
 function el(tag,attrs={},parent){const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);if(parent)parent.appendChild(e);return e;}
@@ -176,17 +197,17 @@ function renderKeyboard(){
   const W=40,H=118,BW=24,BH=74,octs=3,whites=octs*7+1;
   svg.setAttribute('viewBox',`0 0 ${whites*W+2} ${H+2}`);
 
-  const WPC=[0,2,4,5,7,9,11], BLK={1:0,3:1,6:3,8:4,10:5};
+  const WPC=[0,2,4,5,7,9,11], BLK={1:0,3:1,6:3,8:4,10:5}, BASE=48;   // 左端 C3
   const g=el('g',{transform:'translate(1,1)'},svg);
   for(let w=0;w<whites;w++){
     const pc=WPC[w%7], n=noteInfo(pc), ds=dotStyle(n);
-    el('rect',{x:w*W,y:0,width:W,height:H,fill:n.inChord?'#F6D6DF':'#fff',stroke:'#1E2742','stroke-width':1,rx:3},g);
+    el('rect',{x:w*W,y:0,width:W,height:H,fill:n.inChord?'#F6D6DF':'#fff',stroke:'#1E2742','stroke-width':1,rx:3,'data-note':BASE+Math.floor(w/7)*12+pc},g);
     if(ds){el('circle',{cx:w*W+W/2,cy:H-19,r:13,fill:ds.fill,opacity:ds.op},g);
       txt(g,w*W+W/2,H-19,n.label,{fill:'#fff','font-size':n.label.length>2?10:12,'font-weight':700,opacity:ds.op===1?1:.6});}
   }
   for(let o=0;o<octs;o++)for(const pc in BLK){
     const x=(o*7+BLK[pc]+1)*W-BW/2, n=noteInfo(+pc), ds=dotStyle(n);
-    el('rect',{x,y:0,width:BW,height:BH,fill:n.inChord?'#8E2346':'#1E2742',rx:2},g);
+    el('rect',{x,y:0,width:BW,height:BH,fill:n.inChord?'#8E2346':'#1E2742',rx:2,'data-note':BASE+o*12+(+pc)},g);
     if(ds){el('circle',{cx:x+BW/2,cy:BH-14,r:10.5,fill:ds.fill,opacity:ds.op,stroke:'#fff','stroke-width':1.5},g);
       txt(g,x+BW/2,BH-14,n.label,{fill:'#fff','font-size':9,'font-weight':700,opacity:ds.op===1?1:.6});}
   }
@@ -249,7 +270,22 @@ function renderFretboard(){
       txt(svg,x,y,n.label,{fill:'#fff','font-size':n.label.length>2?9:11,'font-weight':700,opacity:ds.op===1?1:.6});
     }
   });
+  // クリック判定用の透明な枠（弦×フレット）。上が1弦＝E4
+  const OPEN=[64,59,55,50,45,40];
+  OPEN.forEach((open,s)=>{
+    for(let f=0;f<=FR;f++){
+      const x0=f===0?L-32:L+(f-1)*FW, w=f===0?32:FW;
+      el('rect',{class:'hit',x:x0,y:T+s*SS-SS/2,width:w,height:SS,'data-note':open+f},svg);
+    }
+  });
 }
+
+// 鍵盤・指板を押したらその音を鳴らす
+for(const id of ['kb','fb'])
+  document.getElementById(id).addEventListener('pointerdown',e=>{
+    const note=e.target.dataset&&e.target.dataset.note;
+    if(note!=null){e.preventDefault();playNote(+note,state.timbre);}
+  });
 
 /* ---------- コード進行 ---------- */
 let progChords=[],progTitle='';
@@ -329,6 +365,7 @@ function render(){
   if(shown){si.classList.add('on');document.getElementById('selName').textContent=`${chordName(shown)}（${chordDeg(shown.off,shown.q,shown.boff)}）`;}
   else si.classList.remove('on');
   document.getElementById('progPlay').textContent=playback?'停止':'試聴';
+  renderTempo();
   document.getElementById('progLoop').setAttribute('aria-pressed',state.loop);
   renderKeyPanel();renderFretboard();renderProgs();renderDiatonic();
 }

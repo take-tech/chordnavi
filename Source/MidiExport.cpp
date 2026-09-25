@@ -45,7 +45,7 @@ std::vector<int> voicing (const Chord& chord)
     return notes;
 }
 
-juce::MemoryBlock buildMidi (const std::vector<Chord>& chords, int bpm)
+juce::MemoryBlock buildMidi (const std::vector<Chord>& chords, double bpm)
 {
     bpm = juce::jlimit (minBpm, maxBpm, bpm);
     const auto usPerQuarter = (juce::uint32) juce::roundToInt (60000000.0 / bpm);
@@ -119,7 +119,7 @@ juce::String safeFileName (const juce::String& name)
     return out.isEmpty() ? juce::String ("chord") : out;
 }
 
-juce::File writeTempFile (const std::vector<Chord>& chords, int bpm, const juce::String& name)
+juce::File writeTempFile (const std::vector<Chord>& chords, double bpm, const juce::String& name)
 {
     auto dir = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("GodokenNavigator");
 

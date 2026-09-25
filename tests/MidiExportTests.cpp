@@ -40,8 +40,11 @@ public:
             const std::vector<juce::uint8> expected { 0,0xFF,0x51,3,0x07,0xA1,0x20, 0,0xFF,0x58,4,4,2,24,8 };
             expect (std::equal (expected.begin(), expected.end(), b.begin() + 22));
 
-            const auto b40 = toBytes (MidiExport::buildMidi ({ cMajor }, 10));  // 40 にクランプ → 1500000us
-            expectEquals ((int) b40[26], 0x16); expectEquals ((int) b40[27], 0xE3); expectEquals ((int) b40[28], 0x60);
+            const auto b20 = toBytes (MidiExport::buildMidi ({ cMajor }, 10));  // 20 にクランプ → 3000000us = 0x2DC6C0
+            expectEquals ((int) b20[26], 0x2D); expectEquals ((int) b20[27], 0xC6); expectEquals ((int) b20[28], 0xC0);
+
+            const auto b128 = toBytes (MidiExport::buildMidi ({ cMajor }, 128.5));  // DAW の小数テンポ → 466926us = 0x071FEE
+            expectEquals ((int) b128[26], 0x07); expectEquals ((int) b128[27], 0x1F); expectEquals ((int) b128[28], 0xEE);
         }
 
         beginTest ("End of track");
