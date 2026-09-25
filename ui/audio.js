@@ -5,7 +5,7 @@ import {CHORD,voicing} from './theory.js';
 const juce=window.__JUCE__?await import('./juce/index.js'):null;
 const nativePlay=juce?juce.getNativeFunction('playChords'):null;
 
-const SINGLE_DUR=1.1, BEATS_PER_CHORD=4;   // 進行の試聴は MIDI と同じく 1コード＝1小節（4/4）
+const SINGLE_DUR=1.1;
 
 // 試聴の音色（MIDI 出力には影響しない）。id は C++ 側 PreviewSynth::Timbre に対応
 export const TIMBRES=[
@@ -17,21 +17,23 @@ export const TIMBRES=[
   {id:'pad',name:'パッド（減衰なし）'}
 ];
 
-// 呼ぶたびにそれまでの試聴は止まる（C++ 側）
-function play(chords,interval,duration,timbre){
+// events: [{ch, start, dur}]（秒）。呼ぶたびにそれまでの試聴は止まる（C++ 側）
+function play(events,timbre){
   if(nativePlay){
-    nativePlay({interval,duration,timbre,
-      chords:chords.map(ch=>({root:ch.root,iv:CHORD[ch.q].iv,...(ch.bass!=null?{bass:ch.bass}:{})}))})
+    nativePlay({timbre,chords:events.map(({ch,start,dur})=>
+      ({root:ch.root,iv:CHORD[ch.q].iv,start,dur,...(ch.bass!=null?{bass:ch.bass}:{})}))})
       .catch(err=>console.error(err));
     return;
   }
-  chords.forEach((ch,i)=>webAudioChord(ch,i*interval,duration));
+  events.forEach(({ch,start,dur})=>webAudioChord(ch,start,dur));
 }
 
-export function playChord(ch,timbre){play([ch],SINGLE_DUR,SINGLE_DUR,timbre);}
+export function playChord(ch,timbre){play([{ch,start:0,dur:SINGLE_DUR}],timbre);}
+
+// 進行は MIDI と同じ長さ：各コードの拍数 × テンポ
 export function playProgression(chords,timbre,bpm){
-  const bar=BEATS_PER_CHORD*60/bpm;
-  play(chords,bar,bar,timbre);
+  const beat=60/bpm;let t=0;
+  play(chords.map(ch=>{const dur=(ch.beats??4)*beat, e={ch,start:t,dur};t+=dur;return e;}),timbre);
 }
 
 let ac=null;

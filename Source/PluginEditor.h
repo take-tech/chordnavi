@@ -38,7 +38,7 @@ private:
     void saveMidi (const juce::Array<juce::var>& args,
                    juce::WebBrowserComponent::NativeFunctionCompletion completion);
 
-    // JS: playChords({ chords, interval, duration, timbre }) — interval 秒ごとに各コードを duration 秒鳴らす。
+    // JS: playChords({ chords: [{ root, iv, bass?, start, dur }], timbre }) — 各コードを start 秒後に dur 秒鳴らす。
     // 呼ぶたびにそれまでの試聴は止める
     void playChords (const juce::Array<juce::var>& args,
                      juce::WebBrowserComponent::NativeFunctionCompletion completion);

@@ -7,7 +7,7 @@
 namespace MidiExport
 {
     constexpr int ppq      = 480;
-    constexpr int barTicks = ppq * 4;   // 4/4 で 1コード＝1小節
+    constexpr int barTicks = ppq * 4;   // 4/4。既定は 1コード＝1小節
     constexpr int velocity = 90;
     constexpr int minBpm   = 40;
     constexpr int maxBpm   = 240;
@@ -17,6 +17,7 @@ namespace MidiExport
         int root = 0;                 // ピッチクラス 0〜11
         std::vector<int> intervals;   // ルートからの半音数（例：M7 = 0,4,7,11）
         int bass = -1;                // 分数コードのベース（ピッチクラス）。-1 ならルート
+        int beats = 4;                // 長さ（拍）。1小節に2コードなら 2
     };
 
     // ベース＝ルート（分数コードは指定音）を C2〜B2、上声＝ルートを C3〜B3 に置いてコードトーンを積む

@@ -40,6 +40,9 @@ namespace
                 if (c.hasProperty ("bass"))
                     chord.bass = juce::jlimit (0, 11, (int) c["bass"]);
 
+                if (c.hasProperty ("beats"))
+                    chord.beats = juce::jlimit (1, 16, (int) c["beats"]);
+
                 if (auto* ivs = c["iv"].getArray())
                     for (const auto& iv : *ivs)
                         chord.intervals.push_back (juce::jlimit (0, 24, (int) iv));
@@ -194,10 +197,9 @@ void GodokenEditor::saveMidi (const juce::Array<juce::var>& args,
 void GodokenEditor::playChords (const juce::Array<juce::var>& args,
                                 juce::WebBrowserComponent::NativeFunctionCompletion completion)
 {
-    const auto request  = args.isEmpty() ? juce::var() : args[0];
-    const auto chords   = parseChords (request["chords"]);
-    const auto interval = juce::jlimit (0.05, 10.0, (double) request.getProperty ("interval", 0.9));
-    const auto duration = juce::jlimit (0.05, 10.0, (double) request.getProperty ("duration", 1.1));
+    const auto request = args.isEmpty() ? juce::var() : args[0];
+    const auto list    = request["chords"];
+    const auto chords  = parseChords (list);
 
     const auto name   = request["timbre"].toString();
     const auto timbre = name == "piano"         ? PreviewSynth::Timbre::piano
@@ -207,11 +209,16 @@ void GodokenEditor::playChords (const juce::Array<juce::var>& args,
                       : name == "pad"           ? PreviewSynth::Timbre::pad
                                                 : PreviewSynth::Timbre::triangle;
 
+    // 各コードの開始時刻 start・長さ dur（秒）は JS 側でテンポと拍数から計算済み。
     // 新しい試聴を始めるときは、鳴っている音・予約中の音を止める（先頭のコードで一度だけ）
     int queued = 0;
     for (size_t i = 0; i < chords.size(); ++i)
-        queued += processorRef.getPreviewSynth().queue (MidiExport::voicing (chords[i]), (double) i * interval,
-                                                        duration, timbre, i == 0) ? 1 : 0;
+    {
+        const auto& c    = list[(int) i];
+        const auto start = juce::jlimit (0.0, 120.0, (double) c.getProperty ("start", 0.0));
+        const auto dur   = juce::jlimit (0.05, 10.0, (double) c.getProperty ("dur", 1.1));
+        queued += processorRef.getPreviewSynth().queue (MidiExport::voicing (chords[i]), start, dur, timbre, i == 0) ? 1 : 0;
+    }
 
     completion (juce::var (queued));
 }

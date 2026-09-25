@@ -2,6 +2,7 @@ import {
   MAJ_LABEL,MIN_LABEL,SIG,SCALES,PROGRESSIONS,DIATONIC,WHEEL_CELLS,
   mod12,tonicOf,isFlatKey,noteName,keyName as keyNameOf,degLabel,chordName as chordNameOf,chordDeg,
   chordPcs,scaleById,spellChordTone,variantsOf,chordAt,sameChord,voicing,keySignature,
+  progressionChords,progressionDegrees,BEATS_PER_BAR,
   CHORD,spellScaleTone,spellChordInterval,convertChordSize
 } from './theory.js';
 import {renderStaff} from './staff.js';
@@ -235,10 +236,10 @@ function renderProgs(){
     vars.forEach((x,i)=>{const b=document.createElement('button');b.textContent=x.name;b.setAttribute('aria-pressed',i===vi);
       b.onclick=()=>{state.vari[state.mode]=i;state.sel=null;render();};vbox.appendChild(b);});
   }
-  const chords=v.c.map(c=>chordAt(t,c));
+  const chords=progressionChords(t,v.c);
   const title=`${nn(t)}${state.mode==='minor'?'m':''}_${p.name}${vi>0?'_'+v.name:''}`;
   document.getElementById('progName').textContent=p.name+(vi>0?`（${v.name}）`:'');
-  document.getElementById('progDeg').textContent=v.c.length>8?`${v.c.length}小節`:v.c.map(([o,q,bo])=>chordDeg(o,q,bo)).join(' – ');
+  document.getElementById('progDeg').textContent=v.c.length>8?`${v.c.length}小節`:progressionDegrees(v.c);
   progChords=chords;progTitle=title;
   const box=document.getElementById('chips');box.innerHTML='';
   box.style.gridTemplateColumns=`repeat(${Math.min(8,Math.max(4,chords.length<=8?chords.length:6))},1fr)`;
@@ -249,10 +250,11 @@ function makeChip(ch){
   if(sameChord(state.sel,ch))b.classList.add('sel');
   b.innerHTML='<span class="n"></span><span class="d"></span>';
   b.querySelector('.n').textContent=chordName(ch);
-  b.querySelector('.d').textContent=chordDeg(ch.off,ch.q,ch.boff);
+  b.querySelector('.d').textContent=chordDeg(ch.off,ch.q,ch.boff)+(ch.beats&&ch.beats<BEATS_PER_BAR?`（${ch.beats}拍）`:'');
   b.title='クリックで試聴／DAWへドラッグでMIDI';
   b.onclick=()=>{playChord(ch);state.sel={...ch};render();};
-  attachMidiDrag(b,()=>({name:chordName(ch),bpm:bpm(),chords:[ch]}));
+  // 単体のドラッグは拍数に関わらず1小節
+  attachMidiDrag(b,()=>({name:chordName(ch),bpm:bpm(),chords:[{...ch,beats:BEATS_PER_BAR}]}));
   return b;
 }
 function renderDiatonic(){

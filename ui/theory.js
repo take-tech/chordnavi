@@ -33,7 +33,8 @@ export const CHORD={
   '7sus4':{s:'7sus4',iv:[0,5,7,10]}, dim7:{s:'dim7',iv:[0,3,6,9]}
 };
 
-// コードは [ルートの度数(半音), 種類, ベースの度数(分数コードのみ)]
+// c は小節の並び。1小節は [ルートの度数(半音), 種類, ベースの度数(分数コードのみ)]、
+// 1小節に複数のコードを入れるときは [[...],[...]] と並べる（小節内で等分。2つなら各2拍）
 // v は派生形（基本形は c）。ここの内容は好みで追加・変更してよい
 export const PROGRESSIONS=[
   {mode:'major',name:'王道進行',c:[[5,'M7'],[7,'7'],[4,'m7'],[9,'m']],v:[
@@ -49,7 +50,7 @@ export const PROGRESSIONS=[
     {name:'IV始まり',c:[[5,''],[0,''],[7,''],[9,'m']]},
     {name:'7th',c:[[0,'M7'],[7,''],[9,'m7'],[5,'M7']]}]},
   {mode:'major',name:'小室進行',c:[[9,'m'],[5,''],[7,''],[0,'']],v:[
-    {name:'sus4',c:[[9,'m'],[5,''],[7,'sus4'],[0,'']]},
+    {name:'sus4',c:[[9,'m'],[5,''],[[7,'sus4'],[7,'']],[0,'']]},
     {name:'分数ベース',c:[[9,'m'],[5,''],[7,''],[0,'',4]]},
     {name:'7th',c:[[9,'m7'],[5,'M7'],[7,'7'],[0,'M7']]}]},
   {mode:'major',name:'50年代進行',c:[[0,''],[9,'m'],[5,''],[7,'']],v:[
@@ -57,7 +58,7 @@ export const PROGRESSIONS=[
     {name:'7th',c:[[0,'M7'],[9,'m7'],[5,'M7'],[7,'7']]}]},
   {mode:'major',name:'ツーファイブワン',c:[[2,'m7'],[7,'7'],[0,'M7'],[0,'M7']],v:[
     {name:'裏コード',c:[[2,'m7'],[1,'7'],[0,'M7'],[0,'M7']]},
-    {name:'V7sus4経由',c:[[2,'m7'],[7,'7sus4'],[7,'7'],[0,'M7']]}]},
+    {name:'V7sus4経由',c:[[2,'m7'],[[7,'7sus4'],[7,'7']],[0,'M7'],[0,'M7']]}]},
   {mode:'major',name:'イチロクニーゴー（循環）',c:[[0,'M7'],[9,'m7'],[2,'m7'],[7,'7']],v:[
     {name:'3和音',c:[[0,''],[9,'m'],[2,'m'],[7,'']]},
     {name:'VI7版',c:[[0,'M7'],[9,'7'],[2,'m7'],[7,'7']]},
@@ -65,7 +66,7 @@ export const PROGRESSIONS=[
     {name:'裏コード',c:[[0,'M7'],[9,'7'],[2,'m7'],[1,'7']]}]},
   {mode:'major',name:'丸サ進行',c:[[5,'M7'],[4,'7'],[9,'m7'],[0,'7']],v:[
     {name:'IIIm7版',c:[[5,'M7'],[4,'m7'],[9,'m7'],[0,'7']]},
-    {name:'Vm7経由',c:[[5,'M7'],[4,'7'],[9,'m7'],[7,'m7'],[0,'7']]}]},
+    {name:'Vm7経由',c:[[5,'M7'],[4,'7'],[9,'m7'],[[7,'m7'],[0,'7']]]}]},
   {mode:'minor',name:'Im–♭VI–♭III–♭VII',c:[[0,'m'],[8,''],[3,''],[10,'']],v:[
     {name:'♭VI始まり',c:[[8,''],[10,''],[0,'m'],[0,'m']]},
     {name:'7th',c:[[0,'m7'],[8,'M7'],[3,'M7'],[10,'7']]}]},
@@ -123,6 +124,16 @@ export const chordPcs=ch=>{const pcs=CHORD[ch.q].iv.map(x=>mod12(ch.root+x));ret
 export const sameChord=(a,b)=>!!a&&!!b&&a.root===b.root&&a.q===b.q&&(a.bass??a.root)===(b.bass??b.root);
 // [度数, 種類, ベース度数] → コード（tonic 基準）
 export const chordAt=(t,[off,q,boff])=>({root:mod12(t+off),q,off,...(boff!=null?{bass:mod12(t+boff),boff}:{})});
+
+export const BEATS_PER_BAR=4;
+const barItems=bar=>Array.isArray(bar[0])?bar:[bar];
+// 小節の並び → コード列（各コードに拍数 beats を付ける）
+export const progressionChords=(t,bars)=>bars.flatMap(bar=>{
+  const items=barItems(bar);
+  return items.map(c=>({...chordAt(t,c),beats:BEATS_PER_BAR/items.length}));
+});
+// ディグリー表記：小節は「 – 」、小節内は「・」でつなぐ
+export const progressionDegrees=bars=>bars.map(bar=>barItems(bar).map(([o,q,bo])=>chordDeg(o,q,bo)).join('・')).join(' – ');
 
 // MIDI と同じボイシング：ベース（C2〜B2）＋上声（ルートを C3〜B3 に置いて積む）
 export const voicing=ch=>[36+(ch.bass??ch.root),...CHORD[ch.q].iv.map(i=>48+ch.root+i)];

@@ -1,5 +1,6 @@
 #include "MidiExport.h"
 #include <juce_audio_basics/juce_audio_basics.h>
+#include <set>
 
 namespace
 {
@@ -88,6 +89,29 @@ public:
                 expectEquals (e->noteOffObject->message.getTimeStamp(), start + 1910.0);
             }
             expectEquals (ons, 4 + 5);
+        }
+
+        beginTest ("Chord lengths follow beats (two chords in one bar)");
+        {
+            // Vm7(2拍)・I7(2拍) → 次の小節頭に IM7
+            const MidiExport::Chord gm7 { 7, { 0, 3, 7, 10 }, -1, 2 }, c7 { 0, { 0, 4, 7, 10 }, -1, 2 };
+            const auto mb = MidiExport::buildMidi ({ gm7, c7, fM7 }, 120);
+            juce::MemoryInputStream in (mb, false);
+            juce::MidiFile mf;
+            expect (mf.readFrom (in));
+            auto seq = *mf.getTrack (0);
+            seq.updateMatchedPairs();
+
+            std::set<double> starts;
+            for (auto* e : seq)
+            {
+                if (! e->message.isNoteOn()) continue;
+                const auto s = e->message.getTimeStamp();
+                starts.insert (s);
+                const auto len = (s < 1920.0 ? 960.0 : 1920.0) - 10.0;
+                expectEquals (e->noteOffObject->message.getTimeStamp() - s, len);
+            }
+            expect (starts == std::set<double> { 0.0, 960.0, 1920.0 });
         }
 
         beginTest ("Repeated chord does not overlap");

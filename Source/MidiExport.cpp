@@ -52,16 +52,19 @@ juce::MemoryBlock buildMidi (const std::vector<Chord>& chords, int bpm)
 
     std::vector<Event> events;
 
-    for (size_t i = 0; i < chords.size(); ++i)
+    int t = 0;
+    for (const auto& chord : chords)
     {
-        const int t = (int) i * barTicks;
+        const int length = juce::jlimit (1, 16, chord.beats) * ppq;
 
-        for (auto note : voicing (chords[i]))
+        for (auto note : voicing (chord))
         {
             const auto n = (juce::uint8) juce::jlimit (0, 127, note);
             events.push_back ({ t, true, { 0x90, n, (juce::uint8) velocity } });
-            events.push_back ({ t + barTicks - 10, false, { 0x80, n, 0 } });
+            events.push_back ({ t + length - 10, false, { 0x80, n, 0 } });
         }
+
+        t += length;
     }
 
     // 同じ時刻ではノートオフを先に
