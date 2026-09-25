@@ -12,7 +12,7 @@ import {getHostInfo,onHostTempo} from './host.js';
 import {loadState,saveState,onStateRestored} from './persist.js';
 
 /* ---------- 状態 ---------- */
-const state={idx:0,mode:'major',scale:'major',label:'name',view:'kb',dia:'7',sel:null,prog:{major:0,minor:0},vari:{major:0,minor:0},timbre:'organ',loop:false,syncTempo:false,half:false,pick:false};
+const state={idx:0,mode:'major',scale:'major',label:'name',view:'kb',dia:'7',sel:null,prog:{major:0,minor:0},vari:{major:0,minor:0},timbre:'organ',loop:false,syncTempo:false,half:false,pick:false,editIdx:null};
 // コード判別で選んだ音。キーは 'kb:<MIDI>'（鍵盤）または 's<弦番号>'（指板：1本の弦に1音）、値は MIDI
 const picks=new Map();
 const pickedNotes=()=>[...new Set(picks.values())];
@@ -165,7 +165,7 @@ bindSeg('diaSeg','dia',()=>{
   if(state.sel){state.sel=convertChordSize(state.sel,state.dia,state.mode);playChord(state.sel);}
   render();
 });
-document.getElementById('selClear').addEventListener('click',()=>{stopPlayback(true);state.sel=null;render();});
+document.getElementById('selClear').addEventListener('click',()=>{stopPlayback(true);state.sel=null;state.editIdx=null;render();});
 const timbreSel=document.getElementById('timbre');
 for(const t of TIMBRES){const o=document.createElement('option');o.value=t.id;o.textContent=t.name;timbreSel.appendChild(o);}
 timbreSel.value=state.timbre;
@@ -375,12 +375,33 @@ function renderPick(){
 
 /* ---------- コード進行 ---------- */
 let progChords=[],progTitle='';
+// 一時的なコードの変更：{ key: どの進行か, q: { コード番号: 種類 } }。進行・派生を切り替えると消える（保存しない）
+const edits={key:null,q:{}};
+const EDIT_QUALITIES=['','m','7','M7','m7','6','m6','add9','sus2','sus4','7sus4','9','M9','m9','mM7','dim','dim7','m7b5','aug'];
+// 小節の並びに変更を当てはめる
+function applyEdits(bars){
+  let k=0;
+  const one=it=>{const q=edits.q[k++];return q!=null?[it[0],q,it[2]]:it;};
+  return bars.map(bar=>Array.isArray(bar[0])?bar.map(one):one(bar));
+}
+function selectProgression(i){
+  stopPlayback(true);state.prog[state.mode]=i;state.vari[state.mode]=0;state.sel=null;closeMore();render();
+}
 function renderProgs(){
   const list=PROGRESSIONS.filter(p=>p.mode===state.mode), cur=state.prog[state.mode];
   const pills=document.getElementById('pills');pills.innerHTML='';
-  list.forEach((p,i)=>{const b=document.createElement('button');b.textContent=p.name;b.setAttribute('aria-pressed',i===cur);
-    b.onclick=()=>{stopPlayback(true);state.prog[state.mode]=i;state.vari[state.mode]=0;state.sel=null;render();};pills.appendChild(b);});
+  list.forEach((p,i)=>{if(p.extra)return;const b=document.createElement('button');b.textContent=p.name;b.setAttribute('aria-pressed',i===cur);
+    b.onclick=()=>selectProgression(i);pills.appendChild(b);});
+  // 「その他」：一覧から選ぶ
+  const more=document.createElement('button');more.id='moreBtn';
+  more.textContent=list[cur].extra?`その他：${list[cur].name}`:'その他…';
+  more.setAttribute('aria-pressed',!!list[cur].extra);
+  more.onclick=()=>toggleMore(list);
+  pills.appendChild(more);
   const p=list[cur], t=tonic(), vars=variantsOf(p), vi=Math.min(state.vari[state.mode],vars.length-1), v=vars[vi];
+  const ekey=`${state.mode}:${cur}:${vi}`;
+  if(edits.key!==ekey){edits.key=ekey;edits.q={};state.editIdx=null;}
+  const edited=Object.keys(edits.q).length>0, bars=applyEdits(v.c), original=progressionChords(t,v.c);
   const vbox=document.getElementById('variants');vbox.innerHTML='';
   if(vars.length>1){
     vbox.append('派生：');
@@ -389,30 +410,89 @@ function renderProgs(){
   }
   // リズム½：各コードの長さを半分に（1小節→2拍、2拍→1拍）
   const rate=state.half?.5:1;
-  const chords=progressionChords(t,v.c).map(c=>({...c,beats:c.beats*rate}));
-  // ファイル名は英字のみ（例：C_Canon_BassLine_half）
-  const title=`${nn(t)}${state.mode==='minor'?'m':''}_${p.file}${vi>0?'_'+VARIANT_FILE[v.name]:''}${state.half?'_half':''}`;
-  document.getElementById('progName').textContent=p.name+(vi>0?`（${v.name}）`:'');
-  document.getElementById('progDeg').textContent=v.c.length>8?`${v.c.length}小節`:progressionDegrees(v.c);
+  const chords=progressionChords(t,bars).map((c,i)=>({...c,beats:c.beats*rate,...(edits.q[i]!=null?{edited:true}:{})}));
+  // ファイル名は英字のみ（例：C_Canon_BassLine_half、変更ありは _custom）
+  const title=`${nn(t)}${state.mode==='minor'?'m':''}_${p.file}${vi>0?'_'+VARIANT_FILE[v.name]:''}${state.half?'_half':''}${edited?'_custom':''}`;
+  document.getElementById('progName').textContent=p.name+(vi>0?`（${v.name}）`:'')+(edited?'＊':'');
+  document.getElementById('progDeg').textContent=v.c.length>8?`${v.c.length}小節`:progressionDegrees(bars);
   progChords=chords;progTitle=title;
   // 幅は拍数で決める（1小節＝4マス、2拍のコードは半分の幅）
   const box=document.getElementById('chips');box.innerHTML='';
   box.style.gridTemplateColumns=`repeat(${Math.min(8,Math.max(4,v.c.length))*BEATS_PER_BAR},1fr)`;
   chords.forEach((ch,i)=>{
-    const chip=makeChip(ch);
+    const chip=makeChip(ch,i);
+    if(ch.edited)chip.classList.add('edited');
+    if(state.editIdx===i)chip.classList.add('editing');
     chip.style.gridColumn=`span ${(ch.beats??BEATS_PER_BAR)/rate}`;   // 幅は元の拍数の比率のまま
     if(playback&&playback.index===i)chip.classList.add('playing');
     box.appendChild(chip);
   });
+  renderEditBar(chords,original);
 }
-function makeChip(ch){
+
+// 選んだ進行のコードの種類を変えるバー（ヒントの位置に出す）
+function renderEditBar(chords,original){
+  const bar=document.getElementById('editBar'), i=state.editIdx, ch=i!=null&&chords[i];
+  document.getElementById('hint').hidden=!!ch;
+  bar.classList.toggle('on',!!ch);
+  bar.innerHTML='';
+  if(!ch)return;
+  const lab=document.createElement('span');lab.className='lab';lab.textContent='種類を変更：';bar.appendChild(lab);
+  for(const q of EDIT_QUALITIES){
+    const b=document.createElement('button');
+    b.textContent=chordName({...ch,q});
+    b.setAttribute('aria-pressed',ch.q===q);
+    b.onclick=()=>{
+      if(q===original[i].q)delete edits.q[i];else edits.q[i]=q;
+      const next={...ch,q};playChord(next);state.sel=next;state.editIdx=i;render();
+    };
+    bar.appendChild(b);
+  }
+  const tail=document.createElement('span');tail.className='tail';
+  if(edits.q[i]!=null){
+    const undo=document.createElement('button');undo.textContent='元に戻す';
+    undo.onclick=()=>{delete edits.q[i];const o={...ch,q:original[i].q};playChord(o);state.sel=o;render();};
+    tail.appendChild(undo);
+  }
+  const close=document.createElement('button');close.textContent='閉じる';
+  close.onclick=()=>{state.editIdx=null;render();};
+  tail.appendChild(close);
+  bar.appendChild(tail);
+}
+
+// 「その他」の一覧
+function toggleMore(list){
+  const pop=document.getElementById('morePop');
+  if(!pop.hidden){closeMore();return;}
+  pop.innerHTML='';
+  const t=tonic(), cur=state.prog[state.mode];
+  list.forEach((p,i)=>{
+    if(!p.extra)return;
+    const b=document.createElement('button');b.setAttribute('aria-pressed',i===cur);
+    b.innerHTML='<span class="n"></span><span class="d"></span>';
+    b.querySelector('.n').textContent=p.name;
+    b.querySelector('.d').textContent=progressionChords(t,p.c).map(c=>chordName(c)).join(' – ');
+    b.onclick=()=>selectProgression(i);
+    pop.appendChild(b);
+  });
+  pop.hidden=false;
+}
+function closeMore(){document.getElementById('morePop').hidden=true;}
+addEventListener('pointerdown',e=>{
+  const pop=document.getElementById('morePop');
+  if(!pop.hidden&&!pop.contains(e.target)&&e.target.id!=='moreBtn')closeMore();
+});
+addEventListener('keydown',e=>{if(e.key==='Escape')closeMore();});
+
+function makeChip(ch,progIndex=null){
   const b=document.createElement('button');b.className='chip';
   if(sameChord(state.sel,ch))b.classList.add('sel');
   b.innerHTML='<span class="n"></span><span class="d"></span>';
   b.querySelector('.n').textContent=chordName(ch);
   b.querySelector('.d').textContent=chordDeg(ch.off,ch.q,ch.boff);
   b.title='クリックで試聴／DAWへドラッグでMIDI';
-  b.onclick=()=>{playChord(ch);state.sel={...ch};render();};
+  // 進行のチップを選ぶと、そのコードの種類を変えるバーが出る
+  b.onclick=()=>{playChord(ch);state.sel={...ch};state.editIdx=progIndex;render();};
   // 単体のドラッグは拍数に関わらず1小節
   attachMidiDrag(b,()=>({name:chordName(ch),bpm:bpm(),chords:[{...ch,beats:BEATS_PER_BAR}]}));
   return b;
