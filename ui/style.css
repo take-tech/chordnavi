@@ -7,7 +7,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#D5D9E2}
 body{color:var(--ink);font-family:"Hiragino Sans","Yu Gothic UI","Noto Sans JP",sans-serif;font-size:14px;line-height:1.5}
 /* 固定サイズのステージをウィンドウに合わせて拡大縮小（スクロールなし） */
 .stage{position:absolute;left:50%;top:50%;width:1280px;height:780px;transform-origin:center center;
-  background:var(--bg);display:grid;grid-template-columns:320px 1fr;gap:16px;padding:18px}
+  background:var(--bg);display:grid;grid-template-columns:320px minmax(0,1fr);gap:16px;padding:18px}
 .panel{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:12px 16px;min-height:0}
 .left{display:flex;flex-direction:column;min-height:0}
 .left .panel{flex:1;display:flex;flex-direction:column}
@@ -31,13 +31,13 @@ input[type=number]{width:64px}
 .dia-head .spacer,.head .spacer{flex:1}
 .seg.small button{font-size:11px;padding:1px 10px}
 svg[hidden]{display:none!important}
-.dia-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:5px}
+.dia-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px}
 .dia-grid .chip{padding:4px 6px}
 .dia-grid .chip .n{font-size:14px}
 .notes{margin-top:auto;padding-top:10px;border-top:1px solid var(--line);font-size:12px;color:var(--muted)}
 .notes b{display:block;color:var(--ink);font-size:15px;letter-spacing:.06em;font-weight:700}
 button:focus-visible,select:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid var(--root);outline-offset:2px}
-.right{display:grid;grid-template-rows:auto auto 1fr;gap:14px;min-height:0}
+.right{display:grid;grid-template-rows:auto auto 1fr;grid-template-columns:minmax(0,1fr);gap:14px;min-height:0;min-width:0}
 .right svg{display:block;width:100%;height:auto}
 svg text{font-family:inherit}
 .legend{display:flex;gap:12px;font-size:11px;color:var(--muted)}
@@ -64,7 +64,7 @@ svg text{font-family:inherit}
 .actions button[aria-pressed=true]{background:var(--ink);border-color:var(--ink);color:#fff}
 #progPlay{min-width:4.5em}
 .handle:active{cursor:grabbing}
-.chips{display:grid;grid-template-columns:repeat(8,1fr);gap:6px}
+.chips{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:6px}
 .chip{font:inherit;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:4px;padding:5px 8px;cursor:grab;text-align:left;min-width:0}
 .chip:hover{border-color:var(--ink2)}
 .chip.sel{border-color:var(--chord);box-shadow:inset 0 0 0 1px var(--chord)}
@@ -85,7 +85,7 @@ svg text{font-family:inherit}
 .editbar .tail .tool{background:#fff;border-color:#6B4FBB;color:#6B4FBB;font-weight:700}
 .prog-panel{position:relative}
 .more-pop{position:absolute;left:16px;right:16px;top:118px;z-index:5;background:#fff;border:1px solid var(--ink2);border-radius:6px;
-  box-shadow:0 6px 20px rgba(30,39,66,.18);padding:10px;display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+  box-shadow:0 6px 20px rgba(30,39,66,.18);padding:10px;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}
 .more-pop[hidden]{display:none}
 .more-pop button{font:inherit;text-align:left;border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:4px;padding:4px 8px;cursor:pointer;min-width:0}
 .more-pop button:hover{border-color:var(--ink2)}
@@ -129,9 +129,16 @@ button,svg{-webkit-user-drag:none}
 /* 見出し行は1行に収める（狭いときはタイトルを省略表示） */
 .head h2{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .head>:not(h2):not(.spacer){flex-shrink:0}
+.panel{min-width:0}
+/* 選択中のコード名が長いときは見出しの中で縮める */
+.head>.selinfo{flex-shrink:1;min-width:0}
+.selinfo>span{overflow:hidden;text-overflow:ellipsis;min-width:0}
+.selinfo>button{flex-shrink:0}
 .legend span,.selinfo span{white-space:nowrap}
 /* 進行名とディグリーは1行に収める（長いときは省略表示。全体は title で確認できる） */
 .detail-head{min-width:0}
 .detail-head h3{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:0 1 auto}
 .detail-head .deg{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1 1 0}
 .detail-head .actions{flex-shrink:0}
+.detail.longdeg .detail-head{flex-wrap:wrap;row-gap:0;margin-bottom:6px}
+.detail.longdeg .detail-head .deg{order:3;flex:1 1 100%;white-space:normal;overflow:visible}

@@ -531,12 +531,17 @@ function renderProgs(){
   const title=`${nn(t)}${state.mode==='minor'?'m':''}_${p.file}${vi>0?'_'+VARIANT_FILE[v.name]:''}${state.half?'_half':''}${edited?'_custom':''}`;
   const nameEl=document.getElementById('progName'), degEl=document.getElementById('progDeg');
   nameEl.textContent=nameEl.title=p.name+(vi>0?`（${v.name}）`:'')+(edited?'＊':'');
-  degEl.textContent=v.c.length>8?`${v.c.length}小節`:progressionDegrees(bars);
+  degEl.textContent=progressionDegrees(bars);
   degEl.title=progressionDegrees(bars);
+  // 1行に収まらない長い進行は、ディグリーを進行名の下の行に出す（その分ヒントを隠す）
+  const detail=document.querySelector('.detail');
+  detail.classList.remove('longdeg');
+  if(degEl.scrollWidth>degEl.clientWidth+1)detail.classList.add('longdeg');
   progChords=chords;progTitle=title;
   // 幅は拍数で決める（1小節＝4マス、2拍のコードは半分の幅）
   const box=document.getElementById('chips');box.innerHTML='';
-  box.style.gridTemplateColumns=`repeat(${Math.min(8,Math.max(4,v.c.length))*BEATS_PER_BAR},1fr)`;
+  // minmax(0,1fr)：チップの文字幅で列が広がって画面からはみ出さないように
+  box.style.gridTemplateColumns=`repeat(${Math.min(8,Math.max(4,v.c.length))*BEATS_PER_BAR},minmax(0,1fr))`;
   chords.forEach((ch,i)=>{
     const chip=makeChip(ch,i);
     if(ch.edited)chip.classList.add('edited');
@@ -553,7 +558,7 @@ function renderProgs(){
 // 選んだ進行のコードのルート・種類を変え、1小節のコードを分割・結合するバー（ヒントの位置に出す）
 function renderEditBar(chords,{t,orig,bars,where}){
   const bar=document.getElementById('editBar'), i=state.editIdx, ch=i!=null&&chords[i];
-  document.getElementById('hint').hidden=!!ch;
+  document.getElementById('hint').hidden=!!ch||document.querySelector('.detail').classList.contains('longdeg');
   bar.classList.toggle('on',!!ch);
   bar.innerHTML='';
   if(!ch)return;
