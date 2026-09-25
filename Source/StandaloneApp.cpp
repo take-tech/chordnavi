@@ -30,6 +30,11 @@ public:
             if (const auto size = peer->getFrameSizeIfPresent())
                 frame = *size;
 
+        // Windows ではウィンドウ内のメニューバーの分も除く
+        if (auto* rw = dynamic_cast<ResizableWindow*> (&window))
+            frame = BorderSize<int> (frame.getTop() + rw->getContentComponentBorder().getTop(), frame.getLeft(),
+                                     frame.getBottom(), frame.getRight());
+
         auto content = frame.subtractedFrom (bounds);
         ComponentBoundsConstrainer::checkBounds (content, frame.subtractedFrom (previousBounds), limits,
                                                  isStretchingTop, isStretchingLeft, isStretchingBottom, isStretchingRight);
@@ -176,6 +181,10 @@ public:
 
        #if JUCE_MAC
         MenuBarModel::setMacMainMenu (&menu);
+       #else
+        // Windows：ウィンドウ上部のメニューバーに「オプション」を出す
+        window->setMenuBar (&menu);
+        window->centreWithSize (GodokenEditor::baseWidth, GodokenEditor::baseHeight + window->getContentComponentBorder().getTop());
        #endif
     }
 
@@ -183,6 +192,9 @@ public:
     {
        #if JUCE_MAC
         MenuBarModel::setMacMainMenu (nullptr);
+       #else
+        if (window != nullptr)
+            window->setMenuBar (nullptr);
        #endif
         window = nullptr;
         holder = nullptr;

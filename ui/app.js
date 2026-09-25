@@ -432,7 +432,9 @@ function renderProgs(){
     const chip=makeChip(ch,i);
     if(ch.edited)chip.classList.add('edited');
     if(state.editIdx===i)chip.classList.add('editing');
-    chip.style.gridColumn=`span ${(ch.beats??BEATS_PER_BAR)/rate}`;   // 幅は元の拍数の比率のまま
+    const span=(ch.beats??BEATS_PER_BAR)/rate;
+    chip.style.gridColumn=`span ${span}`;   // 幅は元の拍数の比率のまま
+    if(span<BEATS_PER_BAR&&v.c.length>4)chip.classList.add('narrow');   // 5小節以上で2拍のチップは幅が狭いので文字を小さく
     if(playback&&playback.index===i)chip.classList.add('playing');
     box.appendChild(chip);
   });
@@ -509,6 +511,7 @@ function toggleMore(list){
     b.innerHTML='<span class="n"></span><span class="d"></span>';
     b.querySelector('.n').textContent=p.name;
     b.querySelector('.d').textContent=progressionChords(t,p.c).map(c=>chordName(c)).join(' – ');
+    b.title=p.name;
     b.onclick=()=>selectProgression(i);
     pop.appendChild(b);
   });

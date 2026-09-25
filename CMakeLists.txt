@@ -9,6 +9,11 @@ project(ChordNavi VERSION 1.0.0)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# ソースに日本語（UTF-8）を含むので、MSVC にも UTF-8 として読ませる
+if(MSVC)
+    add_compile_options(/utf-8)
+endif()
+
 # JUCE 8（ローカルに JUCE があれば -DFETCHCONTENT_SOURCE_DIR_JUCE=<path> で再利用可）
 include(FetchContent)
 FetchContent_Declare(
@@ -53,6 +58,7 @@ juce_add_plugin(ChordNavi
     EDITOR_WANTS_KEYBOARD_FOCUS TRUE
     VST3_CATEGORIES             "Instrument" "Tools"
     AU_MAIN_TYPE                kAudioUnitType_MusicDevice
+    NEEDS_WEBVIEW2              TRUE   # Windows：WebView2 を静的リンク（macOS では無視される）
 )
 
 target_sources(ChordNavi PRIVATE
@@ -63,6 +69,11 @@ target_sources(ChordNavi PRIVATE
     Source/PluginState.cpp
     Source/StandaloneApp.cpp
 )
+
+if(WIN32)
+    # Windows では JS ⇔ C++ 連携に WebView2（Edge）が必要。WebView2Loader.dll を配らなくて済むよう静的リンク
+    target_compile_definitions(ChordNavi PUBLIC JUCE_USE_WIN_WEBVIEW2_WITH_STATIC_LINKING=1)
+endif()
 
 target_compile_definitions(ChordNavi PUBLIC
     JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP=1   # Standalone は Source/StandaloneApp.cpp（ネイティブのタイトルバーとメニューバー）

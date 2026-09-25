@@ -2,7 +2,7 @@
 
 ChordNavi は、五度圏・スケール・鍵盤・ギター指板・コード進行を1画面で確認し、コードや進行を **MIDI として DAW へドラッグ＆ドロップ**できるプラグインです。
 
-![対応](https://img.shields.io/badge/macOS-11%2B-blue) ![形式](https://img.shields.io/badge/format-AU%20%7C%20VST3%20%7C%20Standalone-informational)
+![対応](https://img.shields.io/badge/macOS-11%2B-blue) ![対応](https://img.shields.io/badge/Windows-10%20%7C%2011-blue) ![形式](https://img.shields.io/badge/format-AU%20%7C%20VST3%20%7C%20Standalone-informational)
 
 ---
 
@@ -26,14 +26,15 @@ ChordNavi は、五度圏・スケール・鍵盤・ギター指板・コード�
 
 ## 対応環境
 
-- macOS 11 以降（Apple Silicon／Intel どちらも可）
-- **AU**（Logic Pro、GarageBand など）
-- **VST3**（Ableton Live、Cubase、Studio One、Bitwig、Reaper など）
-- **Standalone**（DAW なしで単体起動）
+- **macOS** 11 以降（Apple Silicon／Intel どちらも可）：AU・VST3・Standalone
+- **Windows** 10／11（64bit）：VST3・Standalone（「Microsoft Edge WebView2 ランタイム」が必要。Windows 11 と更新済みの Windows 10 には入っています）
+- AU は Logic Pro・GarageBand など、VST3 は Ableton Live・Cubase・Studio One・Bitwig・Reaper・FL Studio など
 
 ---
 
 ## インストール
+
+### macOS
 
 1. [Releases](../../releases) から `ChordNavi-<バージョン>-macOS.pkg` をダウンロードします。
 2. `.pkg` を開いてインストールします。次の場所に入ります。
@@ -50,7 +51,7 @@ ChordNavi は、五度圏・スケール・鍵盤・ギター指板・コード�
 - `.pkg` を **右クリック（control＋クリック）→「開く」→「開く」**
 - または、一度開こうとした後に **システム設定 →「プライバシーとセキュリティ」→「このまま開く」**
 
-### アンインストール
+### アンインストール（macOS）
 
 次の3つを削除します。
 
@@ -59,6 +60,15 @@ ChordNavi は、五度圏・スケール・鍵盤・ギター指板・コード�
 /Library/Audio/Plug-Ins/VST3/ChordNavi.vst3
 /Applications/ChordNavi.app
 ```
+
+### Windows
+
+1. [Releases](../../releases) から `ChordNavi-<バージョン>-Windows-x64-Setup.exe` をダウンロードして実行します。
+   - VST3：`C:\Program Files\Common Files\VST3\ChordNavi.vst3`
+   - Standalone：`C:\Program Files\ChordNavi\ChordNavi.exe`（スタートメニューに登録）
+2. 「Windows によって PC が保護されました」と表示されたら、**「詳細情報」→「実行」** を選びます（署名していないため）。
+3. DAW でプラグインを再スキャンし、**音源（インストゥルメント）** として挿します。
+4. アンインストールは「設定」→「アプリ」から「ChordNavi」を選びます。
 
 ---
 

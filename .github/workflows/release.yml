@@ -1,4 +1,4 @@
-name: Build Installer
+name: Build Installers
 
 on:
   workflow_dispatch:
@@ -63,10 +63,60 @@ jobs:
           name: ChordNavi-macOS-pkg
           path: build-release/packages/*.pkg
 
+  windows:
+    name: Windows Installer
+    runs-on: windows-2022
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install WebView2 SDK
+        shell: pwsh
+        run: nuget install Microsoft.Web.WebView2 -Version 1.0.1901.177 -OutputDirectory "$env:RUNNER_TEMP\nuget"
+
+      - name: Configure
+        shell: pwsh
+        run: cmake -S . -B build -G "Visual Studio 17 2022" -A x64 "-DJUCE_WEBVIEW2_PACKAGE_LOCATION=$env:RUNNER_TEMP\nuget"
+
+      - name: Build
+        shell: pwsh
+        run: cmake --build build --config Release --target MidiExportTests ChordNavi_VST3 ChordNavi_Standalone -- /m
+
+      - name: Unit tests
+        shell: pwsh
+        run: ./build/MidiExportTests_artefacts/Release/MidiExportTests.exe
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --no-progress -y
+
+      - name: Package
+        shell: pwsh
+        run: |
+          $version = "${env:GITHUB_REF_NAME}" -replace '^v', ''
+          if ($version -eq "${env:GITHUB_REF_NAME}") {
+            $version = (Select-String -Path CMakeLists.txt -Pattern 'project\(ChordNavi VERSION ([0-9.]+)\)').Matches[0].Groups[1].Value
+          }
+          $vst3 = Get-ChildItem -Path build -Recurse -Directory -Filter "ChordNavi.vst3" | Where-Object { $_.FullName -match "Release" } | Select-Object -First 1
+          $app  = Get-ChildItem -Path build -Recurse -File -Filter "ChordNavi.exe" | Where-Object { $_.FullName -match "Standalone" } | Select-Object -First 1
+          if (-not $vst3) { throw "ChordNavi.vst3 was not found under build" }
+          if (-not $app)  { throw "ChordNavi.exe was not found under build" }
+          New-Item -ItemType Directory -Force -Path build/packages | Out-Null
+          $env:CHORDNAVI_VERSION = $version
+          $env:CHORDNAVI_VST3_DIR = $vst3.FullName
+          $env:CHORDNAVI_APP_EXE = $app.FullName
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" installer/windows/ChordNavi.iss
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ChordNavi-Windows-Setup
+          path: build/packages/*.exe
+
   github-release:
     name: Attach To GitHub Release
     if: startsWith(github.ref, 'refs/tags/')
-    needs: [macos]
+    needs: [macos, windows]
     runs-on: ubuntu-latest
     permissions:
       contents: write

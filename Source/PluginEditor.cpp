@@ -87,6 +87,13 @@ GodokenEditor::GodokenEditor (GodokenProcessor& p)
     : AudioProcessorEditor (&p),
       processorRef (p),
       webView (juce::WebBrowserComponent::Options{}
+                  #if JUCE_WINDOWS
+                   // Windows は WebView2（Edge）を使う。データはプラグインの置き場所ではなく AppData に置く
+                   .withBackend (juce::WebBrowserComponent::Options::Backend::webview2)
+                   .withWinWebView2Options (juce::WebBrowserComponent::Options::WinWebView2{}
+                       .withUserDataFolder (juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory)
+                                                .getChildFile ("ChordNavi").getChildFile ("WebView2")))
+                  #endif
                    .withNativeIntegrationEnabled (true)
                    .withKeepPageLoadedWhenBrowserIsHidden()
                    .withResourceProvider ([this] (const auto& url) { return serveResource (url); })

@@ -75,9 +75,10 @@ export const PROGRESSIONS=[
     {name:'VI7版',c:[[0,'M7'],[9,'7'],[2,'m7'],[7,'7']]},
     {name:'スリーシックス',c:[[4,'m7'],[9,'7'],[2,'m7'],[7,'7']]},
     {name:'裏コード',c:[[0,'M7'],[9,'7'],[2,'m7'],[1,'7']]}]},
-  {mode:'major',name:'丸サ進行',file:'Marunouchi',c:[[5,'M7'],[4,'7'],[9,'m7'],[0,'7']],v:[
-    {name:'IIIm7版',c:[[5,'M7'],[4,'m7'],[9,'m7'],[0,'7']]},
-    {name:'Vm7経由',c:[[5,'M7'],[4,'7'],[9,'m7'],[[7,'m7'],[0,'7']]]}]},
+  // 丸サ（Just the Two of Us）進行：一般的な形は最後の小節が Vm7・I7
+  {mode:'major',name:'丸サ進行',file:'Marunouchi',c:[[5,'M7'],[4,'7'],[9,'m7'],[[7,'m7'],[0,'7']]],v:[
+    {name:'IIIm7版',c:[[5,'M7'],[4,'m7'],[9,'m7'],[[7,'m7'],[0,'7']]]},
+    {name:'I7のみ',c:[[5,'M7'],[4,'7'],[9,'m7'],[0,'7']]}]},
   {mode:'minor',name:'Im–♭VI–♭III–♭VII',file:'Im-bVI-bIII-bVII',c:[[0,'m'],[8,''],[3,''],[10,'']],v:[
     {name:'♭VI始まり',c:[[8,''],[10,''],[0,'m'],[0,'m']]},
     {name:'7th',c:[[0,'m7'],[8,'M7'],[3,'M7'],[10,'7']]}]},
@@ -107,6 +108,16 @@ PROGRESSIONS.push(...[
   {mode:'major',name:'I–♭VII–IV–I（ミクソリディアン）',file:'Mixolydian',c:[[0,''],[10,''],[5,''],[0,'']],v:[{name:'I–♭VII–IV',c:[[0,''],[10,''],[5,''],[5,'']]},{name:'2拍ずつ',c:[[[0,''],[10,'']],[[5,''],[0,'']]]}]},
   {mode:'major',name:'♭VI–♭VII–I',file:'bVI-bVII-I',c:[[8,''],[10,''],[0,''],[0,'']],v:[{name:'♭VI・♭VII',c:[[[8,''],[10,'']],[0,'']]},{name:'7th',c:[[8,'M7'],[10,'7'],[0,'M7'],[0,'M7']]}]},
   {mode:'major',name:'IM7–IVM7（2コード）',file:'I-IV-Vamp',c:[[0,'M7'],[5,'M7'],[0,'M7'],[5,'M7']],v:[{name:'2拍ずつ',c:[[[0,'M7'],[5,'M7']],[[0,'M7'],[5,'M7']]]},{name:'IM7–IIm7',c:[[0,'M7'],[2,'m7'],[0,'M7'],[2,'m7']]}]},
+  // コンファメ進行（Ⅱ-Ⅴ分解型カノン進行）：カノン進行の V・IIIm をセカンダリードミナント（III7・I7）にして
+  // ツーファイブ分解した形。| I | VIIm7♭5 III7 | VIm7 | Vm7 I7 | IV …。名前は Charlie Parker「Confirmation」から
+  {mode:'major',name:'コンファメ進行',file:'Confirmation',
+    c:[[0,''],[[11,'m7b5'],[4,'7']],[9,'m7'],[[7,'m7'],[0,'7']],[5,''],[[4,'m7'],[9,'m7']],[2,'m7'],[[7,'sus4'],[7,'']]],
+    v:[
+      {name:'前半4小節',c:[[0,''],[[11,'m7b5'],[4,'7']],[9,'m7'],[[7,'m7'],[0,'7']]]},
+      {name:'Confirmation型',c:[[0,'M7'],[[11,'m7b5'],[4,'7']],[[9,'m7'],[2,'7']],[[7,'m7'],[0,'7']],[5,'7'],[[5,'m7'],[10,'7']],[[4,'m7'],[9,'7']],[[2,'m7'],[7,'7']]]},
+      {name:'♭VIm7経由',c:[[0,''],[[11,'m7b5'],[4,'7']],[[9,'m7'],[8,'m7']],[[7,'m7'],[0,'7']]]},
+      {name:'VIIm7版',c:[[0,''],[[11,'m7'],[4,'7']],[9,'m7'],[[7,'m7'],[0,'7']]]},
+      {name:'Iaug/♯IV代理',c:[[0,''],[[11,'m7b5'],[4,'7']],[9,'m7'],[[7,'m7'],[0,'aug',6]]]}]},
   {mode:'minor',name:'マイナー・クリシェ',file:'MinorCliche',c:[[0,'m'],[0,'mM7'],[0,'m7'],[0,'m6']],v:[{name:'2拍ずつ',c:[[[0,'m'],[0,'mM7']],[[0,'m7'],[0,'m6']]]},{name:'♭VIM7へ',c:[[0,'m'],[0,'mM7'],[0,'m7'],[0,'m6'],[8,'M7'],[8,'M7']]}]},
   {mode:'minor',name:'枯葉進行',file:'AutumnLeaves',c:[[5,'m7'],[10,'7'],[3,'M7'],[8,'M7'],[2,'m7b5'],[7,'7'],[0,'m'],[0,'m']]},
   {mode:'minor',name:'Im7–IV7（ドリアン）',file:'DorianVamp',c:[[0,'m7'],[5,'7'],[0,'m7'],[5,'7']],v:[{name:'2拍ずつ',c:[[[0,'m7'],[5,'7']],[[0,'m7'],[5,'7']]]}]},
@@ -118,7 +129,7 @@ PROGRESSIONS.push(...[
 export const VARIANT_FILE={
   '3和音':'Triad','III7版':'III7','ツーファイブ解決':'II-V-Resolve','ベース下降':'BassLine','7th':'7th',
   'IV始まり':'FromIV','sus4':'sus4','分数ベース':'SlashBass','IIm版':'IIm','裏コード':'TritoneSub',
-  'V7sus4経由':'V7sus4','VI7版':'VI7','スリーシックス':'III-VI','IIIm7版':'IIIm7','Vm7経由':'Vm7',
+  'V7sus4経由':'V7sus4','VI7版':'VI7','スリーシックス':'III-VI','IIIm7版':'IIIm7','Vm7経由':'Vm7','I7のみ':'I7Only','前半4小節':'First4','Confirmation型':'Jazz','♭VIm7経由':'bVIm7Pass','VIIm7版':'VIIm7','Iaug/♯IV代理':'IaugSub',
   '♭VI始まり':'FrombVI','V7版':'V7','Vm版':'Vm',
   'M7下降':'DescendingM7','IV解決':'ToIV','バックドア':'Backdoor','2拍ずつ':'HalfBar','8小節':'8Bars','IIm7版':'IIm7',
   'I–♭VII–IV':'I-bVII-IV','♭VI・♭VII':'bVI-bVII','IM7–IIm7':'I-IIm','V7終止':'V7End','♭VIM7へ':'TobVIM7'
@@ -201,7 +212,10 @@ export function chordRootName(ch,flat,tonic){
 }
 export const chordName=(ch,flat,tonic)=>{
   const root=chordRootName(ch,flat,tonic);
-  return root+CHORD[ch.q].s+(hasBass(ch)?'/'+spellChordTone(ch.bass,ch.root,flat,root):'');
+  // 分数コードのベースも、キーの外の音（例：♯IV）なら度数から綴る
+  const bass=!hasBass(ch)?'':ch.boff!=null&&/[♭♯]/.test(ROMAN[ch.boff])
+    ?chordRootName({root:ch.bass,off:ch.boff},flat,tonic):spellChordTone(ch.bass,ch.root,flat,root);
+  return root+CHORD[ch.q].s+(bass?'/'+bass:'');
 };
 export const chordDeg=(off,q,boff)=>ROMAN[off]+CHORD[q].s+(boff!=null?'/'+ROMAN[boff]:'');
 export const chordPcs=ch=>{const pcs=CHORD[ch.q].iv.map(x=>mod12(ch.root+x));return hasBass(ch)&&!pcs.includes(ch.bass)?[...pcs,ch.bass]:pcs;};
