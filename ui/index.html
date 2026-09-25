@@ -37,10 +37,11 @@
         <h2 id="kbTitle">鍵盤</h2>
         <div class="seg small" id="viewSeg"><button data-v="kb" aria-pressed="true">鍵盤</button><button data-v="staff" aria-pressed="false">五線譜</button></div>
         <button id="pickBtn" class="sync" aria-pressed="false" title="鍵盤・指板で音を選んでコードを判別">コード判別</button>
+        <button id="pickClear" class="sync" hidden title="選んだ音をすべて外す">クリア</button>
         <span class="spacer"></span>
         <div class="selinfo" id="selInfo"><span><b id="selName"></b> の構成音</span><button id="selClear">スケールに戻す</button></div>
         <div class="pickinfo live" id="liveInfo"><span class="pk">MIDI：</span><span id="liveResult"></span></div>
-        <div class="pickinfo" id="pickInfo"><span class="pk">判別：</span><span id="pickResult"></span><button id="pickPlay">鳴らす</button><button id="pickClear">クリア</button></div>
+        <div class="pickinfo" id="pickInfo"><span class="pk">判別：</span><span id="pickResult"></span><button id="pickPlay">鳴らす</button></div>
         <div class="legend" id="kbLegend">
           <span><i style="background:var(--root)"></i>ルート</span>
           <span><i style="background:var(--tone)"></i>スケール音</span>

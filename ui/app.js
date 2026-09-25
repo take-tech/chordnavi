@@ -496,7 +496,8 @@ function pickOnString(s,midi){
   if(!canAdd(midi)){if(prev!=null)picks.set(key,prev);return;}
   picks.set(key,midi);playNote(midi,state.timbre);
 }
-document.getElementById('pickBtn').onclick=()=>{state.pick=!state.pick;if(state.pick)stopPlayback(true);render();};
+// オフにしたら選んだ音は消す（次にオンにしたときは空から始める）
+document.getElementById('pickBtn').onclick=()=>{state.pick=!state.pick;if(state.pick)stopPlayback(true);else picks.clear();render();};
 document.getElementById('pickClear').onclick=()=>{picks.clear();render();};
 document.getElementById('pickPlay').onclick=()=>{const ns=pickedNotes();if(ns.length)playNotes(ns,state.timbre);};
 // MIDI で弾いている音のコード名（見出しに出す）
@@ -515,6 +516,8 @@ function renderLive(){
 function renderPick(){
   const on=state.pick;
   document.getElementById('pickBtn').setAttribute('aria-pressed',on);
+  const clear=document.getElementById('pickClear');
+  clear.hidden=!on;clear.disabled=!picks.size;
   document.getElementById('pickInfo').classList.toggle('on',on);
   document.getElementById('kbLegend').hidden=on||liveNotes.length>0;
   if(!on)return;
@@ -722,6 +725,15 @@ function fit(){
 addEventListener('resize',fit);fit();
 
 /* ---------- 全体描画 ---------- */
+// チップのコード名が入りきらないときは、切り捨てずに文字を小さくして収める（最小 9px）
+function fitChipNames(){
+  for(const n of document.querySelectorAll('#dia .chip .n, #chips .chip .n')){
+    n.style.fontSize='';
+    let size=parseFloat(getComputedStyle(n).fontSize);
+    while(n.scrollWidth>n.clientWidth+1&&size>9){size-=.5;n.style.fontSize=size+'px';}
+  }
+}
+
 function render(){
   keySel.value=state.idx+':'+state.mode;scaleSel.value=state.scale;
   cKey.textContent=keyName().replace('/',' / ');
@@ -748,6 +760,7 @@ function render(){
   renderPick();
   // 進行のコード（progChords）を先に作ってから TAB譜を描く
   renderKeyPanel();renderProgs();renderFretPanel();renderDiatonic();
+  fitChipNames();
   persist();
 }
 /* ---------- 状態の保存・復元 ---------- */
