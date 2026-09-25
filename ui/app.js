@@ -375,16 +375,14 @@ function renderPick(){
 
 /* ---------- コード進行 ---------- */
 let progChords=[],progTitle='';
-// 一時的なコードの変更：{ key: どの進行か, c: { コード番号: [ルートの度数, 種類, ベースの度数] } }。
-// 進行・派生を切り替えると消える（保存しない）
-const edits={key:null,c:{}};
+// 一時的なコードの変更：{ key: どの進行か, bars: 変更後の小節の並び（変更なしは null） }。
+// 1小節のコードの分割（2拍×2）・結合もここに入る。進行・派生を切り替えると消える（保存しない）
+const edits={key:null,bars:null};
+const isSplitBar=bar=>Array.isArray(bar[0]);
+const barItemsOf=bar=>isSplitBar(bar)?bar:[bar];
+const clone=x=>JSON.parse(JSON.stringify(x));
+const sameJSON=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 const EDIT_QUALITIES=['','m','7','M7','m7','6','m6','add9','sus2','sus4','7sus4','9','M9','m9','mM7','dim','dim7','m7b5','aug'];
-// 小節の並びに変更を当てはめる
-function applyEdits(bars){
-  let k=0;
-  const one=it=>edits.c[k++]??it;
-  return bars.map(bar=>Array.isArray(bar[0])?bar.map(one):one(bar));
-}
 function selectProgression(i){
   stopPlayback(true);state.prog[state.mode]=i;state.vari[state.mode]=0;state.sel=null;closeMore();render();
 }
@@ -401,8 +399,10 @@ function renderProgs(){
   pills.appendChild(more);
   const p=list[cur], t=tonic(), vars=variantsOf(p), vi=Math.min(state.vari[state.mode],vars.length-1), v=vars[vi];
   const ekey=`${state.mode}:${cur}:${vi}`;
-  if(edits.key!==ekey){edits.key=ekey;edits.c={};state.editIdx=null;}
-  const edited=Object.keys(edits.c).length>0, bars=applyEdits(v.c), original=progressionChords(t,v.c);
+  if(edits.key!==ekey){edits.key=ekey;edits.bars=null;state.editIdx=null;}
+  const bars=edits.bars??v.c, edited=!!edits.bars;
+  // コード番号 → 小節の位置（b 小節目の k 番目）
+  const where=bars.flatMap((bar,b)=>barItemsOf(bar).map((_,k)=>({b,k})));
   const vbox=document.getElementById('variants');vbox.innerHTML='';
   if(vars.length>1){
     vbox.append('派生：');
@@ -411,7 +411,7 @@ function renderProgs(){
   }
   // リズム½：各コードの長さを半分に（1小節→2拍、2拍→1拍）
   const rate=state.half?.5:1;
-  const chords=progressionChords(t,bars).map((c,i)=>({...c,beats:c.beats*rate,...(edits.c[i]!=null?{edited:true}:{})}));
+  const chords=progressionChords(t,bars).map((c,i)=>({...c,beats:c.beats*rate,...(sameJSON(bars[where[i].b],v.c[where[i].b])?{}:{edited:true})}));
   // ファイル名は英字のみ（例：C_Canon_BassLine_half、変更ありは _custom）
   const title=`${nn(t)}${state.mode==='minor'?'m':''}_${p.file}${vi>0?'_'+VARIANT_FILE[v.name]:''}${state.half?'_half':''}${edited?'_custom':''}`;
   const nameEl=document.getElementById('progName'), degEl=document.getElementById('progDeg');
@@ -430,23 +430,27 @@ function renderProgs(){
     if(playback&&playback.index===i)chip.classList.add('playing');
     box.appendChild(chip);
   });
-  renderEditBar(chords,original,t);
+  renderEditBar(chords,{t,orig:v.c,bars,where});
 }
 
-// 選んだ進行のコードのルート・種類を変えるバー（ヒントの位置に出す）
-function renderEditBar(chords,original,t){
+// 選んだ進行のコードのルート・種類を変え、1小節のコードを分割・結合するバー（ヒントの位置に出す）
+function renderEditBar(chords,{t,orig,bars,where}){
   const bar=document.getElementById('editBar'), i=state.editIdx, ch=i!=null&&chords[i];
   document.getElementById('hint').hidden=!!ch;
   bar.classList.toggle('on',!!ch);
   bar.innerHTML='';
   if(!ch)return;
-  const o=original[i], item=c=>[c.off,c.q,c.boff];
-  // 変更を当てはめて鳴らす（元と同じなら変更なしに戻す）
+  const {b,k}=where[i], split=isSplitBar(bars[b]);
+  // 小節の並びを書き換える（元と同じになったら変更なしに戻す）。newIdx は書き換え後に選ぶコード
+  const update=(fn,newIdx)=>{
+    const next=clone(bars);fn(next);
+    edits.bars=sameJSON(next,orig)?null:next;
+    const nb=edits.bars??orig, items=nb.flatMap(barItemsOf), c={...chordAt(t,items[newIdx])};
+    playChord(c);state.sel=c;state.editIdx=newIdx;render();
+  };
   const setItem=([off,q,boff])=>{
-    const same=off===o.off&&q===o.q&&(boff??null)===(o.boff??null);
-    if(same)delete edits.c[i];else edits.c[i]=boff!=null?[off,q,boff]:[off,q];
-    const next={...chordAt(t,[off,q,boff]),beats:ch.beats};
-    playChord(next);state.sel=next;state.editIdx=i;render();
+    const it=boff!=null?[off,q,boff]:[off,q];
+    update(nb=>{if(split)nb[b][k]=it;else nb[b]=it;},i);
   };
   // ルート：主音から半音ずつ12音。分数コードはベースとの距離を保つ
   const root=document.createElement('select');root.title='ルート';
@@ -464,9 +468,21 @@ function renderEditBar(chords,original,t){
     bar.appendChild(b);
   }
   const tail=document.createElement('span');tail.className='tail';
-  if(edits.c[i]!=null){
-    const undo=document.createElement('button');undo.textContent='元に戻す';
-    undo.onclick=()=>setItem(item(o));
+  // 分割：1小節のコード → 同じコードを2拍×2に。結合：分割された小節 → 選んだほうのコードで1小節に
+  const first=where.findIndex(w=>w.b===b);
+  const tool=document.createElement('button');tool.className='tool';
+  if(!split){
+    tool.textContent='✂ 分割';tool.title='この小節を2拍ずつの2コードに分ける';
+    tool.onclick=()=>update(nb=>{nb[b]=[clone(nb[b]),clone(nb[b])];},i);
+  }else{
+    tool.textContent='結合';tool.title='この小節を選んでいるコード1つ（1小節）にする';
+    tool.onclick=()=>update(nb=>{nb[b]=clone(nb[b][k]);},first);
+  }
+  tail.appendChild(tool);
+  if(!sameJSON(bars[b],orig[b])){
+    const undo=document.createElement('button');undo.textContent='元に戻す';undo.title='この小節を元に戻す';
+    // 元に戻した後は、その小節の先頭のコードを選ぶ
+    undo.onclick=()=>update(nb=>{nb[b]=clone(orig[b]);},first);
     tail.appendChild(undo);
   }
   const close=document.createElement('button');close.textContent='閉じる';

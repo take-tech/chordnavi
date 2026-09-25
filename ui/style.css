@@ -79,6 +79,7 @@ svg text{font-family:inherit}
 .editbar button[aria-pressed=true]{background:#6B4FBB;border-color:#6B4FBB;color:#fff}
 .editbar .tail{margin-left:auto;display:flex;gap:4px}
 .editbar .tail button{background:var(--panel)}
+.editbar .tail .tool{background:#fff;border-color:#6B4FBB;color:#6B4FBB;font-weight:700}
 .prog-panel{position:relative}
 .more-pop{position:absolute;left:16px;right:16px;top:118px;z-index:5;background:#fff;border:1px solid var(--ink2);border-radius:6px;
   box-shadow:0 6px 20px rgba(30,39,66,.18);padding:10px;display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
