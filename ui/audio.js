@@ -31,9 +31,10 @@ function play(events,timbre){
 // 鍵盤・指板のクリック：1音だけ鳴らす（他の試聴は止めない）
 const nativeNotes=juce?juce.getNativeFunction('playNotes'):null;
 const NOTE_DUR=1.0;
-export function playNote(midi,timbre){
-  if(nativeNotes){nativeNotes({notes:[midi],dur:NOTE_DUR,timbre}).catch(err=>console.error(err));return;}
-  webAudioNotes([midi],0,NOTE_DUR);
+export function playNote(midi,timbre){playNotes([midi],timbre);}
+export function playNotes(notes,timbre){
+  if(nativeNotes){nativeNotes({notes,dur:NOTE_DUR,timbre}).catch(err=>console.error(err));return;}
+  webAudioNotes(notes,0,NOTE_DUR);
 }
 
 // 試聴中の音と予約をすべて止める

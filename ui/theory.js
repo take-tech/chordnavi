@@ -30,7 +30,11 @@ export const CHORD={
   '':{s:'',iv:[0,4,7]}, m:{s:'m',iv:[0,3,7]}, '7':{s:'7',iv:[0,4,7,10]},
   M7:{s:'M7',iv:[0,4,7,11]}, m7:{s:'m7',iv:[0,3,7,10]}, m7b5:{s:'m7♭5',iv:[0,3,6,10]},
   dim:{s:'dim',iv:[0,3,6]}, aug:{s:'aug',iv:[0,4,8]}, sus4:{s:'sus4',iv:[0,5,7]},
-  '7sus4':{s:'7sus4',iv:[0,5,7,10]}, dim7:{s:'dim7',iv:[0,3,6,9]}
+  '7sus4':{s:'7sus4',iv:[0,5,7,10]}, dim7:{s:'dim7',iv:[0,3,6,9]},
+  // 以下はコード判別用（進行データでも使える）
+  sus2:{s:'sus2',iv:[0,2,7]}, '6':{s:'6',iv:[0,4,7,9]}, m6:{s:'m6',iv:[0,3,7,9]},
+  add9:{s:'add9',iv:[0,4,7,14]}, mM7:{s:'mM7',iv:[0,3,7,11]}, '9':{s:'9',iv:[0,4,7,10,14]},
+  M9:{s:'M9',iv:[0,4,7,11,14]}, m9:{s:'m9',iv:[0,3,7,10,14]}, '5':{s:'5',iv:[0,7]}
 };
 
 // c は小節の並び。1小節は [ルートの度数(半音), 種類, ベースの度数(分数コードのみ)]、
@@ -108,6 +112,34 @@ export function convertChordSize(ch,size,mode){
   if(size==='3')return ch.q in TRIAD_OF?{...ch,q:TRIAD_OF[ch.q]}:ch;
   const i=DIATONIC['3'][mode].findIndex(([off,q])=>off===ch.off&&q===ch.q);
   return i<0?ch:{...ch,q:DIATONIC['7'][mode][i][1]};
+}
+
+/* ---------- コード判別 ---------- */
+// 同じ構成音なら先に来る種類を優先（例：C E G A は C6 より Am7/C を後に）
+const DETECT_ORDER=['','m','7','M7','m7','m7b5','dim','dim7','aug','sus4','7sus4','sus2','6','m6','mM7','add9','9','M9','m9','5'];
+
+/**
+ * MIDI ノート番号の集合 → コード候補（良い順、最大 limit 件）。
+ * 最低音をベースとし、ルート≠ベースなら分数コードにする。5度を省略した形も低い優先度で候補にする
+ */
+export function detectChords(midiNotes,limit=4){
+  const notes=[...new Set(midiNotes)].sort((a,b)=>a-b);
+  if(!notes.length)return [];
+  const pcs=[...new Set(notes.map(mod12))], bass=mod12(notes[0]);
+  const same=(a,b)=>a.length===b.length&&a.every(x=>b.includes(x));
+  const found=[];
+  for(const root of pcs){
+    DETECT_ORDER.forEach((q,order)=>{
+      const tones=[...new Set(CHORD[q].iv.map(i=>mod12(root+i)))];
+      let penalty=null;
+      if(same(tones,pcs))penalty=0;
+      else if(tones.length>=4&&CHORD[q].iv.includes(7)&&same(tones.filter(p=>p!==mod12(root+7)),pcs))penalty=10;   // 5度省略
+      if(penalty==null)return;
+      if(root!==bass)penalty+=2;
+      found.push({root,q,...(root!==bass?{bass}:{}),score:penalty*100+order});
+    });
+  }
+  return found.sort((a,b)=>a.score-b.score).slice(0,limit).map(({score,...c})=>c);
 }
 
 /* ---------- 純粋関数 ---------- */

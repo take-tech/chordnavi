@@ -78,6 +78,14 @@ svg text{font-family:inherit}
 .sync{font:inherit;font-size:11px;border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:4px;padding:3px 8px;cursor:pointer}
 .sync[aria-pressed=true]{background:var(--ink);border-color:var(--ink);color:#fff}
 .sync[hidden]{display:none}
+.legend[hidden]{display:none}
+.pickinfo{display:none;align-items:center;gap:5px;font-size:12px;background:#fff;border:1px solid #6B4FBB;border-radius:4px;padding:2px 4px 2px 8px;min-width:0}
+.pickinfo.on{display:flex}
+.pickinfo .pk{color:#6B4FBB;font-weight:700;white-space:nowrap}
+#pickResult{display:flex;gap:4px;align-items:center;color:var(--muted);white-space:nowrap;overflow:hidden}
+#pickResult button{font:inherit;font-size:12px;border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:3px;padding:0 6px;cursor:grab}
+#pickResult button.best{border-color:#6B4FBB;color:#6B4FBB;font-weight:700}
+.pickinfo>button{font:inherit;font-size:11px;border:1px solid var(--line);background:var(--panel);border-radius:3px;padding:1px 8px;cursor:pointer;white-space:nowrap}
 /* 鍵盤・指板：押すと鳴る */
 #kb circle,#kb text,#fb circle,#fb text{pointer-events:none}
 #kb [data-note]{cursor:pointer}
