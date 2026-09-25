@@ -97,6 +97,25 @@ WebView上のマウス操作から外部ドラッグを開始できるかはOS�
 6. 状態の保存（キー・モード・スケール・表示・選択中の進行・テンポを `getStateInformation` で保存／復元）
 7. VST3／AU のビルドと、DAW上での動作確認
 
+## ビルド・確認
+
+```
+# 構成（手元の JUCE を使う場合は -DFETCHCONTENT_SOURCE_DIR_JUCE=<JUCE のパス>）
+cmake -S . -B build-release -DCMAKE_BUILD_TYPE=Release
+cmake --build build-release --target GodokenNavigator_VST3 GodokenNavigator_AU GodokenNavigator_Standalone -j8
+
+# 単体テスト
+cmake --build build --target MidiExportTests && ./build/MidiExportTests_artefacts/Debug/MidiExportTests
+
+# インストール（ユーザーのプラグインフォルダ）と AU の検証
+cp -R "build-release/GodokenNavigator_artefacts/Release/VST3/Godoken Navigator.vst3" ~/Library/Audio/Plug-Ins/VST3/
+cp -R "build-release/GodokenNavigator_artefacts/Release/AU/Godoken Navigator.component" ~/Library/Audio/Plug-Ins/Components/
+auval -v aumu Gdkn Rnze
+```
+
+- 音源（aumu）なので MIDI 入力を受ける設定にしている（`NEEDS_MIDI_INPUT TRUE`。auval の MIDI テストに必要）。受けた MIDI は今は使わない。
+- UI をブラウザで確認するときは `ui/` を HTTP で配信して開く（JUCE ブリッジが無いときは WebAudio・DAW同期なしで動く）。
+
 ## ルール
 
 - 音楽理論のデータ（スケール・コード・進行）は `theory.js` に集約し、UIコードと混ぜない。
