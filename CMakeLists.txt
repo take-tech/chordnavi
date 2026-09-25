@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 3.22)
 set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING "")
 set(CMAKE_OSX_ARCHITECTURES "arm64;x86_64" CACHE STRING "")
 
-project(ChordNavi VERSION 0.1.0)
+project(ChordNavi VERSION 0.9.0)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -39,7 +39,7 @@ juce_add_binary_data(GodokenUIData
 # Plugin Target
 # ──────────────────────────────────────────────────────
 juce_add_plugin(ChordNavi
-    VERSION                     0.1.0
+    VERSION                     0.9.0
     COMPANY_NAME                Ranze
     PLUGIN_MANUFACTURER_CODE    Rnze
     PLUGIN_CODE                 Gdkn
