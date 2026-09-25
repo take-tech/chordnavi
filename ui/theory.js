@@ -23,7 +23,14 @@ export const SCALES=[
   {id:'minpenta',name:'マイナー・ペンタトニック',iv:[0,3,5,7,10]},
   {id:'blues',name:'ブルース',iv:[0,3,5,6,7,10]},
   {id:'whole',name:'ホールトーン',iv:[0,2,4,6,8,10],alt:{6:'♯4',8:'♯5'}},
-  {id:'dim',name:'ディミニッシュ（H-W）',iv:[0,1,3,4,6,7,9,10],alt:{4:'♭4'}}
+  {id:'dim',name:'ディミニッシュ（H-W）',iv:[0,1,3,4,6,7,9,10],alt:{4:'♭4'}},
+  {id:'augscale',name:'オーギュメント（対称）',iv:[0,3,4,7,8,11],alt:{3:'♯2',8:'♯5'}},
+  // コードトーン（group:'chord'）：五度圏で選んだキーの主音をルートにして、構成音だけを表示する
+  {id:'ct_M7',group:'chord',name:'メジャーセブン（M7）',iv:[0,4,7,11]},
+  {id:'ct_m7',group:'chord',name:'マイナーセブン（m7）',iv:[0,3,7,10]},
+  {id:'ct_7',group:'chord',name:'ドミナントセブン（7）',iv:[0,4,7,10]},
+  {id:'ct_m7b5',group:'chord',name:'ハーフディミニッシュ（m7♭5）',iv:[0,3,6,10]},
+  {id:'ct_dim7',group:'chord',name:'ディミニッシュセブン（dim7）',iv:[0,3,6,9],alt:{9:'𝄫7'}}
 ];
 
 export const CHORD={
@@ -212,7 +219,7 @@ export function spellWithLetter(pc,letter){
 const shiftLetter=(name,n)=>LETTERS[(LETTERS.indexOf(name[0])+n)%7];
 // スケール音：度数表記（'♭3','♯4' など）の数字で文字を決める
 export function spellScaleTone(pc,tonicName,deg){
-  return spellWithLetter(pc,shiftLetter(tonicName,parseInt(deg.replace(/[♭♯]/g,''),10)-1));
+  return spellWithLetter(pc,shiftLetter(tonicName,parseInt(deg.replace(/[♭♯𝄫𝄪]/gu,''),10)-1));
 }
 // コード構成音：ルートからの音程で文字を決める（dim7 の 9半音は減7度）
 const CHORD_LETTER={0:0,1:1,2:1,3:2,4:2,5:3,6:4,7:4,8:4,9:5,10:6,11:6};

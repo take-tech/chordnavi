@@ -149,7 +149,12 @@ for(const m of ['major','minor'])for(let i=0;i<12;i++){
   o.textContent=(m==='major'?MAJ_LABEL[i]+' メジャー':MIN_LABEL[i].replace(/m/g,'')+' マイナー')+'（'+SIG[i]+'）';
   keySel.appendChild(o);
 }
-for(const s of SCALES){const o=document.createElement('option');o.value=s.id;o.textContent=s.name;scaleSel.appendChild(o);}
+// スケールとコードトーンをグループに分けて並べる
+for(const [group,label] of [[undefined,'スケール'],['chord','コードトーン（主音がルート）']]){
+  const g=document.createElement('optgroup');g.label=label;
+  for(const s of SCALES.filter(x=>x.group===group)){const o=document.createElement('option');o.value=s.id;o.textContent=s.name;g.appendChild(o);}
+  scaleSel.appendChild(g);
+}
 keySel.addEventListener('change',()=>{const [i,m]=keySel.value.split(':');setKey(+i,m);});
 scaleSel.addEventListener('change',()=>{state.scale=scaleSel.value;render();});
 function bindSeg(id,key,onChange){
