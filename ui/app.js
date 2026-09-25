@@ -12,8 +12,11 @@ import {getHostInfo,onHostTempo} from './host.js';
 
 /* ---------- 状態 ---------- */
 const state={idx:0,mode:'major',scale:'major',label:'name',view:'kb',dia:'7',sel:null,prog:{major:0,minor:0},vari:{major:0,minor:0},timbre:'organ',loop:false,syncTempo:false,half:false,pick:false};
-// コード判別で選んだ音（MIDI ノート番号）
-const picked=new Set();
+// コード判別で選んだ音。キーは 'kb:<MIDI>'（鍵盤）または 's<弦番号>'（指板：1本の弦に1音）、値は MIDI
+const picks=new Map();
+const pickedNotes=()=>[...new Set(picks.values())];
+const isPicked=midi=>[...picks.values()].includes(midi);
+const stringPick=s=>picks.get('s'+s);
 const MAX_PICK=8, PICK_COLOR='#6B4FBB';
 const tonic=()=>tonicOf(state.idx,state.mode);
 const playChord=ch=>{stopPlayback(false);play1(ch,state.timbre);};
@@ -222,8 +225,18 @@ function keyStyle(midi){
   const n=noteInfo(mod12(midi));
   let ds=dotStyle(n);
   if(!state.pick)return {n,ds,on:false};
-  if(picked.has(midi))return {n,ds:{fill:PICK_COLOR,op:1},on:true};
+  if(isPicked(midi))return {n,ds:{fill:PICK_COLOR,op:1},on:true};
   return {n,ds:ds&&{...ds,op:.25},on:false};
+}
+// 指板の1マス：その弦で選んだ音は濃い紫、鍵盤で選んだ同じ高さの音は薄い紫
+function fretStyle(s,midi){
+  const st=keyStyle(midi);
+  if(!state.pick||!st.on)return st;
+  if(stringPick(s)===midi)return st;
+  if(picks.has('kb:'+midi))return {...st,ds:{fill:PICK_COLOR,op:.4}};
+  // 別の弦で選んだ音：このマスは通常の（薄い）表示
+  const d=dotStyle(st.n);
+  return {...st,ds:d&&{...d,op:.25},on:false};
 }
 
 /* ---------- 五線譜 ---------- */
@@ -231,13 +244,13 @@ function renderStaffView(){
   const svg=document.getElementById('staff'), t=tonic(), sig=keySignature(state.idx);
   if(state.pick){
     // コード判別：選んだ音を和音で表示（綴りは第1候補のコードから）
-    const cand=detectChords([...picked])[0];
+    const cand=detectChords(pickedNotes())[0];
     const spell=pc=>{
       if(cand){const iv=CHORD[cand.q].iv.find(i=>mod12(cand.root+i)===pc);
         const s=iv!=null&&spellChordInterval(cand.root,nn(cand.root),iv,cand.q);if(s)return s;}
       return nn(pc);
     };
-    const notes=[...picked].sort((a,b)=>a-b).map(midi=>{const n=noteInfo(mod12(midi)),name=spell(mod12(midi));
+    const notes=pickedNotes().sort((a,b)=>a-b).map(midi=>{const n=noteInfo(mod12(midi)),name=spell(mod12(midi));
       return {midi,name,label:state.label==='name'?name:n.label,fill:PICK_COLOR,op:1,col:0};});
     renderStaff(svg,{sig,notes,columns:1,labelSide:'right'});
     return;
@@ -291,7 +304,7 @@ function renderFretboard(){
     el('line',{x1:L,y1:y,x2:L+FR*FW,y2:y,stroke:'#5B6275','stroke-width':1+s*.35},svg);
     txt(svg,13,y,(s+1)+'弦',{fill:'#6A7390','font-size':10});
     for(let f=0;f<=FR;f++){
-      const {n,ds}=keyStyle(OPEN[s]+f); if(!ds)continue;
+      const {n,ds}=fretStyle(s,OPEN[s]+f); if(!ds)continue;
       const x=f===0?L-18:L+(f-.5)*FW;
       el('circle',{cx:x,cy:y,r:12,fill:ds.fill,opacity:ds.op,stroke:'#fff','stroke-width':1.5},svg);
       txt(svg,x,y,n.label,{fill:'#fff','font-size':n.label.length>2?9:11,'font-weight':700,opacity:ds.op===1?1:.6});
@@ -301,7 +314,7 @@ function renderFretboard(){
   OPEN.forEach((open,s)=>{
     for(let f=0;f<=FR;f++){
       const x0=f===0?L-32:L+(f-1)*FW, w=f===0?32:FW;
-      el('rect',{class:'hit',x:x0,y:T+s*SS-SS/2,width:w,height:SS,'data-note':open+f},svg);
+      el('rect',{class:'hit',x:x0,y:T+s*SS-SS/2,width:w,height:SS,'data-note':open+f,'data-string':s},svg);
     }
   });
 }
@@ -312,17 +325,32 @@ for(const id of ['kb','fb'])
     const note=e.target.dataset&&e.target.dataset.note;
     if(note==null)return;
     e.preventDefault();
-    const midi=+note;
+    const midi=+note, str=e.target.dataset.string;
     if(!state.pick){playNote(midi,state.timbre);return;}
-    if(picked.has(midi))picked.delete(midi);
-    else if(picked.size<MAX_PICK){picked.add(midi);playNote(midi,state.timbre);}
+    if(str!=null)pickOnString(+str,midi);else pickOnKeyboard(midi);
     render();
   });
 
 /* ---------- コード判別 ---------- */
+const canAdd=midi=>isPicked(midi)||pickedNotes().length<MAX_PICK;
+// 鍵盤：選んでいる高さなら（指板で選んだものも含めて）外す。それ以外は追加
+function pickOnKeyboard(midi){
+  if(isPicked(midi)){for(const [k,v] of picks)if(v===midi)picks.delete(k);return;}
+  if(!canAdd(midi))return;
+  picks.set('kb:'+midi,midi);playNote(midi,state.timbre);
+}
+// 指板：1本の弦に1音。同じマスなら外し、同じ弦の別のフレットなら置き換える
+function pickOnString(s,midi){
+  const key='s'+s;
+  if(picks.get(key)===midi){picks.delete(key);return;}
+  const prev=picks.get(key);
+  picks.delete(key);
+  if(!canAdd(midi)){if(prev!=null)picks.set(key,prev);return;}
+  picks.set(key,midi);playNote(midi,state.timbre);
+}
 document.getElementById('pickBtn').onclick=()=>{state.pick=!state.pick;if(state.pick)stopPlayback(true);render();};
-document.getElementById('pickClear').onclick=()=>{picked.clear();render();};
-document.getElementById('pickPlay').onclick=()=>{if(picked.size)playNotes([...picked],state.timbre);};
+document.getElementById('pickClear').onclick=()=>{picks.clear();render();};
+document.getElementById('pickPlay').onclick=()=>{const ns=pickedNotes();if(ns.length)playNotes(ns,state.timbre);};
 function renderPick(){
   const on=state.pick;
   document.getElementById('pickBtn').setAttribute('aria-pressed',on);
@@ -331,8 +359,8 @@ function renderPick(){
   if(!on)return;
   const box=document.getElementById('pickResult');box.innerHTML='';
   const t=tonic();
-  const cands=detectChords([...picked]).map(c=>({...c,off:mod12(c.root-t),...(c.bass!=null?{boff:mod12(c.bass-t)}:{})}));
-  if(!picked.size){box.textContent='音を選んでください';return;}
+  const cands=detectChords(pickedNotes()).map(c=>({...c,off:mod12(c.root-t),...(c.bass!=null?{boff:mod12(c.bass-t)}:{})}));
+  if(!picks.size){box.textContent='音を選んでください';return;}
   if(!cands.length){box.textContent='該当なし';return;}
   cands.forEach((ch,i)=>{
     const b=document.createElement('button');b.className=i===0?'best':'';
