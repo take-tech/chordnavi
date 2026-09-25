@@ -36,7 +36,8 @@ namespace
 std::vector<int> voicing (const Chord& chord)
 {
     const int root = ((chord.root % 12) + 12) % 12;
-    std::vector<int> notes { 36 + root };
+    const int bass = chord.bass >= 0 ? chord.bass % 12 : root;
+    std::vector<int> notes { 36 + bass };
 
     for (auto iv : chord.intervals)
         notes.push_back (48 + root + iv);

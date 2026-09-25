@@ -7,9 +7,9 @@ const native=name=>juce?juce.getNativeFunction(name):(...a)=>{console.warn(`nati
 const nativeStartDrag=native('startMidiDrag');
 const nativeSave=native('saveMidi');
 
-// { name, bpm, chords:[{root,q}] } → C++ へ渡す形式
+// { name, bpm, chords:[{root,q,bass?}] } → C++ へ渡す形式
 function toRequest({name,bpm,chords}){
-  return {name,bpm,chords:chords.map(ch=>({root:ch.root,iv:CHORD[ch.q].iv}))};
+  return {name,bpm,chords:chords.map(ch=>({root:ch.root,iv:CHORD[ch.q].iv,...(ch.bass!=null?{bass:ch.bass}:{})}))};
 }
 
 // mousedown ＋ 数px の移動で OS のファイルドラッグを開始する。

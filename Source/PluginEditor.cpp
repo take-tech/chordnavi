@@ -37,6 +37,9 @@ namespace
                 MidiExport::Chord chord;
                 chord.root = juce::jlimit (0, 11, (int) c["root"]);
 
+                if (c.hasProperty ("bass"))
+                    chord.bass = juce::jlimit (0, 11, (int) c["bass"]);
+
                 if (auto* ivs = c["iv"].getArray())
                     for (const auto& iv : *ivs)
                         chord.intervals.push_back (juce::jlimit (0, 24, (int) iv));

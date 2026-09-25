@@ -1,10 +1,5 @@
 /* 試聴（暫定：WebAudio）。マイルストーン5で C++ 側の簡易シンセに置き換える */
-import {CHORD} from './theory.js';
-
-function voicing(ch){
-  const base=48+ch.root; // C3〜B3
-  return [36+ch.root,...CHORD[ch.q].iv.map(i=>base+i)];
-}
+import {voicing} from './theory.js';
 
 let ac=null;
 export function playChord(ch,when=0,dur=1.1){

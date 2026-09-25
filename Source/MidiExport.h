@@ -16,9 +16,10 @@ namespace MidiExport
     {
         int root = 0;                 // ピッチクラス 0〜11
         std::vector<int> intervals;   // ルートからの半音数（例：M7 = 0,4,7,11）
+        int bass = -1;                // 分数コードのベース（ピッチクラス）。-1 ならルート
     };
 
-    // ベース＝ルート（C2〜B2）、上声＝ルートを C3〜B3 に置いてコードトーンを積む
+    // ベース＝ルート（分数コードは指定音）を C2〜B2、上声＝ルートを C3〜B3 に置いてコードトーンを積む
     std::vector<int> voicing (const Chord& chord);
 
     juce::MemoryBlock buildMidi (const std::vector<Chord>& chords, int bpm);

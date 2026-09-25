@@ -56,6 +56,12 @@ public:
             expect (MidiExport::voicing ({ 11, { 0, 3, 7 } }) == std::vector<int> { 47, 59, 62, 66 });
         }
 
+        beginTest ("Voicing: slash chord puts the given bass in C2-B2");
+        {
+            expect (MidiExport::voicing ({ 7, { 0, 4, 7 }, 11 }) == std::vector<int> { 47, 55, 59, 62 });  // G/B
+            expect (MidiExport::voicing ({ 0, { 0, 4, 7 }, 4 })  == std::vector<int> { 40, 48, 52, 55 });  // C/E
+        }
+
         beginTest ("Delta times, note on/off pairing (parsed with juce::MidiFile)");
         {
             const auto mb = MidiExport::buildMidi ({ cMajor, fM7 }, 120);
