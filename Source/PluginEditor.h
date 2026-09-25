@@ -29,6 +29,9 @@ public:
 
     void resized() override;
 
+    // Standalone のメニューからテーマを切り替える（UI に "setTheme" イベントで送る）
+    void setTheme (const juce::String& name);
+
 private:
     std::optional<juce::WebBrowserComponent::Resource> serveResource (const juce::String& urlPath);
 

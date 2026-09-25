@@ -1,7 +1,8 @@
 /* 大譜表（ト音記号＋ヘ音記号）の SVG 描画。音の綴りは呼び出し側（鍵盤と同じ表記）から受け取る */
 
 const NS='http://www.w3.org/2000/svg';
-function el(tag,attrs={},parent){const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);if(parent)parent.appendChild(e);return e;}
+// 色に var(--…) を渡したときは style で指定する（テーマを切り替えると描き直さずに色が変わる）
+function el(tag,attrs={},parent){const e=document.createElementNS(NS,tag);for(const k in attrs){const v=attrs[k];if(typeof v==='string'&&v.startsWith('var('))e.style.setProperty(k,v);else e.setAttribute(k,v);}if(parent)parent.appendChild(e);return e;}
 function txt(parent,x,y,s,attrs={}){const t=el('text',{x,y,'text-anchor':'middle','dominant-baseline':'central',...attrs},parent);t.textContent=s;return t;}
 
 // 鍵盤と同じ縦横比（viewBox 884×120）にしてパネルの高さを変えない
@@ -38,10 +39,10 @@ function measureInk(glyph){
 }
 function drawClef(svg,staff,{glyph,line,above,below},x,fallback){
   const ink=measureInk(glyph), lineY=stepY(staff,line);
-  if(!ink){txt(svg,x,lineY,glyph,{fill:'#1E2742','font-size':fallback,'font-family':CLEF_FONT});return;}
+  if(!ink){txt(svg,x,lineY,glyph,{fill:'var(--ink)','font-size':fallback,'font-family':CLEF_FONT});return;}
   const top=lineY-above*GAP, bottom=lineY+below*GAP;
   const fontSize=(bottom-top)/(ink.up+ink.down);
-  const t=el('text',{x,y:top+ink.up*fontSize,'text-anchor':'middle',fill:'#1E2742','font-size':fontSize.toFixed(2),'font-family':CLEF_FONT},svg);
+  const t=el('text',{x,y:top+ink.up*fontSize,'text-anchor':'middle',fill:'var(--ink)','font-size':fontSize.toFixed(2),'font-family':CLEF_FONT},svg);
   t.textContent=glyph;
 }
 
@@ -56,15 +57,15 @@ function position(midi,name){
 const stepY=(staff,step)=>staff.bottomY-(step-staff.bottomStep)*STEP;
 
 function drawStaffLines(svg,staff){
-  for(let i=0;i<5;i++){const y=staff.bottomY-i*GAP;el('line',{x1:10,y1:y,x2:STAFF_W-10,y2:y,stroke:'#5B6275','stroke-width':1},svg);}
+  for(let i=0;i<5;i++){const y=staff.bottomY-i*GAP;el('line',{x1:10,y1:y,x2:STAFF_W-10,y2:y,stroke:'var(--staff-line)','stroke-width':1},svg);}
 }
 
 function drawKeySignature(svg,sig,x0){
   const order=sig.acc==='♯'?SHARP_ORDER:FLAT_ORDER;
   for(let i=0;i<sig.count;i++){
     const x=x0+i*9;
-    txt(svg,x,stepY(TREBLE,order[i]),sig.acc,{fill:'#1E2742','font-size':15});
-    txt(svg,x,stepY(BASS,order[i]-14),sig.acc,{fill:'#1E2742','font-size':15});
+    txt(svg,x,stepY(TREBLE,order[i]),sig.acc,{fill:'var(--ink)','font-size':15});
+    txt(svg,x,stepY(BASS,order[i]-14),sig.acc,{fill:'var(--ink)','font-size':15});
   }
   return x0+sig.count*9;
 }
@@ -79,8 +80,8 @@ function signatureMap(sig){
 
 function drawLedgers(svg,staff,step,x){
   const top=staff.bottomStep+8, bottom=staff.bottomStep;
-  for(let s=bottom-2;s>=step;s-=2)el('line',{x1:x-9,y1:stepY(staff,s),x2:x+9,y2:stepY(staff,s),stroke:'#5B6275','stroke-width':1},svg);
-  for(let s=top+2;s<=step;s+=2)el('line',{x1:x-9,y1:stepY(staff,s),x2:x+9,y2:stepY(staff,s),stroke:'#5B6275','stroke-width':1},svg);
+  for(let s=bottom-2;s>=step;s-=2)el('line',{x1:x-9,y1:stepY(staff,s),x2:x+9,y2:stepY(staff,s),stroke:'var(--staff-line)','stroke-width':1},svg);
+  for(let s=top+2;s<=step;s+=2)el('line',{x1:x-9,y1:stepY(staff,s),x2:x+9,y2:stepY(staff,s),stroke:'var(--staff-line)','stroke-width':1},svg);
 }
 
 /**
@@ -92,7 +93,7 @@ export function renderStaff(svg,{sig,notes,columns,labelSide='below'}){
   svg.innerHTML='';
   svg.setAttribute('viewBox',`0 0 ${STAFF_W} ${STAFF_H}`);
   drawStaffLines(svg,TREBLE);drawStaffLines(svg,BASS);
-  el('line',{x1:10,y1:stepY(TREBLE,38),x2:10,y2:BASS.bottomY,stroke:'#5B6275','stroke-width':1.5},svg);
+  el('line',{x1:10,y1:stepY(TREBLE,38),x2:10,y2:BASS.bottomY,stroke:'var(--staff-line)','stroke-width':1.5},svg);
   drawClef(svg,TREBLE,CLEF_SPEC.treble,30,58);
   drawClef(svg,BASS,CLEF_SPEC.bass,30,30);
   const x0=drawKeySignature(svg,sig,58)+24;
@@ -114,10 +115,10 @@ export function renderStaff(svg,{sig,notes,columns,labelSide='below'}){
       const key=n.letter+n.step, current=inEffect[key]??sigMap[n.letter];
       if(current!==n.acc){
         const sym=n.acc||'♮';
-        txt(svg,x-14-(accCol%3)*8,y,sym,{fill:'#1E2742','font-size':14,opacity:n.op});
+        txt(svg,x-14-(accCol%3)*8,y,sym,{fill:'var(--ink)','font-size':14,opacity:n.op});
         accCol++;inEffect[key]=n.acc;
       }
-      el('ellipse',{cx:nx,cy:y,rx:5.4,ry:3.9,transform:`rotate(-20,${nx},${y})`,fill:n.fill,opacity:n.op,stroke:'#1E2742','stroke-width':.8},svg);
+      el('ellipse',{cx:nx,cy:y,rx:5.4,ry:3.9,transform:`rotate(-20,${nx},${y})`,fill:n.fill,opacity:n.op,stroke:'var(--ink)','stroke-width':.8},svg);
       if(n.label){
         const attrs={fill:n.fill,'font-size':10,'font-weight':700,opacity:n.op===1?1:.6};
         if(labelSide==='right'){

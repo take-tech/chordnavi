@@ -35,6 +35,10 @@ public:
     void getStateInformation (juce::MemoryBlock&) override;
     void setStateInformation (const void*, int) override;
 
+    // 今のテーマ（"light" / "dark" / "auto"）。UI から知らされ、Standalone のメニューのチェックに使う。メッセージスレッドのみ
+    void setUiTheme (const juce::String& t) { uiTheme = t; }
+    juce::String getUiTheme() const { return uiTheme; }
+
     // UI の状態（JSON 文字列）。UI が変わるたびにエディタから送られる
     void setUiState (const juce::String& json);
     juce::String getUiState() const;
@@ -63,6 +67,7 @@ private:
 
     juce::CriticalSection stateLock;   // get/setStateInformation はメッセージスレッド以外から呼ばれることがある
     juce::String uiState;
+    juce::String uiTheme { "light" };
 
     PreviewSynth previewSynth;
 

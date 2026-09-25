@@ -112,10 +112,14 @@ public:
         audioSettings = 1,
         saveState,
         loadState,
-        resetState
+        resetState,
+        themeLight = 11,
+        themeDark,
+        themeAuto
     };
 
     std::function<void (int)> onItem;
+    std::function<juce::String()> currentTheme;   // チェックを付けるため
 
     StringArray getMenuBarNames() override { return { String::fromUTF8 ("オプション") }; }
 
@@ -123,6 +127,13 @@ public:
     {
         PopupMenu m;
         m.addItem (audioSettings, String::fromUTF8 ("オーディオ／MIDI の設定…"));
+        m.addSeparator();
+        const auto theme = currentTheme != nullptr ? currentTheme() : String ("light");
+        PopupMenu themes;
+        themes.addItem (themeLight, String::fromUTF8 ("ライト"), true, theme == "light");
+        themes.addItem (themeDark,  String::fromUTF8 ("ダーク"), true, theme == "dark");
+        themes.addItem (themeAuto,  String::fromUTF8 ("自動（システムに合わせる）"), true, theme == "auto");
+        m.addSubMenu (String::fromUTF8 ("テーマ"), themes);
         m.addSeparator();
         m.addItem (saveState, String::fromUTF8 ("状態を保存…"));
         m.addItem (loadState, String::fromUTF8 ("状態を読み込む…"));
@@ -177,8 +188,18 @@ public:
                 case OptionsMenu::saveState:     holder->askUserToSaveState();      break;
                 case OptionsMenu::loadState:     holder->askUserToLoadState();      break;
                 case OptionsMenu::resetState:    window->resetToDefaultState();     break;
+                case OptionsMenu::themeLight:    setTheme ("light");                 break;
+                case OptionsMenu::themeDark:     setTheme ("dark");                  break;
+                case OptionsMenu::themeAuto:     setTheme ("auto");                  break;
                 default: break;
             }
+        };
+
+        menu.currentTheme = [this]
+        {
+            if (auto* p = dynamic_cast<GodokenProcessor*> (holder->processor.get()))
+                return p->getUiTheme();
+            return String ("light");
         };
 
        #if JUCE_MAC
@@ -188,6 +209,13 @@ public:
         window->setMenuBar (&menu);
         window->centreWithSize (GodokenEditor::baseWidth, GodokenEditor::baseHeight + window->getContentComponentBorder().getTop());
        #endif
+    }
+
+    void setTheme (const String& name)
+    {
+        if (auto* editor = dynamic_cast<GodokenEditor*> (holder->processor->getActiveEditor()))
+            editor->setTheme (name);
+        menu.menuItemsChanged();
     }
 
     void shutdown() override

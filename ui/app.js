@@ -10,11 +10,11 @@ import {renderStaff} from './staff.js';
 import {threePositions,nearestVoicing,TAB_AREAS} from './guitar.js';
 import {attachMidiDrag,saveMidi} from './midi.js';
 import {playChord as play1,playProgression as playN,playNote,playNotes,stopPreview,setLiveTimbre,TIMBRES} from './audio.js';
-import {getHostInfo,onHostTempo,onMidiNotes} from './host.js';
+import {getHostInfo,onHostTempo,onMidiNotes,onSetTheme,reportTheme} from './host.js';
 import {loadState,saveState,onStateRestored} from './persist.js';
 
 /* ---------- 状態 ---------- */
-const state={idx:0,mode:'major',scale:'major',label:'name',view:'kb',dia:'7',sel:null,prog:{major:0,minor:0},vari:{major:0,minor:0},timbre:'organ',loop:false,syncTempo:false,half:false,pick:false,editIdx:null,fbView:'fb',tabArea:'low',conform:false};
+const state={idx:0,mode:'major',scale:'major',label:'name',view:'kb',dia:'7',sel:null,prog:{major:0,minor:0},vari:{major:0,minor:0},timbre:'organ',loop:false,syncTempo:false,half:false,pick:false,editIdx:null,fbView:'fb',tabArea:'low',conform:false,theme:'light'};
 // 「スケールに沿う」が効いているか（対象の 7 音のスケールのときだけ）
 const conformOn=()=>state.conform&&CONFORM_SCALES.includes(state.scale);
 const conformed=(bars,mode=state.mode)=>conformOn()?conformBars(bars,mode,state.scale):bars;
@@ -69,6 +69,7 @@ const syncing=()=>state.syncTempo&&hostBpm>0;
 const bpm=()=>syncing()?Math.min(300,Math.max(20,hostBpm)):inputBpm();
 const host=await getHostInfo();
 if(!host.standalone){
+  document.getElementById('themeBtn').hidden=false;   // DAW 上はメニューが無いのでタイトル横にボタン
   hostBpm=host.bpm||0;
   state.syncTempo=true;
   document.getElementById('bpmSync').hidden=false;
@@ -86,7 +87,8 @@ function renderTempo(){
 document.getElementById('bpm').addEventListener('change',e=>{e.target.value=inputBpm();persist();});
 
 const NS='http://www.w3.org/2000/svg';
-function el(tag,attrs={},parent){const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);if(parent)parent.appendChild(e);return e;}
+// 色に var(--…) を渡したときは style で指定する（テーマを切り替えると描き直さずに色が変わる）
+function el(tag,attrs={},parent){const e=document.createElementNS(NS,tag);for(const k in attrs){const v=attrs[k];if(typeof v==='string'&&v.startsWith('var('))e.style.setProperty(k,v);else e.setAttribute(k,v);}if(parent)parent.appendChild(e);return e;}
 function txt(parent,x,y,s,attrs={}){const t=el('text',{x,y,'text-anchor':'middle','dominant-baseline':'central',...attrs},parent);t.textContent=s;return t;}
 
 /* ---------- 五度圏 ---------- */
@@ -102,8 +104,8 @@ const labelNodes=[];
 
 for(let i=0;i<12;i++){
   const a0=i*30-15,a1=i*30+15;
-  const o=el('path',{d:arc(R.o0,R.o1,a0,a1),fill:'#1E2742',stroke:'#E7EAF0','stroke-width':2,class:'wedge',tabindex:0,role:'button','aria-label':MAJ_LABEL[i]+' メジャー'},gWedges);
-  const n=el('path',{d:arc(R.i0,R.i1,a0,a1),fill:'#39456B',stroke:'#E7EAF0','stroke-width':2,class:'wedge',tabindex:0,role:'button','aria-label':MIN_LABEL[i]+' マイナー'},gWedges);
+  const o=el('path',{d:arc(R.o0,R.o1,a0,a1),fill:'var(--wheel-outer)',stroke:'var(--bg)','stroke-width':2,class:'wedge',tabindex:0,role:'button','aria-label':MAJ_LABEL[i]+' メジャー'},gWedges);
+  const n=el('path',{d:arc(R.i0,R.i1,a0,a1),fill:'var(--wheel-inner)',stroke:'var(--bg)','stroke-width':2,class:'wedge',tabindex:0,role:'button','aria-label':MIN_LABEL[i]+' マイナー'},gWedges);
   o.addEventListener('click',()=>setKey(i,'major'));
   n.addEventListener('click',()=>setKey(i,'minor'));
   for(const [node,m] of [[o,'major'],[n,'minor']])
@@ -113,10 +115,10 @@ for(let i=0;i<12;i++){
   labelNodes.push({t:txt(gLabels,ox,oy,MAJ_LABEL[i],{fill:'#fff','font-size':long?13:22,'font-weight':700}),x:ox,y:oy});
   labelNodes.push({t:txt(gLabels,ix,iy,MIN_LABEL[i],{fill:'#fff','font-size':long?9:14,'font-weight':500}),x:ix,y:iy});
 }
-el('circle',{r:R.c,fill:'#F6F7FA',stroke:'#C9CFDC'},wheel);
-const cKey=txt(wheel,0,-12,'',{fill:'#1E2742','font-size':26,'font-weight':900});
-const cSig=txt(wheel,0,16,'',{fill:'#6A7390','font-size':11});
-const cMode=txt(wheel,0,32,'',{fill:'#6A7390','font-size':11});
+el('circle',{r:R.c,fill:'var(--panel)',stroke:'var(--line)'},wheel);
+const cKey=txt(wheel,0,-12,'',{fill:'var(--ink)','font-size':26,'font-weight':900});
+const cSig=txt(wheel,0,16,'',{fill:'var(--muted)','font-size':11});
+const cMode=txt(wheel,0,32,'',{fill:'var(--muted)','font-size':11});
 el('path',{d:'M-9,-212 L9,-212 L0,-197 Z',fill:'#E3A21A'},wheel);
 
 function drawOverlay(){
@@ -172,6 +174,21 @@ const syncSeg=(id,key)=>document.querySelectorAll(`#${id} button`).forEach(x=>x.
 bindSeg('labelSeg','label',()=>{renderKeyPanel();renderFretPanel();});
 bindSeg('viewSeg','view',()=>render());
 bindSeg('fbViewSeg','fbView',()=>render());
+
+/* ---------- テーマ（ライト／ダーク／自動＝OS の外観に合わせる） ---------- */
+// Standalone はメニューの「オプション → テーマ」、DAW 上はタイトル横のボタンで切り替える
+const THEMES=['light','dark','auto'], THEME_LABEL={light:'☀ ライト',dark:'☾ ダーク',auto:'◐ 自動'};
+const darkQuery=matchMedia('(prefers-color-scheme: dark)');
+function applyTheme(){
+  const dark=state.theme==='dark'||(state.theme==='auto'&&darkQuery.matches);
+  document.documentElement.dataset.theme=dark?'dark':'light';
+  document.getElementById('themeBtn').textContent=THEME_LABEL[state.theme];
+  reportTheme(state.theme);
+}
+function setTheme(name){if(!THEMES.includes(name))return;state.theme=name;applyTheme();persist();}
+darkQuery.addEventListener('change',()=>{if(state.theme==='auto')applyTheme();});
+document.getElementById('themeBtn').onclick=()=>setTheme(THEMES[(THEMES.indexOf(state.theme)+1)%THEMES.length]);
+onSetTheme(setTheme);
 bindSeg('tabAreaSeg','tabArea',()=>render());
 // 選択中のコードも3和音／4和音の対応する和音に切り替えて、鍵盤・指板の着色に反映し、試聴する
 bindSeg('diaSeg','dia',()=>{
@@ -229,13 +246,13 @@ function renderKeyboard(){
   const g=el('g',{transform:'translate(1,1)'},svg);
   for(let w=0;w<whites;w++){
     const pc=WPC[w%7], midi=BASE+Math.floor(w/7)*12+pc, {n,ds,on,live}=keyStyle(midi);
-    el('rect',{x:w*W,y:0,width:W,height:H,fill:live?'#D6E4FA':on?'#E4DDF5':n.inChord?'#F6D6DF':'#fff',stroke:'#1E2742','stroke-width':1,rx:3,'data-note':midi},g);
+    el('rect',{x:w*W,y:0,width:W,height:H,fill:live?'var(--key-live)':on?'var(--key-pick)':n.inChord?'var(--key-chord)':'var(--key-white)',stroke:'var(--key-line)','stroke-width':1,rx:3,'data-note':midi},g);
     if(ds){el('circle',{cx:w*W+W/2,cy:H-19,r:13,fill:ds.fill,opacity:ds.op},g);
       txt(g,w*W+W/2,H-19,n.label,{fill:'#fff','font-size':n.label.length>2?10:12,'font-weight':700,opacity:ds.op===1?1:.6});}
   }
   for(let o=0;o<octs;o++)for(const pc in BLK){
     const midi=BASE+o*12+(+pc), x=(o*7+BLK[pc]+1)*W-BW/2, {n,ds,on,live}=keyStyle(midi);
-    el('rect',{x,y:0,width:BW,height:BH,fill:live?'#1F4FA8':on?'#4B3590':n.inChord?'#8E2346':'#1E2742',rx:2,'data-note':midi},g);
+    el('rect',{x,y:0,width:BW,height:BH,fill:live?'#1F4FA8':on?'#4B3590':n.inChord?'#8E2346':'var(--key-black)',rx:2,'data-note':midi},g);
     if(ds){el('circle',{cx:x+BW/2,cy:BH-14,r:10.5,fill:ds.fill,opacity:ds.op,stroke:'#fff','stroke-width':1.5},g);
       txt(g,x+BW/2,BH-14,n.label,{fill:'#fff','font-size':9,'font-weight':700,opacity:ds.op===1?1:.6});}
   }
@@ -343,28 +360,28 @@ function renderTab(){
   const W=895,H=180,L=50,R=885,TOP=46,GAP=20;
   svg.setAttribute('viewBox',`0 0 ${W} ${H}`);
   const {mode,cols}=tabColumns();
-  for(let s=0;s<6;s++)el('line',{x1:L,y1:TOP+s*GAP,x2:R,y2:TOP+s*GAP,stroke:'#9AA2B8','stroke-width':1.2},svg);
-  ['T','A','B'].forEach((c,i)=>txt(svg,26,TOP+18+i*32,c,{fill:'#1E2742','font-size':15,'font-weight':900}));
-  el('line',{x1:L,y1:TOP,x2:L,y2:TOP+5*GAP,stroke:'#1E2742','stroke-width':2},svg);
-  el('line',{x1:R,y1:TOP,x2:R,y2:TOP+5*GAP,stroke:'#1E2742','stroke-width':2},svg);
-  if(!cols.length){txt(svg,W/2,TOP+2.5*GAP,'このコードの形が見つかりません',{fill:'#6A7390','font-size':13});return;}
+  for(let s=0;s<6;s++)el('line',{x1:L,y1:TOP+s*GAP,x2:R,y2:TOP+s*GAP,stroke:'var(--faint)','stroke-width':1.2},svg);
+  ['T','A','B'].forEach((c,i)=>txt(svg,26,TOP+18+i*32,c,{fill:'var(--ink)','font-size':15,'font-weight':900}));
+  el('line',{x1:L,y1:TOP,x2:L,y2:TOP+5*GAP,stroke:'var(--ink)','stroke-width':2},svg);
+  el('line',{x1:R,y1:TOP,x2:R,y2:TOP+5*GAP,stroke:'var(--ink)','stroke-width':2},svg);
+  if(!cols.length){txt(svg,W/2,TOP+2.5*GAP,'このコードの形が見つかりません',{fill:'var(--muted)','font-size':13});return;}
   const cw=(R-L)/cols.length, small=cols.length>8;
   cols.forEach((c,i)=>{
     const x0=L+i*cw, cx=x0+cw/2;
     const g=el('g',{class:'col'},svg);
-    el('rect',{class:'colbg',x:x0,y:0,width:cw,height:H,fill:c.playing?'#F6D6DF':'transparent'},g);
-    if(i>0)el('line',{x1:x0,y1:TOP,x2:x0,y2:TOP+5*GAP,stroke:mode==='prog'?'#1E2742':'#C9CFDC','stroke-width':mode==='prog'?1.2:1},g);
-    txt(g,cx,14,c.title,{fill:c.playing?'#C4456A':'#1E2742','font-size':small?11:14,'font-weight':700});
-    if(c.sub)txt(g,cx,30,c.sub,{fill:'#6A7390','font-size':10});
+    el('rect',{class:'colbg',x:x0,y:0,width:cw,height:H,fill:c.playing?'var(--chord-tint)':'transparent'},g);
+    if(i>0)el('line',{x1:x0,y1:TOP,x2:x0,y2:TOP+5*GAP,stroke:mode==='prog'?'var(--ink)':'var(--line)','stroke-width':mode==='prog'?1.2:1},g);
+    txt(g,cx,14,c.title,{fill:c.playing?'#C4456A':'var(--ink)','font-size':small?11:14,'font-weight':700});
+    if(c.sub)txt(g,cx,30,c.sub,{fill:'var(--muted)','font-size':10});
     if(!c.v)return;
     for(let s=0;s<6;s++){
       const f=c.v.frets[s], y=TOP+s*GAP;
-      if(f==null){txt(g,cx,y,'×',{fill:'#B5BCCD','font-size':10});continue;}
+      if(f==null){txt(g,cx,y,'×',{fill:'var(--faint2)','font-size':10});continue;}
       const label=String(f);
-      el('rect',{x:cx-(label.length>1?10:7),y:y-8,width:label.length>1?20:14,height:16,fill:c.playing?'#F6D6DF':'#F6F7FA'},g);
-      txt(g,cx,y,label,{fill:s===c.v.bassString?'#E3A21A':'#1E2742','font-size':small?12:14,'font-weight':700});
+      el('rect',{x:cx-(label.length>1?10:7),y:y-8,width:label.length>1?20:14,height:16,fill:c.playing?'var(--chord-tint)':'var(--panel)'},g);
+      txt(g,cx,y,label,{fill:s===c.v.bassString?'#E3A21A':'var(--ink)','font-size':small?12:14,'font-weight':700});
     }
-    if(mode==='chord')txt(g,cx,H-12,'クリックで試聴',{fill:'#9AA2B8','font-size':9});
+    if(mode==='chord')txt(g,cx,H-12,'クリックで試聴',{fill:'var(--faint)','font-size':9});
     g.addEventListener('pointerdown',e=>{e.preventDefault();playNotes(c.v.notes,state.timbre);});
   });
 }
@@ -374,7 +391,7 @@ function renderChart(){
   const W=895,H=180,L=20,R=885;
   svg.setAttribute('viewBox',`0 0 ${W} ${H}`);
   const {mode,cols}=tabColumns();
-  if(!cols.length){txt(svg,W/2,H/2,'このコードの形が見つかりません',{fill:'#6A7390','font-size':13});return;}
+  if(!cols.length){txt(svg,W/2,H/2,'このコードの形が見つかりません',{fill:'var(--muted)','font-size':13});return;}
   const cw=(R-L)/cols.length, small=cols.length>8;
   // 表示するフレット数・弦の間隔・1フレットの幅（コードが少ないほど大きく描く）
   const FRETS=4, SG=19;
@@ -382,25 +399,25 @@ function renderChart(){
   const fw=Math.min(mode==='chord'?42:small?14:34,(cw-(small?14:40))/FRETS);
   cols.forEach((c,i)=>{
     const x0=L+i*cw, cx=x0+cw/2, g=el('g',{class:'col'},svg);
-    el('rect',{class:'colbg',x:x0,y:0,width:cw,height:H,fill:c.playing?'#F6D6DF':'transparent'},g);
-    txt(g,cx,14,c.title,{fill:c.playing?'#C4456A':'#1E2742','font-size':small?11:14,'font-weight':700});
-    if(c.sub)txt(g,cx,30,c.sub,{fill:'#6A7390','font-size':10});
+    el('rect',{class:'colbg',x:x0,y:0,width:cw,height:H,fill:c.playing?'var(--chord-tint)':'transparent'},g);
+    txt(g,cx,14,c.title,{fill:c.playing?'#C4456A':'var(--ink)','font-size':small?11:14,'font-weight':700});
+    if(c.sub)txt(g,cx,30,c.sub,{fill:'var(--muted)','font-size':10});
     if(!c.v)return;
     const v=c.v, fretted=v.frets.filter(f=>f!=null&&f>0);
     const lo=fretted.length?Math.min(...fretted):1, hi=fretted.length?Math.max(...fretted):1;
     const start=hi<=FRETS?1:lo;                        // ローポジションはナットから
     const gx=cx-fw*FRETS/2+(small?3:6), sy=s=>top+s*SG;
     // 地・フレット・弦（6弦ほど太く）
-    el('rect',{x:gx,y:sy(0),width:fw*FRETS,height:sy(5)-sy(0),fill:'#fff'},g);
-    for(let k=0;k<=FRETS;k++)el('line',{x1:gx+k*fw,y1:sy(0),x2:gx+k*fw,y2:sy(5),stroke:k===0&&start===1?'#1E2742':'#9AA2B8',
+    el('rect',{x:gx,y:sy(0),width:fw*FRETS,height:sy(5)-sy(0),fill:'var(--card)'},g);
+    for(let k=0;k<=FRETS;k++)el('line',{x1:gx+k*fw,y1:sy(0),x2:gx+k*fw,y2:sy(5),stroke:k===0&&start===1?'var(--ink)':'var(--faint)',
       'stroke-width':k===0&&start===1?(small?3:5):1.2},g);
-    for(let s=0;s<6;s++)el('line',{x1:gx,y1:sy(s),x2:gx+fw*FRETS,y2:sy(s),stroke:'#5B6275','stroke-width':.8+s*.28},g);
-    if(start>1)txt(g,gx+fw/2,sy(5)+(small?11:14),`${start}fr`,{fill:'#1E2742','font-size':small?9:12,'font-weight':700});
+    for(let s=0;s<6;s++)el('line',{x1:gx,y1:sy(s),x2:gx+fw*FRETS,y2:sy(s),stroke:'var(--string)','stroke-width':.8+s*.28},g);
+    if(start>1)txt(g,gx+fw/2,sy(5)+(small?11:14),`${start}fr`,{fill:'var(--ink)','font-size':small?9:12,'font-weight':700});
     // 開放（○）・ミュート（×）
     for(let s=0;s<6;s++){
       const f=v.frets[s], x=gx-(small?6:9);
-      if(f==null)txt(g,x,sy(s),'×',{fill:'#6A7390','font-size':small?9:11});
-      else if(f===0)el('circle',{cx:x,cy:sy(s),r:small?2.6:3.5,fill:'none',stroke:'#1E2742','stroke-width':1.2},g);
+      if(f==null)txt(g,x,sy(s),'×',{fill:'var(--muted)','font-size':small?9:11});
+      else if(f===0)el('circle',{cx:x,cy:sy(s),r:small?2.6:3.5,fill:'none',stroke:'var(--ink)','stroke-width':1.2},g);
     }
     const fx=f=>gx+(f-start+.5)*fw, r=Math.min(fw*.36,SG*.36);
     // セーハ：一番低いフレットを 2 本以上の弦で押さえるときは太い棒でつなぐ
@@ -408,13 +425,13 @@ function renderChart(){
     const barre=atLo.length>=2;
     if(barre){
       const s0=Math.min(...atLo), s1=Math.max(...atLo);
-      el('rect',{x:fx(lo)-r,y:sy(s0)-r,width:r*2,height:sy(s1)-sy(s0)+r*2,rx:r,fill:'#1E2742'},g);
+      el('rect',{x:fx(lo)-r,y:sy(s0)-r,width:r*2,height:sy(s1)-sy(s0)+r*2,rx:r,fill:'var(--ink)'},g);
     }
     v.frets.forEach((f,s)=>{
       if(f==null||f===0||(barre&&f===lo&&s!==v.bassString))return;
-      el('circle',{cx:fx(f),cy:sy(s),r,fill:s===v.bassString?'#E3A21A':'#1E2742',stroke:s===v.bassString&&barre&&f===lo?'#fff':'none','stroke-width':1},g);
+      el('circle',{cx:fx(f),cy:sy(s),r,fill:s===v.bassString?'#E3A21A':'var(--ink)',stroke:s===v.bassString&&barre&&f===lo?'var(--card)':'none','stroke-width':1},g);
     });
-    if(mode==='chord')txt(g,cx,H-8,'クリックで試聴',{fill:'#9AA2B8','font-size':9});
+    if(mode==='chord')txt(g,cx,H-8,'クリックで試聴',{fill:'var(--faint)','font-size':9});
     g.addEventListener('pointerdown',e=>{e.preventDefault();playNotes(v.notes,state.timbre);});
   });
 }
@@ -439,18 +456,18 @@ function renderFretboard(){
   const FR=15,FW=55,SS=26,L=60,T=14,strings=[4,11,7,2,9,4];
   const Wd=L+FR*FW+10,Hd=T+SS*5+36;
   svg.setAttribute('viewBox',`0 0 ${Wd} ${Hd}`);
-  el('rect',{x:L,y:T-8,width:FR*FW,height:SS*5+16,fill:'#E9DCC6',rx:2},svg);
-  for(const f of [3,5,7,9,15])el('circle',{cx:L+(f-.5)*FW,cy:T+SS*2.5,r:6,fill:'#CDBB9C'},svg);
-  el('circle',{cx:L+11.5*FW,cy:T+SS*1.5,r:6,fill:'#CDBB9C'},svg);el('circle',{cx:L+11.5*FW,cy:T+SS*3.5,r:6,fill:'#CDBB9C'},svg);
+  el('rect',{x:L,y:T-8,width:FR*FW,height:SS*5+16,fill:'var(--wood)',rx:2},svg);
+  for(const f of [3,5,7,9,15])el('circle',{cx:L+(f-.5)*FW,cy:T+SS*2.5,r:6,fill:'var(--inlay)'},svg);
+  el('circle',{cx:L+11.5*FW,cy:T+SS*1.5,r:6,fill:'var(--inlay)'},svg);el('circle',{cx:L+11.5*FW,cy:T+SS*3.5,r:6,fill:'var(--inlay)'},svg);
   for(let f=0;f<=FR;f++){
-    el('line',{x1:L+f*FW,y1:T-8,x2:L+f*FW,y2:T+SS*5+8,stroke:f===0?'#1E2742':'#9AA2B8','stroke-width':f===0?6:2},svg);
-    if(f>0)txt(svg,L+(f-.5)*FW,T+SS*5+22,f,{fill:'#6A7390','font-size':12});
+    el('line',{x1:L+f*FW,y1:T-8,x2:L+f*FW,y2:T+SS*5+8,stroke:f===0?'var(--nut)':'var(--fret)','stroke-width':f===0?6:2},svg);
+    if(f>0)txt(svg,L+(f-.5)*FW,T+SS*5+22,f,{fill:'var(--muted)','font-size':12});
   }
   const OPEN=[64,59,55,50,45,40];   // 上が1弦＝E4
   strings.forEach((open,s)=>{
     const y=T+s*SS;
-    el('line',{x1:L,y1:y,x2:L+FR*FW,y2:y,stroke:'#5B6275','stroke-width':1+s*.35},svg);
-    txt(svg,13,y,(s+1)+'弦',{fill:'#6A7390','font-size':10});
+    el('line',{x1:L,y1:y,x2:L+FR*FW,y2:y,stroke:'var(--string)','stroke-width':1+s*.35},svg);
+    txt(svg,13,y,(s+1)+'弦',{fill:'var(--muted)','font-size':10});
     for(let f=0;f<=FR;f++){
       const {n,ds}=fretStyle(s,OPEN[s]+f); if(!ds)continue;
       const x=f===0?L-18:L+(f-.5)*FW;
@@ -630,10 +647,18 @@ function renderEditBar(chords,{t,orig,bars,where}){
   root.value=ch.off;
   root.onchange=()=>{const off=+root.value;setItem([off,ch.q,ch.boff!=null?mod12(ch.boff+off-ch.off):undefined]);};
   bar.appendChild(root);
+  // ベース：分数コード・オンコード（例：C/E、D/G）。「なし」かルートと同じ音ならベース指定なし
+  const slash=document.createElement('span');slash.className='slash';slash.textContent='/';bar.appendChild(slash);
+  const bass=document.createElement('select');bass.title='ベース（分数コード・オンコード）';
+  const none=document.createElement('option');none.value='';none.textContent='なし';bass.appendChild(none);
+  for(let off=0;off<12;off++){const op=document.createElement('option');op.value=off;op.textContent=rootName({root:mod12(t+off),off});bass.appendChild(op);}
+  bass.value=ch.boff!=null?String(ch.boff):'';
+  bass.onchange=()=>{const b=bass.value===''?undefined:+bass.value;setItem([ch.off,ch.q,b===ch.off?undefined:b]);};
+  bar.appendChild(bass);
   // 種類：1行に収めるため種類名だけ（例：add9）
   for(const q of EDIT_QUALITIES){
     const b=document.createElement('button');
-    b.textContent=q===''?'メジャー':CHORD[q].s;
+    b.textContent=q===''?'maj':CHORD[q].s;
     b.title=chordName({...ch,q});
     b.setAttribute('aria-pressed',ch.q===q);
     b.onclick=()=>setItem([ch.off,q,ch.boff]);
@@ -652,7 +677,7 @@ function renderEditBar(chords,{t,orig,bars,where}){
   }
   tail.appendChild(tool);
   if(!sameJSON(bars[b],orig[b])){
-    const undo=document.createElement('button');undo.textContent='元に戻す';undo.title='この小節を元に戻す';
+    const undo=document.createElement('button');undo.textContent='戻す';undo.title='この小節を元に戻す';
     // 元に戻した後は、その小節の先頭のコードを選ぶ
     undo.onclick=()=>update(nb=>{nb[b]=clone(orig[b]);},first);
     tail.appendChild(undo);
@@ -713,6 +738,19 @@ document.getElementById('progPlay').onclick=()=>{
   else playProgression(progChords);
 };
 document.getElementById('progLoop').onclick=()=>{state.loop=!state.loop;render();};
+// Space キーで試聴／停止（試聴ボタンと同じ）。入力欄・選択メニュー・五度圏のキー操作中は横取りしない。
+// ボタンにフォーカスがあるときの「Space でそのボタンを押す」動作は止めて、試聴を優先する
+document.addEventListener('keydown',e=>{
+  if(e.code!=='Space'&&e.key!==' ')return;
+  const t=e.target;
+  if(t.closest&&(t.closest('input,select,textarea')||t.closest('.wedge')))return;
+  e.preventDefault();
+  if(e.repeat)return;
+  document.getElementById('progPlay').click();
+},true);
+document.addEventListener('keyup',e=>{
+  if((e.code==='Space'||e.key===' ')&&e.target.closest&&e.target.closest('button'))e.preventDefault();
+},true);
 document.getElementById('progHalf').onclick=()=>{stopPlayback(true);state.half=!state.half;render();};
 document.getElementById('conformBtn').onclick=()=>{stopPlayback(true);state.conform=!state.conform;state.sel=null;render();};
 document.getElementById('progDl').onclick=()=>saveMidi({name:progTitle,bpm:bpm(),chords:progChords});
@@ -768,7 +806,7 @@ function render(){
 function persist(){
   saveState({idx:state.idx,mode:state.mode,scale:state.scale,label:state.label,view:state.view,dia:state.dia,
     prog:state.prog,vari:state.vari,timbre:state.timbre,loop:state.loop,half:state.half,
-    syncTempo:!!state.syncTempo,bpm:inputBpm(),fbView:state.fbView,tabArea:state.tabArea,conform:state.conform});
+    syncTempo:!!state.syncTempo,bpm:inputBpm(),fbView:state.fbView,tabArea:state.tabArea,conform:state.conform,theme:state.theme});
 }
 // 読み込んだ値は1つずつ確かめてから使う（古い・壊れたデータでも落ちないように）
 function applySaved(saved){
@@ -786,6 +824,7 @@ function applySaved(saved){
   pick('tabArea',oneOf(Object.keys(TAB_AREAS)));
   pick('timbre',oneOf(TIMBRES.map(t=>t.id)));
   pick('loop',bool);pick('half',bool);pick('conform',bool);
+  pick('theme',oneOf(['light','dark','auto']));
   if(!host.standalone)pick('syncTempo',bool);
   for(const key of ['prog','vari'])
     for(const m of ['major','minor']){
@@ -802,7 +841,7 @@ function applySaved(saved){
   state.sel=null;picks.clear();state.pick=false;
   stopPlayback(true);
   timbreSel.value=state.timbre;setLiveTimbre(state.timbre);
-  syncSeg('labelSeg','label');syncSeg('viewSeg','view');syncSeg('diaSeg','dia');syncSeg('fbViewSeg','fbView');syncSeg('tabAreaSeg','tabArea');
+  syncSeg('labelSeg','label');syncSeg('viewSeg','view');syncSeg('diaSeg','dia');applyTheme();syncSeg('fbViewSeg','fbView');syncSeg('tabAreaSeg','tabArea');
   // 五度圏はアニメーションせずにその位置へ
   cancelAnimationFrame(anim);rot=-state.idx*30;applyRot(rot);
   render();
@@ -811,5 +850,6 @@ onStateRestored(applySaved);
 
 applyRot(0);
 applySaved(await loadState());
+applyTheme();   // 保存された状態が無いとき（初めて開いたとき）もテーマを当てる
 setLiveTimbre(state.timbre);
 render();

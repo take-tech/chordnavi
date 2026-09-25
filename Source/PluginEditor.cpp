@@ -132,6 +132,13 @@ GodokenEditor::GodokenEditor (GodokenProcessor& p)
                                         {
                                             completion (juce::var (processorRef.getUiState()));
                                         })
+                   // JS: reportTheme(name) — 今のテーマを知らせる（Standalone のメニューのチェック用）
+                   .withNativeFunction ("reportTheme", [this] (const auto& args, auto completion)
+                                        {
+                                            if (! args.isEmpty())
+                                                processorRef.setUiTheme (args[0].toString());
+                                            completion (juce::var (true));
+                                        })
                    // JS: setTimbre(name) — MIDI キーボードで弾く音の音色
                    .withNativeFunction ("setTimbre", [this] (const auto& args, auto completion)
                                         {
@@ -195,6 +202,12 @@ void GodokenEditor::timerCallback()
         obj->setProperty ("notes", list);
         webView.emitEventIfBrowserIsVisible ("midiNotes", juce::var (obj));
     }
+}
+
+void GodokenEditor::setTheme (const juce::String& name)
+{
+    processorRef.setUiTheme (name);
+    webView.emitEventIfBrowserIsVisible ("setTheme", juce::var (name));
 }
 
 void GodokenEditor::resized()

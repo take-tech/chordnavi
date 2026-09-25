@@ -1,9 +1,29 @@
 :root{
   --bg:#E7EAF0; --panel:#F6F7FA; --ink:#1E2742; --ink2:#39456B; --muted:#6A7390;
   --line:#C9CFDC; --root:#E3A21A; --tone:#2E8C80; --chord:#C4456A;
+  /* テーマで切り替える色（下の [data-theme=dark] で上書き） */
+  --page:#D5D9E2; --card:#fff; --on-ink:#fff; --faint:#9AA2B8; --faint2:#B5BCCD;
+  --chord-tint:#F6D6DF;
+  --wheel-outer:#1E2742; --wheel-inner:#39456B;
+  --key-white:#fff; --key-black:#1E2742; --key-line:#1E2742;
+  --key-chord:#F6D6DF; --key-pick:#E4DDF5; --key-live:#D6E4FA;
+  --wood:#E9DCC6; --inlay:#CDBB9C; --fret:#9AA2B8; --nut:#1E2742; --string:#5B6275;
+  --staff-line:#5B6275;
+}
+/* ダークテーマ：ルート・スケール音・コード構成音などの意味を持つ色はそのまま */
+[data-theme=dark]{
+  color-scheme:dark;
+  --bg:#161A25; --panel:#1F2433; --ink:#E6E9F2; --ink2:#B7C0DA; --muted:#8D96B0; --line:#39415A;
+  --page:#0E1118; --card:#283044; --on-ink:#161A25; --faint:#5F6780; --faint2:#4E556B;
+  --chord-tint:#4E2536;
+  --wheel-outer:#2B3558; --wheel-inner:#3B4772;
+  --key-white:#CDD2DD; --key-black:#0A0D14; --key-line:#0A0D14;
+  --key-chord:#E3A9B9; --key-pick:#B9AEE0; --key-live:#9DB8E8;
+  --wood:#3A3124; --inlay:#5A4C38; --fret:#6E7690; --nut:#D8DCE6; --string:#A8AFC3;
+  --staff-line:#9AA2B8;
 }
 *{box-sizing:border-box}
-html,body{margin:0;height:100%;overflow:hidden;background:#D5D9E2}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--page)}
 body{color:var(--ink);font-family:"Hiragino Sans","Yu Gothic UI","Noto Sans JP",sans-serif;font-size:14px;line-height:1.5}
 /* 固定サイズのステージをウィンドウに合わせて拡大縮小（スクロールなし） */
 .stage{position:absolute;left:50%;top:50%;width:1280px;height:780px;transform-origin:center center;
@@ -21,11 +41,11 @@ h2{font-size:15px;font-weight:700;margin:0}
 #wheel .wedge:focus{outline:none;stroke:var(--root);stroke-width:3}
 .controls{display:grid;grid-template-columns:64px 1fr;gap:8px 10px;align-items:center;margin-top:12px}
 .controls label{font-size:12px;color:var(--muted)}
-select,input[type=number]{font:inherit;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:4px;padding:5px 8px;width:100%}
+select,input[type=number]{font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:4px;padding:5px 8px;width:100%}
 input[type=number]{width:64px}
 .seg{display:inline-flex;border:1px solid var(--line);border-radius:4px;overflow:hidden;justify-self:start}
-.seg button{font:inherit;font-size:12px;border:0;background:#fff;color:var(--ink);padding:4px 14px;cursor:pointer}
-.seg button[aria-pressed=true]{background:var(--ink);color:#fff}
+.seg button{font:inherit;font-size:12px;border:0;background:var(--card);color:var(--ink);padding:4px 14px;cursor:pointer}
+.seg button[aria-pressed=true]{background:var(--ink);color:var(--on-ink)}
 .dia{margin-top:14px;padding-top:10px;border-top:1px solid var(--line)}
 .dia-head{font-size:12px;color:var(--muted);margin-bottom:6px;display:flex;align-items:center;gap:8px}
 .dia-head .spacer,.head .spacer{flex:1}
@@ -42,30 +62,30 @@ button:focus-visible,select:focus-visible,input:focus-visible,.chip:focus-visibl
 svg text{font-family:inherit}
 .legend{display:flex;gap:12px;font-size:11px;color:var(--muted)}
 .legend i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px;vertical-align:-1px}
-.selinfo{display:none;align-items:center;gap:8px;font-size:12px;background:#fff;border:1px solid var(--chord);border-radius:4px;padding:2px 4px 2px 10px}
+.selinfo{display:none;align-items:center;gap:8px;font-size:12px;background:var(--card);border:1px solid var(--chord);border-radius:4px;padding:2px 4px 2px 10px}
 .selinfo.on{display:flex}
 .selinfo b{color:var(--chord)}
 .selinfo button{font:inherit;font-size:11px;border:1px solid var(--line);background:var(--panel);border-radius:3px;padding:1px 8px;cursor:pointer}
 .prog-panel{display:flex;flex-direction:column}
 .pills{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
-.pills button{font:inherit;font-size:12px;border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:14px;padding:3px 12px;cursor:pointer}
-.pills button[aria-pressed=true]{background:var(--ink);border-color:var(--ink);color:#fff}
+.pills button{font:inherit;font-size:12px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:14px;padding:3px 12px;cursor:pointer}
+.pills button[aria-pressed=true]{background:var(--ink);border-color:var(--ink);color:var(--on-ink)}
 .variants{display:flex;flex-wrap:wrap;align-items:center;gap:5px;margin:-4px 0 10px;font-size:11px;color:var(--muted)}
 .variants:empty{display:none}
-.variants button{font:inherit;font-size:11px;border:1px solid var(--line);background:#fff;color:var(--ink2);border-radius:10px;padding:1px 10px;cursor:pointer}
-.variants button[aria-pressed=true]{background:var(--ink2);border-color:var(--ink2);color:#fff}
+.variants button{font:inherit;font-size:11px;border:1px solid var(--line);background:var(--card);color:var(--ink2);border-radius:10px;padding:1px 10px;cursor:pointer}
+.variants button[aria-pressed=true]{background:var(--ink2);border-color:var(--ink2);color:var(--on-ink)}
 .detail{border-top:1px solid var(--line);padding-top:10px;flex:1;display:flex;flex-direction:column;min-height:0}
 .detail-head{display:flex;align-items:baseline;gap:10px;margin-bottom:8px}
 .detail-head h3{font-size:16px;margin:0;font-weight:700}
 .detail-head .deg{font-size:12px;color:var(--muted)}
 .actions{margin-left:auto;display:flex;gap:6px;align-items:center}
-.actions button,.handle{font:inherit;font-size:12px;border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:4px;padding:3px 10px;cursor:pointer}
+.actions button,.handle{font:inherit;font-size:12px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:4px;padding:3px 10px;cursor:pointer}
 .handle{cursor:grab;border-style:dashed;border-color:var(--ink2)}
-.actions button[aria-pressed=true]{background:var(--ink);border-color:var(--ink);color:#fff}
+.actions button[aria-pressed=true]{background:var(--ink);border-color:var(--ink);color:var(--on-ink)}
 #progPlay{min-width:4.5em}
 .handle:active{cursor:grabbing}
 .chips{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:6px}
-.chip{font:inherit;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:4px;padding:5px 8px;cursor:grab;text-align:left;min-width:0}
+.chip{font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:4px;padding:5px 8px;cursor:grab;text-align:left;min-width:0}
 .chip:hover{border-color:var(--ink2)}
 .chip.sel{border-color:var(--chord);box-shadow:inset 0 0 0 1px var(--chord)}
 .chip{position:relative}
@@ -75,48 +95,52 @@ svg text{font-family:inherit}
 .chip.edited::after{content:'';position:absolute;top:4px;right:4px;width:6px;height:6px;border-radius:50%;background:#6B4FBB}
 .chip.editing{border-color:#6B4FBB;box-shadow:inset 0 0 0 1px #6B4FBB}
 .hint[hidden]{display:none}
-.editbar{display:none;flex-wrap:nowrap;align-items:center;gap:3px;white-space:nowrap;margin:auto 0 0;padding-top:6px;font-size:11px;color:var(--muted)}
+.editbar{display:none;flex-wrap:nowrap;align-items:center;gap:2px;white-space:nowrap;margin:auto 0 0;padding-top:6px;font-size:11px;color:var(--muted)}
 .editbar.on{display:flex}
 .editbar select{width:auto;font-size:11px;padding:0 2px;height:20px;border-color:#6B4FBB;color:#6B4FBB;font-weight:700;flex-shrink:0;margin-right:2px}
-.editbar button{font:inherit;font-size:11px;border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:3px;padding:1px 5px;cursor:pointer;flex-shrink:0}
+.editbar button{font:inherit;font-size:11px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:3px;padding:1px 4px;cursor:pointer;flex-shrink:0}
+.editbar .slash{color:#6B4FBB;font-weight:700;margin:0 1px 0 -1px}
 .editbar button[aria-pressed=true]{background:#6B4FBB;border-color:#6B4FBB;color:#fff}
 .editbar .tail{margin-left:auto;display:flex;gap:4px}
 .editbar .tail button{background:var(--panel)}
-.editbar .tail .tool{background:#fff;border-color:#6B4FBB;color:#6B4FBB;font-weight:700}
+.editbar .tail .tool{background:var(--card);border-color:#6B4FBB;color:#6B4FBB;font-weight:700}
 .prog-panel{position:relative}
-.more-pop{position:absolute;left:16px;right:16px;top:118px;z-index:5;background:#fff;border:1px solid var(--ink2);border-radius:6px;
+.more-pop{position:absolute;left:16px;right:16px;top:118px;z-index:5;background:var(--card);border:1px solid var(--ink2);border-radius:6px;
   box-shadow:0 6px 20px rgba(30,39,66,.18);padding:10px;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}
 .more-pop[hidden]{display:none}
-.more-pop button{font:inherit;text-align:left;border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:4px;padding:4px 8px;cursor:pointer;min-width:0}
+.more-pop button{font:inherit;text-align:left;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:4px;padding:4px 8px;cursor:pointer;min-width:0}
 .more-pop button:hover{border-color:var(--ink2)}
 .more-pop button[aria-pressed=true]{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
 .more-pop .n{display:block;font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .more-pop .d{display:block;font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #moreBtn{border-style:dashed}
-.chip.playing{background:#F6D6DF;border-color:var(--chord);box-shadow:inset 0 0 0 1px var(--chord)}
+.chip.playing{background:var(--chord-tint);border-color:var(--chord);box-shadow:inset 0 0 0 1px var(--chord)}
 .chip .n{display:block;font-weight:700;font-size:16px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .chip .d{display:block;font-size:11px;color:var(--muted);white-space:nowrap}
 .hint{font-size:11px;color:var(--muted);margin:auto 0 0;padding-top:6px}
 .bpm{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
 .bpm select{width:auto;padding:3px 6px;font-size:12px}
 .bpm input:disabled{background:var(--panel);color:var(--muted)}
-.sync{font:inherit;font-size:11px;border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:4px;padding:3px 8px;cursor:pointer}
-.sync[aria-pressed=true]{background:var(--ink);border-color:var(--ink);color:#fff}
+.sync{font:inherit;font-size:11px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:4px;padding:3px 8px;cursor:pointer}
+.sync[aria-pressed=true]{background:var(--ink);border-color:var(--ink);color:var(--on-ink)}
 .sync[hidden]{display:none}
 .sync:disabled{opacity:.4;cursor:default}
 .legend[hidden]{display:none}
 .seg[hidden]{display:none}
+/* DAW 上だけ出すテーマのボタン（Standalone はメニューの「オプション → テーマ」） */
+.themebtn{font:inherit;font-size:11px;font-weight:500;vertical-align:middle;margin-left:6px;border:1px solid var(--line);background:var(--card);color:var(--muted);border-radius:10px;padding:1px 9px;cursor:pointer}
+.themebtn[hidden]{display:none}
 /* TAB譜：列を押すとその形を鳴らす */
 #tab .col{cursor:pointer}
 #tab .col:hover .colbg{fill:rgba(30,39,66,.05)}
-.pickinfo{display:none;align-items:center;gap:5px;font-size:12px;background:#fff;border:1px solid #6B4FBB;border-radius:4px;padding:2px 4px 2px 8px;min-width:0}
+.pickinfo{display:none;align-items:center;gap:5px;font-size:12px;background:var(--card);border:1px solid #6B4FBB;border-radius:4px;padding:2px 4px 2px 8px;min-width:0}
 .pickinfo.on{display:flex}
 .pickinfo.live{border-color:#2F6FD6}
 .pickinfo.live .pk{color:#2F6FD6}
-#liveResult{color:#1E2742;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+#liveResult{color:var(--ink);font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .pickinfo .pk{color:#6B4FBB;font-weight:700;white-space:nowrap}
 #pickResult{display:flex;gap:4px;align-items:center;color:var(--muted);white-space:nowrap;overflow:hidden}
-#pickResult button{font:inherit;font-size:12px;border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:3px;padding:0 6px;cursor:grab}
+#pickResult button{font:inherit;font-size:12px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:3px;padding:0 6px;cursor:grab}
 #pickResult button.best{border-color:#6B4FBB;color:#6B4FBB;font-weight:700}
 .pickinfo>button{font:inherit;font-size:11px;border:1px solid var(--line);background:var(--panel);border-radius:3px;padding:1px 8px;cursor:pointer;white-space:nowrap}
 /* 鍵盤・指板：押すと鳴る */
