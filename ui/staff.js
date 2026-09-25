@@ -16,6 +16,35 @@ const FLAT_ORDER =[34,37,33,36,32,35,31];  // B4 E5 A4 D5 G4 C5 F4
 const ACC_OFFSET={'𝄪':2,'♯':1,'':0,'♭':-1,'𝄫':-2};
 const CLEF_FONT='"Apple Symbols","Segoe UI Symbol","Noto Music",serif';
 
+// 音部記号はフォントごとにベースライン上の位置が違うので、実際のインクの上下端を測って譜表に合わせる。
+// 目標の上下端は SMuFL（Bravura）の gClef / fClef の外接矩形（基準線からの譜間数）
+const CLEF_SPEC={
+  treble:{glyph:'𝄞',line:32,above:4.392,below:2.632},   // 基準線＝第2線（G4）
+  bass:  {glyph:'𝄢',line:24,above:1.024,below:2.54}     // 基準線＝第4線（F3）
+};
+const inkCache={};
+function measureInk(glyph){
+  if(inkCache[glyph])return inkCache[glyph];
+  const size=100, c=document.createElement('canvas');c.width=c.height=size*3;
+  const g=c.getContext('2d');g.font=`${size}px ${CLEF_FONT}`;g.textBaseline='alphabetic';g.textAlign='center';
+  g.fillText(glyph,size*1.5,size*2);
+  const d=g.getImageData(0,0,c.width,c.height).data;
+  let top=-1,bottom=-1;
+  for(let y=0;y<c.height;y++){
+    for(let x=0;x<c.width;x++)if(d[(y*c.width+x)*4+3]>40){if(top<0)top=y;bottom=y;break;}
+  }
+  // フォントサイズ1あたりの、ベースラインから上端・下端までの距離
+  return inkCache[glyph]=top<0?null:{up:(size*2-top)/size,down:(bottom-size*2)/size};
+}
+function drawClef(svg,staff,{glyph,line,above,below},x,fallback){
+  const ink=measureInk(glyph), lineY=stepY(staff,line);
+  if(!ink){txt(svg,x,lineY,glyph,{fill:'#1E2742','font-size':fallback,'font-family':CLEF_FONT});return;}
+  const top=lineY-above*GAP, bottom=lineY+below*GAP;
+  const fontSize=(bottom-top)/(ink.up+ink.down);
+  const t=el('text',{x,y:top+ink.up*fontSize,'text-anchor':'middle',fill:'#1E2742','font-size':fontSize.toFixed(2),'font-family':CLEF_FONT},svg);
+  t.textContent=glyph;
+}
+
 // midi と音名（例 'B♭'）→ 譜表上の位置（C0 を 0 とする全音階ステップ）
 function position(midi,name){
   const letter=name[0], acc=name.slice(1);   // '𝄪' '𝄫' はサロゲートペアだが slice(1) で丸ごと取れる
@@ -64,8 +93,8 @@ export function renderStaff(svg,{sig,notes,columns,labelSide='below'}){
   svg.setAttribute('viewBox',`0 0 ${STAFF_W} ${STAFF_H}`);
   drawStaffLines(svg,TREBLE);drawStaffLines(svg,BASS);
   el('line',{x1:10,y1:stepY(TREBLE,38),x2:10,y2:BASS.bottomY,stroke:'#5B6275','stroke-width':1.5},svg);
-  txt(svg,30,stepY(TREBLE,32)-2,'𝄞',{fill:'#1E2742','font-size':58,'font-family':CLEF_FONT});
-  txt(svg,30,stepY(BASS,24)+4,'𝄢',{fill:'#1E2742','font-size':30,'font-family':CLEF_FONT});
+  drawClef(svg,TREBLE,CLEF_SPEC.treble,30,58);
+  drawClef(svg,BASS,CLEF_SPEC.bass,30,30);
   const x0=drawKeySignature(svg,sig,58)+24;
   const colW=(STAFF_W-30-x0)/Math.max(1,columns), sigMap=signatureMap(sig);
 
