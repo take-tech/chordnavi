@@ -6,13 +6,14 @@ import {
   CHORD,spellScaleTone,spellChordInterval,convertChordSize
 } from './theory.js';
 import {renderStaff} from './staff.js';
+import {threePositions,nearestVoicing,TAB_AREAS} from './guitar.js';
 import {attachMidiDrag,saveMidi} from './midi.js';
 import {playChord as play1,playProgression as playN,playNote,playNotes,stopPreview,TIMBRES} from './audio.js';
 import {getHostInfo,onHostTempo} from './host.js';
 import {loadState,saveState,onStateRestored} from './persist.js';
 
 /* ---------- 状態 ---------- */
-const state={idx:0,mode:'major',scale:'major',label:'name',view:'kb',dia:'7',sel:null,prog:{major:0,minor:0},vari:{major:0,minor:0},timbre:'organ',loop:false,syncTempo:false,half:false,pick:false,editIdx:null};
+const state={idx:0,mode:'major',scale:'major',label:'name',view:'kb',dia:'7',sel:null,prog:{major:0,minor:0},vari:{major:0,minor:0},timbre:'organ',loop:false,syncTempo:false,half:false,pick:false,editIdx:null,fbView:'fb',tabArea:'low'};
 // コード判別で選んだ音。キーは 'kb:<MIDI>'（鍵盤）または 's<弦番号>'（指板：1本の弦に1音）、値は MIDI
 const picks=new Map();
 const pickedNotes=()=>[...new Set(picks.values())];
@@ -164,8 +165,10 @@ function bindSeg(id,key,onChange){
   }));
 }
 const syncSeg=(id,key)=>document.querySelectorAll(`#${id} button`).forEach(x=>x.setAttribute('aria-pressed',x.dataset.v===state[key]));
-bindSeg('labelSeg','label',()=>{renderKeyPanel();renderFretboard();});
+bindSeg('labelSeg','label',()=>{renderKeyPanel();renderFretPanel();});
 bindSeg('viewSeg','view',()=>render());
+bindSeg('fbViewSeg','fbView',()=>render());
+bindSeg('tabAreaSeg','tabArea',()=>render());
 // 選択中のコードも3和音／4和音の対応する和音に切り替えて、鍵盤・指板の着色に反映し、試聴する
 bindSeg('diaSeg','dia',()=>{
   if(state.sel){state.sel=convertChordSize(state.sel,state.dia,state.mode);playChord(state.sel);}
@@ -293,6 +296,56 @@ function renderKeyPanel(){
 }
 
 /* ---------- 指板 ---------- */
+/* ---------- TAB譜 ---------- */
+// 選んだコード：3ポジション（6弦・5弦・4弦ルート）。選んでいない・試聴中：進行を選んだエリア（ロー／ミドル／ハイ）で
+function tabColumns(){
+  const ch=playback||state.pick?null:state.sel;
+  if(ch)return {mode:'chord',cols:threePositions(ch).map(v=>({title:chordName(ch),
+    sub:`${v.bassString+1}弦ルート・${v.open||!v.lo?'開放':v.lo+'フレット'}`,v}))};
+  let prev=null;
+  return {mode:'prog',cols:progChords.map((c,i)=>{const v=nearestVoicing(c,TAB_AREAS[state.tabArea],prev);prev=v;
+    return {title:chordName(c),sub:'',v,playing:!!playback&&playback.index===i};})};
+}
+function renderTab(){
+  const svg=document.getElementById('tab');svg.innerHTML='';
+  const W=895,H=180,L=50,R=885,TOP=46,GAP=20;
+  svg.setAttribute('viewBox',`0 0 ${W} ${H}`);
+  const {mode,cols}=tabColumns();
+  for(let s=0;s<6;s++)el('line',{x1:L,y1:TOP+s*GAP,x2:R,y2:TOP+s*GAP,stroke:'#9AA2B8','stroke-width':1.2},svg);
+  ['T','A','B'].forEach((c,i)=>txt(svg,26,TOP+18+i*32,c,{fill:'#1E2742','font-size':15,'font-weight':900}));
+  el('line',{x1:L,y1:TOP,x2:L,y2:TOP+5*GAP,stroke:'#1E2742','stroke-width':2},svg);
+  el('line',{x1:R,y1:TOP,x2:R,y2:TOP+5*GAP,stroke:'#1E2742','stroke-width':2},svg);
+  if(!cols.length){txt(svg,W/2,TOP+2.5*GAP,'このコードの形が見つかりません',{fill:'#6A7390','font-size':13});return;}
+  const cw=(R-L)/cols.length, small=cols.length>8;
+  cols.forEach((c,i)=>{
+    const x0=L+i*cw, cx=x0+cw/2;
+    const g=el('g',{class:'col'},svg);
+    el('rect',{class:'colbg',x:x0,y:0,width:cw,height:H,fill:c.playing?'#F6D6DF':'transparent'},g);
+    if(i>0)el('line',{x1:x0,y1:TOP,x2:x0,y2:TOP+5*GAP,stroke:mode==='prog'?'#1E2742':'#C9CFDC','stroke-width':mode==='prog'?1.2:1},g);
+    txt(g,cx,14,c.title,{fill:c.playing?'#C4456A':'#1E2742','font-size':small?11:14,'font-weight':700});
+    if(c.sub)txt(g,cx,30,c.sub,{fill:'#6A7390','font-size':10});
+    if(!c.v)return;
+    for(let s=0;s<6;s++){
+      const f=c.v.frets[s], y=TOP+s*GAP;
+      if(f==null){txt(g,cx,y,'×',{fill:'#B5BCCD','font-size':10});continue;}
+      const label=String(f);
+      el('rect',{x:cx-(label.length>1?10:7),y:y-8,width:label.length>1?20:14,height:16,fill:c.playing?'#F6D6DF':'#F6F7FA'},g);
+      txt(g,cx,y,label,{fill:s===c.v.bassString?'#E3A21A':'#1E2742','font-size':small?12:14,'font-weight':700});
+    }
+    if(mode==='chord')txt(g,cx,H-12,'クリックで試聴',{fill:'#9AA2B8','font-size':9});
+    g.addEventListener('pointerdown',e=>{e.preventDefault();playNotes(c.v.notes,state.timbre);});
+  });
+}
+function renderFretPanel(){
+  const tab=state.fbView==='tab';
+  document.getElementById('fb').toggleAttribute('hidden',tab);
+  document.getElementById('tab').toggleAttribute('hidden',!tab);
+  const showArea=tab&&!(state.sel&&!playback&&!state.pick);
+  document.getElementById('tabAreaSeg').toggleAttribute('hidden',!showArea);
+  document.getElementById('fbLegend').textContent=tab?'上が1弦・オレンジはベース（最低音）':'レギュラーチューニング・上が1弦';
+  if(tab)renderTab();else renderFretboard();
+}
+
 function renderFretboard(){
   const svg=document.getElementById('fb');svg.innerHTML='';
   const FR=15,FW=55,SS=26,L=60,T=14,strings=[4,11,7,2,9,4];
@@ -569,7 +622,9 @@ function render(){
   const sc=scaleObj(), notes=sc.iv.map(i=>nn(tonic()+i)).join(' ');
   document.getElementById('kbTitle').textContent=`${state.view==='staff'?'五線譜':'鍵盤'}：${nn(tonic())} ${sc.name}`;
   document.getElementById('scaleNotes').textContent=notes;
-  document.getElementById('fbTitle').textContent=`ギター指板：${nn(tonic())} ${sc.name}`;
+  document.getElementById('fbTitle').textContent=state.fbView==='tab'
+    ?(state.sel&&!playback&&!state.pick?`TAB：${chordName(state.sel)} の3ポジション`:`TAB：${document.getElementById('progName').textContent||'コード進行'}`)
+    :`ギター指板：${nn(tonic())} ${sc.name}`;
   const si=document.getElementById('selInfo');
   const shown=shownChord();
   if(shown&&!state.pick){si.classList.add('on');document.getElementById('selName').textContent=`${chordName(shown)}（${chordDeg(shown.off,shown.q,shown.boff)}）`;}
@@ -579,7 +634,8 @@ function render(){
   document.getElementById('progLoop').setAttribute('aria-pressed',state.loop);
   document.getElementById('progHalf').setAttribute('aria-pressed',state.half);
   renderPick();
-  renderKeyPanel();renderFretboard();renderProgs();renderDiatonic();
+  // 進行のコード（progChords）を先に作ってから TAB譜を描く
+  renderKeyPanel();renderProgs();renderFretPanel();renderDiatonic();
   persist();
 }
 /* ---------- 状態の保存・復元 ---------- */
@@ -587,7 +643,7 @@ function render(){
 function persist(){
   saveState({idx:state.idx,mode:state.mode,scale:state.scale,label:state.label,view:state.view,dia:state.dia,
     prog:state.prog,vari:state.vari,timbre:state.timbre,loop:state.loop,half:state.half,
-    syncTempo:!!state.syncTempo,bpm:inputBpm()});
+    syncTempo:!!state.syncTempo,bpm:inputBpm(),fbView:state.fbView,tabArea:state.tabArea});
 }
 // 読み込んだ値は1つずつ確かめてから使う（古い・壊れたデータでも落ちないように）
 function applySaved(saved){
@@ -601,6 +657,8 @@ function applySaved(saved){
   pick('label',oneOf(['name','degree']));
   pick('view',oneOf(['kb','staff']));
   pick('dia',oneOf(['7','3']));
+  pick('fbView',oneOf(['fb','tab']));
+  pick('tabArea',oneOf(Object.keys(TAB_AREAS)));
   pick('timbre',oneOf(TIMBRES.map(t=>t.id)));
   pick('loop',bool);pick('half',bool);
   if(!host.standalone)pick('syncTempo',bool);
@@ -619,7 +677,7 @@ function applySaved(saved){
   state.sel=null;picks.clear();state.pick=false;
   stopPlayback(true);
   timbreSel.value=state.timbre;
-  syncSeg('labelSeg','label');syncSeg('viewSeg','view');syncSeg('diaSeg','dia');
+  syncSeg('labelSeg','label');syncSeg('viewSeg','view');syncSeg('diaSeg','dia');syncSeg('fbViewSeg','fbView');syncSeg('tabAreaSeg','tabArea');
   // 五度圏はアニメーションせずにその位置へ
   cancelAnimationFrame(anim);rot=-state.idx*30;applyRot(rot);
   render();

@@ -79,13 +79,13 @@ public:
             expect (buf.getMagnitude (0, 2400) < early * 0.05f);
         }
 
-        for (auto [timbre, name] : { std::pair { Timbre::piano, "piano" },
+        for (auto [timbre, label] : { std::pair { Timbre::piano, "piano" },
                                      std::pair { Timbre::electricPiano, "electric piano" },
                                      std::pair { Timbre::guitar, "guitar" },
                                      std::pair { Timbre::organ, "organ" },
                                      std::pair { Timbre::pad, "pad" } })
         {
-            beginTest (juce::String ("Timbre ") + name + ": audible, bounded, released after duration");
+            beginTest (juce::String ("Timbre ") + label + ": audible, bounded, released after duration");
             PreviewSynth synth;
             synth.prepare (sr);
             expect (synth.queue ({ 36, 48, 52, 55 }, 0.0, 0.9, timbre));
@@ -101,9 +101,9 @@ public:
             expectEquals (synth.getNumActiveVoices(), 0);
         }
 
-        for (auto [timbre, name] : { std::pair { Timbre::organ, "organ" }, std::pair { Timbre::pad, "pad" } })
+        for (auto [timbre, label] : { std::pair { Timbre::organ, "organ" }, std::pair { Timbre::pad, "pad" } })
         {
-            beginTest (juce::String ("Timbre ") + name + ": sustains without decay while held");
+            beginTest (juce::String ("Timbre ") + label + ": sustains without decay while held");
             PreviewSynth synth;
             synth.prepare (sr);
             expect (synth.queue ({ 48, 52, 55 }, 0.0, 2.0, timbre));

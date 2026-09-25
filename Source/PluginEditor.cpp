@@ -244,11 +244,11 @@ void GodokenEditor::saveMidi (const juce::Array<juce::var>& args,
 
     fileChooser = std::make_unique<juce::FileChooser> ("MIDIファイルを保存", initial, "*.mid");
 
-    const auto flags = juce::FileBrowserComponent::saveMode
+    const auto chooserFlags = juce::FileBrowserComponent::saveMode
                      | juce::FileBrowserComponent::canSelectFiles
                      | juce::FileBrowserComponent::warnAboutOverwriting;
 
-    fileChooser->launchAsync (flags, [request, completion] (const juce::FileChooser& chooser)
+    fileChooser->launchAsync (chooserFlags, [request, completion] (const juce::FileChooser& chooser)
     {
         auto file = chooser.getResult();
 

@@ -22,8 +22,8 @@ void GodokenProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mid
 {
     juce::ScopedNoDenormals noDenormals;
 
-    if (auto* playHead = getPlayHead())
-        if (const auto position = playHead->getPosition())
+    if (auto* ph = getPlayHead())
+        if (const auto position = ph->getPosition())
             if (const auto bpm = position->getBpm())
                 hostBpm.store (*bpm);
 

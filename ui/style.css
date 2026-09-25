@@ -104,6 +104,10 @@ svg text{font-family:inherit}
 .sync[aria-pressed=true]{background:var(--ink);border-color:var(--ink);color:#fff}
 .sync[hidden]{display:none}
 .legend[hidden]{display:none}
+.seg[hidden]{display:none}
+/* TAB譜：列を押すとその形を鳴らす */
+#tab .col{cursor:pointer}
+#tab .col:hover .colbg{fill:rgba(30,39,66,.05)}
 .pickinfo{display:none;align-items:center;gap:5px;font-size:12px;background:#fff;border:1px solid #6B4FBB;border-radius:4px;padding:2px 4px 2px 8px;min-width:0}
 .pickinfo.on{display:flex}
 .pickinfo .pk{color:#6B4FBB;font-weight:700;white-space:nowrap}

@@ -51,8 +51,12 @@
     </div>
 
     <div class="panel">
-      <div class="head"><h2 id="fbTitle">ギター指板</h2><span class="spacer"></span><span class="legend">レギュラーチューニング・上が1弦</span></div>
+      <div class="head"><h2 id="fbTitle">ギター指板</h2>
+        <div class="seg small" id="fbViewSeg"><button data-v="fb" aria-pressed="true">指板</button><button data-v="tab" aria-pressed="false">TAB</button></div>
+        <div class="seg small" id="tabAreaSeg" hidden><button data-v="low" aria-pressed="true">ロー</button><button data-v="mid" aria-pressed="false">ミドル</button><button data-v="high" aria-pressed="false">ハイ</button></div>
+        <span class="spacer"></span><span class="legend" id="fbLegend">レギュラーチューニング・上が1弦</span></div>
       <svg id="fb"></svg>
+      <svg id="tab" hidden></svg>
     </div>
 
     <div class="panel prog-panel">
