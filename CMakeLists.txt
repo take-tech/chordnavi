@@ -45,6 +45,7 @@ juce_add_plugin(ChordNavi
     PLUGIN_CODE                 Gdkn
     FORMATS                     VST3 AU Standalone
     PRODUCT_NAME                "ChordNavi"
+    ICON_BIG                    "${CMAKE_CURRENT_SOURCE_DIR}/assets/icon/ChordNavi.png"   # 案 B（鍵盤）。元データは icon_B.svg
     IS_SYNTH                    TRUE
     NEEDS_MIDI_INPUT            TRUE
     NEEDS_MIDI_OUTPUT           FALSE
