@@ -375,13 +375,14 @@ function renderPick(){
 
 /* ---------- コード進行 ---------- */
 let progChords=[],progTitle='';
-// 一時的なコードの変更：{ key: どの進行か, q: { コード番号: 種類 } }。進行・派生を切り替えると消える（保存しない）
-const edits={key:null,q:{}};
+// 一時的なコードの変更：{ key: どの進行か, c: { コード番号: [ルートの度数, 種類, ベースの度数] } }。
+// 進行・派生を切り替えると消える（保存しない）
+const edits={key:null,c:{}};
 const EDIT_QUALITIES=['','m','7','M7','m7','6','m6','add9','sus2','sus4','7sus4','9','M9','m9','mM7','dim','dim7','m7b5','aug'];
 // 小節の並びに変更を当てはめる
 function applyEdits(bars){
   let k=0;
-  const one=it=>{const q=edits.q[k++];return q!=null?[it[0],q,it[2]]:it;};
+  const one=it=>edits.c[k++]??it;
   return bars.map(bar=>Array.isArray(bar[0])?bar.map(one):one(bar));
 }
 function selectProgression(i){
@@ -400,8 +401,8 @@ function renderProgs(){
   pills.appendChild(more);
   const p=list[cur], t=tonic(), vars=variantsOf(p), vi=Math.min(state.vari[state.mode],vars.length-1), v=vars[vi];
   const ekey=`${state.mode}:${cur}:${vi}`;
-  if(edits.key!==ekey){edits.key=ekey;edits.q={};state.editIdx=null;}
-  const edited=Object.keys(edits.q).length>0, bars=applyEdits(v.c), original=progressionChords(t,v.c);
+  if(edits.key!==ekey){edits.key=ekey;edits.c={};state.editIdx=null;}
+  const edited=Object.keys(edits.c).length>0, bars=applyEdits(v.c), original=progressionChords(t,v.c);
   const vbox=document.getElementById('variants');vbox.innerHTML='';
   if(vars.length>1){
     vbox.append('派生：');
@@ -410,7 +411,7 @@ function renderProgs(){
   }
   // リズム½：各コードの長さを半分に（1小節→2拍、2拍→1拍）
   const rate=state.half?.5:1;
-  const chords=progressionChords(t,bars).map((c,i)=>({...c,beats:c.beats*rate,...(edits.q[i]!=null?{edited:true}:{})}));
+  const chords=progressionChords(t,bars).map((c,i)=>({...c,beats:c.beats*rate,...(edits.c[i]!=null?{edited:true}:{})}));
   // ファイル名は英字のみ（例：C_Canon_BassLine_half、変更ありは _custom）
   const title=`${nn(t)}${state.mode==='minor'?'m':''}_${p.file}${vi>0?'_'+VARIANT_FILE[v.name]:''}${state.half?'_half':''}${edited?'_custom':''}`;
   const nameEl=document.getElementById('progName'), degEl=document.getElementById('progDeg');
@@ -429,33 +430,43 @@ function renderProgs(){
     if(playback&&playback.index===i)chip.classList.add('playing');
     box.appendChild(chip);
   });
-  renderEditBar(chords,original);
+  renderEditBar(chords,original,t);
 }
 
-// 選んだ進行のコードの種類を変えるバー（ヒントの位置に出す）
-function renderEditBar(chords,original){
+// 選んだ進行のコードのルート・種類を変えるバー（ヒントの位置に出す）
+function renderEditBar(chords,original,t){
   const bar=document.getElementById('editBar'), i=state.editIdx, ch=i!=null&&chords[i];
   document.getElementById('hint').hidden=!!ch;
   bar.classList.toggle('on',!!ch);
   bar.innerHTML='';
   if(!ch)return;
-  // 1行に収めるため、ボタンは種類だけ（例：add9）。どのコードかはラベルに出す
-  const lab=document.createElement('span');lab.className='lab';lab.textContent=`${chordName(ch)} の種類：`;bar.appendChild(lab);
+  const o=original[i], item=c=>[c.off,c.q,c.boff];
+  // 変更を当てはめて鳴らす（元と同じなら変更なしに戻す）
+  const setItem=([off,q,boff])=>{
+    const same=off===o.off&&q===o.q&&(boff??null)===(o.boff??null);
+    if(same)delete edits.c[i];else edits.c[i]=boff!=null?[off,q,boff]:[off,q];
+    const next={...chordAt(t,[off,q,boff]),beats:ch.beats};
+    playChord(next);state.sel=next;state.editIdx=i;render();
+  };
+  // ルート：主音から半音ずつ12音。分数コードはベースとの距離を保つ
+  const root=document.createElement('select');root.title='ルート';
+  for(let off=0;off<12;off++){const op=document.createElement('option');op.value=off;op.textContent=nn(t+off);root.appendChild(op);}
+  root.value=ch.off;
+  root.onchange=()=>{const off=+root.value;setItem([off,ch.q,ch.boff!=null?mod12(ch.boff+off-ch.off):undefined]);};
+  bar.appendChild(root);
+  // 種類：1行に収めるため種類名だけ（例：add9）
   for(const q of EDIT_QUALITIES){
     const b=document.createElement('button');
     b.textContent=q===''?'メジャー':CHORD[q].s;
     b.title=chordName({...ch,q});
     b.setAttribute('aria-pressed',ch.q===q);
-    b.onclick=()=>{
-      if(q===original[i].q)delete edits.q[i];else edits.q[i]=q;
-      const next={...ch,q};playChord(next);state.sel=next;state.editIdx=i;render();
-    };
+    b.onclick=()=>setItem([ch.off,q,ch.boff]);
     bar.appendChild(b);
   }
   const tail=document.createElement('span');tail.className='tail';
-  if(edits.q[i]!=null){
+  if(edits.c[i]!=null){
     const undo=document.createElement('button');undo.textContent='元に戻す';
-    undo.onclick=()=>{delete edits.q[i];const o={...ch,q:original[i].q};playChord(o);state.sel=o;render();};
+    undo.onclick=()=>setItem(item(o));
     tail.appendChild(undo);
   }
   const close=document.createElement('button');close.textContent='閉じる';

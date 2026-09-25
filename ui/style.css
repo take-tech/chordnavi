@@ -74,7 +74,7 @@ svg text{font-family:inherit}
 .hint[hidden]{display:none}
 .editbar{display:none;flex-wrap:nowrap;align-items:center;gap:3px;white-space:nowrap;margin:auto 0 0;padding-top:6px;font-size:11px;color:var(--muted)}
 .editbar.on{display:flex}
-.editbar .lab{color:#6B4FBB;font-weight:700;margin-right:2px}
+.editbar select{width:auto;font-size:11px;padding:0 2px;height:20px;border-color:#6B4FBB;color:#6B4FBB;font-weight:700;flex-shrink:0;margin-right:2px}
 .editbar button{font:inherit;font-size:11px;border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:3px;padding:1px 5px;cursor:pointer;flex-shrink:0}
 .editbar button[aria-pressed=true]{background:#6B4FBB;border-color:#6B4FBB;color:#fff}
 .editbar .tail{margin-left:auto;display:flex;gap:4px}
