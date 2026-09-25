@@ -88,23 +88,23 @@ export const PROGRESSIONS=[
 
 // 「その他」から選ぶ進行（extra:true）。メインの進行の後ろに並べるので、保存済みの番号はずれない
 PROGRESSIONS.push(...[
-  {mode:'major',name:'クリシェ進行',file:'Cliche',c:[[0,''],[0,'aug'],[0,'6'],[0,'7']]},
-  {mode:'major',name:'サブドミナントマイナー',file:'SubdominantMinor',c:[[0,'M7'],[5,'M7'],[5,'m6'],[0,'M7']]},
-  {mode:'major',name:'I–III–IV–IVm',file:'I-III-IV-IVm',c:[[0,''],[4,''],[5,''],[5,'m']]},
-  {mode:'major',name:'VIm–IV–I–V',file:'VIm-IV-I-V',c:[[9,'m'],[5,''],[0,''],[7,'']]},
-  {mode:'major',name:'I–IIIm–IV–V',file:'I-IIIm-IV-V',c:[[0,''],[4,'m'],[5,''],[7,'']]},
-  {mode:'major',name:'IV–V–VIm（偽終止）',file:'DeceptiveCadence',c:[[5,''],[7,''],[9,'m'],[9,'m']]},
-  {mode:'major',name:'逆循環',file:'ReverseCycle',c:[[2,'m7'],[7,'7'],[0,'M7'],[9,'m7']]},
-  {mode:'major',name:'ボサノバ進行',file:'BossaNova',c:[[0,'M7'],[2,'7'],[2,'m7'],[7,'7']]},
-  {mode:'major',name:'ドミナントの連鎖',file:'DominantChain',c:[[4,'7'],[9,'7'],[2,'7'],[7,'7'],[0,'M7'],[0,'M7']]},
-  {mode:'major',name:'I–♭VII–IV–I（ミクソリディアン）',file:'Mixolydian',c:[[0,''],[10,''],[5,''],[0,'']]},
-  {mode:'major',name:'♭VI–♭VII–I',file:'bVI-bVII-I',c:[[8,''],[10,''],[0,''],[0,'']]},
-  {mode:'major',name:'IM7–IVM7（2コード）',file:'I-IV-Vamp',c:[[0,'M7'],[5,'M7'],[0,'M7'],[5,'M7']]},
-  {mode:'minor',name:'マイナー・クリシェ',file:'MinorCliche',c:[[0,'m'],[0,'mM7'],[0,'m7'],[0,'m6']]},
+  {mode:'major',name:'クリシェ進行',file:'Cliche',c:[[0,''],[0,'aug'],[0,'6'],[0,'7']],v:[{name:'M7下降',c:[[0,''],[0,'M7'],[0,'7'],[0,'6']]},{name:'IV解決',c:[[0,''],[0,'aug'],[0,'6'],[0,'7'],[5,'M7'],[5,'m6'],[0,''],[0,'']]}]},
+  {mode:'major',name:'サブドミナントマイナー',file:'SubdominantMinor',c:[[0,'M7'],[5,'M7'],[5,'m6'],[0,'M7']],v:[{name:'バックドア',c:[[0,'M7'],[5,'M7'],[[5,'m7'],[10,'7']],[0,'M7']]},{name:'3和音',c:[[0,''],[5,''],[5,'m'],[0,'']]}]},
+  {mode:'major',name:'I–III–IV–IVm',file:'I-III-IV-IVm',c:[[0,''],[4,''],[5,''],[5,'m']],v:[{name:'7th',c:[[0,'M7'],[4,'7'],[5,'M7'],[5,'m6']]}]},
+  {mode:'major',name:'VIm–IV–I–V',file:'VIm-IV-I-V',c:[[9,'m'],[5,''],[0,''],[7,'']],v:[{name:'sus4',c:[[9,'m'],[5,''],[0,''],[[7,'sus4'],[7,'']]]},{name:'7th',c:[[9,'m7'],[5,'M7'],[0,'M7'],[7,'7']]}]},
+  {mode:'major',name:'I–IIIm–IV–V',file:'I-IIIm-IV-V',c:[[0,''],[4,'m'],[5,''],[7,'']],v:[{name:'7th',c:[[0,'M7'],[4,'m7'],[5,'M7'],[7,'7']]},{name:'2拍ずつ',c:[[[0,''],[4,'m']],[[5,''],[7,'']]]}]},
+  {mode:'major',name:'IV–V–VIm（偽終止）',file:'DeceptiveCadence',c:[[5,''],[7,''],[9,'m'],[9,'m']],v:[{name:'7th',c:[[5,'M7'],[7,'7'],[9,'m7'],[9,'m7']]},{name:'2拍ずつ',c:[[[5,''],[7,'']],[9,'m'],[9,'m']]}]},
+  {mode:'major',name:'逆循環',file:'ReverseCycle',c:[[2,'m7'],[7,'7'],[0,'M7'],[9,'m7']],v:[{name:'2拍ずつ',c:[[[2,'m7'],[7,'7']],[[0,'M7'],[9,'m7']]]},{name:'VI7版',c:[[2,'m7'],[7,'7'],[0,'M7'],[9,'7']]}]},
+  {mode:'major',name:'ボサノバ進行',file:'BossaNova',c:[[0,'M7'],[2,'7'],[2,'m7'],[7,'7']],v:[{name:'8小節',c:[[0,'M7'],[0,'M7'],[2,'7'],[2,'7'],[2,'m7'],[1,'7'],[0,'M7'],[0,'M7']]},{name:'裏コード',c:[[0,'M7'],[2,'7'],[2,'m7'],[1,'7']]}]},
+  {mode:'major',name:'ドミナントの連鎖',file:'DominantChain',c:[[4,'7'],[9,'7'],[2,'7'],[7,'7'],[0,'M7'],[0,'M7']],v:[{name:'2拍ずつ',c:[[[4,'7'],[9,'7']],[[2,'7'],[7,'7']],[0,'M7'],[0,'M7']]},{name:'IIm7版',c:[[4,'7'],[9,'7'],[2,'m7'],[7,'7'],[0,'M7'],[0,'M7']]}]},
+  {mode:'major',name:'I–♭VII–IV–I（ミクソリディアン）',file:'Mixolydian',c:[[0,''],[10,''],[5,''],[0,'']],v:[{name:'I–♭VII–IV',c:[[0,''],[10,''],[5,''],[5,'']]},{name:'2拍ずつ',c:[[[0,''],[10,'']],[[5,''],[0,'']]]}]},
+  {mode:'major',name:'♭VI–♭VII–I',file:'bVI-bVII-I',c:[[8,''],[10,''],[0,''],[0,'']],v:[{name:'♭VI・♭VII',c:[[[8,''],[10,'']],[0,'']]},{name:'7th',c:[[8,'M7'],[10,'7'],[0,'M7'],[0,'M7']]}]},
+  {mode:'major',name:'IM7–IVM7（2コード）',file:'I-IV-Vamp',c:[[0,'M7'],[5,'M7'],[0,'M7'],[5,'M7']],v:[{name:'2拍ずつ',c:[[[0,'M7'],[5,'M7']],[[0,'M7'],[5,'M7']]]},{name:'IM7–IIm7',c:[[0,'M7'],[2,'m7'],[0,'M7'],[2,'m7']]}]},
+  {mode:'minor',name:'マイナー・クリシェ',file:'MinorCliche',c:[[0,'m'],[0,'mM7'],[0,'m7'],[0,'m6']],v:[{name:'2拍ずつ',c:[[[0,'m'],[0,'mM7']],[[0,'m7'],[0,'m6']]]},{name:'♭VIM7へ',c:[[0,'m'],[0,'mM7'],[0,'m7'],[0,'m6'],[8,'M7'],[8,'M7']]}]},
   {mode:'minor',name:'枯葉進行',file:'AutumnLeaves',c:[[5,'m7'],[10,'7'],[3,'M7'],[8,'M7'],[2,'m7b5'],[7,'7'],[0,'m'],[0,'m']]},
-  {mode:'minor',name:'Im7–IV7（ドリアン）',file:'DorianVamp',c:[[0,'m7'],[5,'7'],[0,'m7'],[5,'7']]},
-  {mode:'minor',name:'Im–♭VI–♭VII–Im',file:'Im-bVI-bVII-Im',c:[[0,'m'],[8,''],[10,''],[0,'m']]},
-  {mode:'minor',name:'Im–♭III–♭VII–IV',file:'Im-bIII-bVII-IV',c:[[0,'m'],[3,''],[10,''],[5,'']]}
+  {mode:'minor',name:'Im7–IV7（ドリアン）',file:'DorianVamp',c:[[0,'m7'],[5,'7'],[0,'m7'],[5,'7']],v:[{name:'2拍ずつ',c:[[[0,'m7'],[5,'7']],[[0,'m7'],[5,'7']]]}]},
+  {mode:'minor',name:'Im–♭VI–♭VII–Im',file:'Im-bVI-bVII-Im',c:[[0,'m'],[8,''],[10,''],[0,'m']],v:[{name:'7th',c:[[0,'m7'],[8,'M7'],[10,'7'],[0,'m7']]},{name:'V7終止',c:[[0,'m'],[8,''],[10,''],[7,'7']]}]},
+  {mode:'minor',name:'Im–♭III–♭VII–IV',file:'Im-bIII-bVII-IV',c:[[0,'m'],[3,''],[10,''],[5,'']],v:[{name:'7th',c:[[0,'m7'],[3,'M7'],[10,'7'],[5,'7']]}]}
 ].map(p=>({...p,extra:true})));
 
 // ファイル名に使う派生形の英字名（ファイル名に日本語を使わない）
@@ -112,7 +112,9 @@ export const VARIANT_FILE={
   '3和音':'Triad','III7版':'III7','ツーファイブ解決':'II-V-Resolve','ベース下降':'BassLine','7th':'7th',
   'IV始まり':'FromIV','sus4':'sus4','分数ベース':'SlashBass','IIm版':'IIm','裏コード':'TritoneSub',
   'V7sus4経由':'V7sus4','VI7版':'VI7','スリーシックス':'III-VI','IIIm7版':'IIIm7','Vm7経由':'Vm7',
-  '♭VI始まり':'FrombVI','V7版':'V7','Vm版':'Vm'
+  '♭VI始まり':'FrombVI','V7版':'V7','Vm版':'Vm',
+  'M7下降':'DescendingM7','IV解決':'ToIV','バックドア':'Backdoor','2拍ずつ':'HalfBar','8小節':'8Bars','IIm7版':'IIm7',
+  'I–♭VII–IV':'I-bVII-IV','♭VI・♭VII':'bVI-bVII','IM7–IIm7':'I-IIm','V7終止':'V7End','♭VIM7へ':'TobVIM7'
 };
 
 // 派生形の一覧（先頭が基本形）

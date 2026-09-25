@@ -413,8 +413,10 @@ function renderProgs(){
   const chords=progressionChords(t,bars).map((c,i)=>({...c,beats:c.beats*rate,...(edits.q[i]!=null?{edited:true}:{})}));
   // ファイル名は英字のみ（例：C_Canon_BassLine_half、変更ありは _custom）
   const title=`${nn(t)}${state.mode==='minor'?'m':''}_${p.file}${vi>0?'_'+VARIANT_FILE[v.name]:''}${state.half?'_half':''}${edited?'_custom':''}`;
-  document.getElementById('progName').textContent=p.name+(vi>0?`（${v.name}）`:'')+(edited?'＊':'');
-  document.getElementById('progDeg').textContent=v.c.length>8?`${v.c.length}小節`:progressionDegrees(bars);
+  const nameEl=document.getElementById('progName'), degEl=document.getElementById('progDeg');
+  nameEl.textContent=nameEl.title=p.name+(vi>0?`（${v.name}）`:'')+(edited?'＊':'');
+  degEl.textContent=v.c.length>8?`${v.c.length}小節`:progressionDegrees(bars);
+  degEl.title=progressionDegrees(bars);
   progChords=chords;progTitle=title;
   // 幅は拍数で決める（1小節＝4マス、2拍のコードは半分の幅）
   const box=document.getElementById('chips');box.innerHTML='';
@@ -437,10 +439,12 @@ function renderEditBar(chords,original){
   bar.classList.toggle('on',!!ch);
   bar.innerHTML='';
   if(!ch)return;
-  const lab=document.createElement('span');lab.className='lab';lab.textContent='種類を変更：';bar.appendChild(lab);
+  // 1行に収めるため、ボタンは種類だけ（例：add9）。どのコードかはラベルに出す
+  const lab=document.createElement('span');lab.className='lab';lab.textContent=`${chordName(ch)} の種類：`;bar.appendChild(lab);
   for(const q of EDIT_QUALITIES){
     const b=document.createElement('button');
-    b.textContent=chordName({...ch,q});
+    b.textContent=q===''?'メジャー':CHORD[q].s;
+    b.title=chordName({...ch,q});
     b.setAttribute('aria-pressed',ch.q===q);
     b.onclick=()=>{
       if(q===original[i].q)delete edits.q[i];else edits.q[i]=q;

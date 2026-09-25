@@ -72,10 +72,10 @@ svg text{font-family:inherit}
 .chip.edited::after{content:'';position:absolute;top:4px;right:4px;width:6px;height:6px;border-radius:50%;background:#6B4FBB}
 .chip.editing{border-color:#6B4FBB;box-shadow:inset 0 0 0 1px #6B4FBB}
 .hint[hidden]{display:none}
-.editbar{display:none;flex-wrap:wrap;align-items:center;gap:4px;margin:auto 0 0;padding-top:6px;font-size:11px;color:var(--muted)}
+.editbar{display:none;flex-wrap:nowrap;align-items:center;gap:3px;white-space:nowrap;margin:auto 0 0;padding-top:6px;font-size:11px;color:var(--muted)}
 .editbar.on{display:flex}
 .editbar .lab{color:#6B4FBB;font-weight:700;margin-right:2px}
-.editbar button{font:inherit;font-size:11px;border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:3px;padding:1px 6px;cursor:pointer}
+.editbar button{font:inherit;font-size:11px;border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:3px;padding:1px 5px;cursor:pointer;flex-shrink:0}
 .editbar button[aria-pressed=true]{background:#6B4FBB;border-color:#6B4FBB;color:#fff}
 .editbar .tail{margin-left:auto;display:flex;gap:4px}
 .editbar .tail button{background:var(--panel)}
@@ -122,3 +122,8 @@ button,svg{-webkit-user-drag:none}
 .head h2{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .head>:not(h2):not(.spacer){flex-shrink:0}
 .legend span,.selinfo span{white-space:nowrap}
+/* 進行名とディグリーは1行に収める（長いときは省略表示。全体は title で確認できる） */
+.detail-head{min-width:0}
+.detail-head h3{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:0 1 auto}
+.detail-head .deg{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1 1 0}
+.detail-head .actions{flex-shrink:0}
