@@ -55,6 +55,7 @@ target_sources(GodokenNavigator PRIVATE
     Source/PluginEditor.cpp
     Source/MidiExport.cpp
     Source/PreviewSynth.cpp
+    Source/PluginState.cpp
 )
 
 target_compile_definitions(GodokenNavigator PUBLIC
@@ -85,8 +86,10 @@ juce_add_console_app(MidiExportTests PRODUCT_NAME "MidiExportTests")
 target_sources(MidiExportTests PRIVATE
     tests/MidiExportTests.cpp
     tests/PreviewSynthTests.cpp
+    tests/PluginStateTests.cpp
     Source/MidiExport.cpp
     Source/PreviewSynth.cpp
+    Source/PluginState.cpp
 )
 
 target_include_directories(MidiExportTests PRIVATE Source)
@@ -100,6 +103,7 @@ target_compile_definitions(MidiExportTests PRIVATE
 target_link_libraries(MidiExportTests
     PRIVATE
         juce::juce_audio_basics
+        juce::juce_data_structures
     PUBLIC
         juce::juce_recommended_config_flags
         juce::juce_recommended_warning_flags

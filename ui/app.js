@@ -9,6 +9,7 @@ import {renderStaff} from './staff.js';
 import {attachMidiDrag,saveMidi} from './midi.js';
 import {playChord as play1,playProgression as playN,playNote,playNotes,stopPreview,TIMBRES} from './audio.js';
 import {getHostInfo,onHostTempo} from './host.js';
+import {loadState,saveState,onStateRestored} from './persist.js';
 
 /* ---------- 状態 ---------- */
 const state={idx:0,mode:'major',scale:'major',label:'name',view:'kb',dia:'7',sel:null,prog:{major:0,minor:0},vari:{major:0,minor:0},timbre:'organ',loop:false,syncTempo:false,half:false,pick:false};
@@ -76,7 +77,7 @@ function renderTempo(){
   if(syncing())input.value=Math.round(hostBpm*10)/10;
 }
 // 範囲外・空欄の入力は確定時に 40〜240 に丸めて表示し直す
-document.getElementById('bpm').addEventListener('change',e=>{e.target.value=inputBpm();});
+document.getElementById('bpm').addEventListener('change',e=>{e.target.value=inputBpm();persist();});
 
 const NS='http://www.w3.org/2000/svg';
 function el(tag,attrs={},parent){const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);if(parent)parent.appendChild(e);return e;}
@@ -168,7 +169,7 @@ document.getElementById('selClear').addEventListener('click',()=>{stopPlayback(t
 const timbreSel=document.getElementById('timbre');
 for(const t of TIMBRES){const o=document.createElement('option');o.value=t.id;o.textContent=t.name;timbreSel.appendChild(o);}
 timbreSel.value=state.timbre;
-timbreSel.addEventListener('change',()=>{state.timbre=timbreSel.value;});
+timbreSel.addEventListener('change',()=>{state.timbre=timbreSel.value;persist();});
 
 function setKey(i,m){
   if(m!==state.mode){state.scale=m==='major'?'major':'nminor';}
@@ -459,5 +460,52 @@ function render(){
   document.getElementById('progHalf').setAttribute('aria-pressed',state.half);
   renderPick();
   renderKeyPanel();renderFretboard();renderProgs();renderDiatonic();
+  persist();
 }
-applyRot(0);render();
+/* ---------- 状態の保存・復元 ---------- */
+// 保存するのは設定や選択の状態だけ（選択中のコード・コード判別の音・再生状態は保存しない）
+function persist(){
+  saveState({idx:state.idx,mode:state.mode,scale:state.scale,label:state.label,view:state.view,dia:state.dia,
+    prog:state.prog,vari:state.vari,timbre:state.timbre,loop:state.loop,half:state.half,
+    syncTempo:!!state.syncTempo,bpm:inputBpm()});
+}
+// 読み込んだ値は1つずつ確かめてから使う（古い・壊れたデータでも落ちないように）
+function applySaved(saved){
+  if(!saved||typeof saved!=='object')return;
+  const pick=(key,ok)=>{if(key in saved&&ok(saved[key]))state[key]=saved[key];};
+  const oneOf=list=>v=>list.includes(v);
+  const bool=v=>typeof v==='boolean';
+  pick('idx',v=>Number.isInteger(v)&&v>=0&&v<12);
+  pick('mode',oneOf(['major','minor']));
+  pick('scale',v=>!!scaleById(v));
+  pick('label',oneOf(['name','degree']));
+  pick('view',oneOf(['kb','staff']));
+  pick('dia',oneOf(['7','3']));
+  pick('timbre',oneOf(TIMBRES.map(t=>t.id)));
+  pick('loop',bool);pick('half',bool);
+  if(!host.standalone)pick('syncTempo',bool);
+  for(const key of ['prog','vari'])
+    for(const m of ['major','minor']){
+      const v=saved[key]&&saved[key][m];
+      if(Number.isInteger(v)&&v>=0)state[key][m]=v;
+    }
+  // 進行・派生の番号は範囲内に収める
+  for(const m of ['major','minor']){
+    const list=PROGRESSIONS.filter(p=>p.mode===m);
+    state.prog[m]=Math.min(state.prog[m],list.length-1);
+    state.vari[m]=Math.min(state.vari[m],variantsOf(list[state.prog[m]]).length-1);
+  }
+  if(Number.isFinite(saved.bpm))document.getElementById('bpm').value=Math.min(240,Math.max(40,Math.round(saved.bpm)));
+  state.sel=null;picks.clear();state.pick=false;
+  stopPlayback(true);
+  timbreSel.value=state.timbre;
+  syncSeg('labelSeg','label');syncSeg('viewSeg','view');syncSeg('diaSeg','dia');
+  // 五度圏はアニメーションせずにその位置へ
+  cancelAnimationFrame(anim);rot=-state.idx*30;applyRot(rot);
+  render();
+}
+onStateRestored(applySaved);
+
+applyRot(0);
+applySaved(await loadState());
+render();

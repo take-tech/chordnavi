@@ -113,6 +113,17 @@ GodokenEditor::GodokenEditor (GodokenProcessor& p)
                    .withNativeFunction ("getHostInfo", [this] (const auto&, auto completion)
                                         {
                                             completion (hostInfo());
+                                        })
+                   // JS: saveState(json) — UI の状態を保存用に預ける／loadState() — 保存済みの状態（無ければ空文字列）
+                   .withNativeFunction ("saveState", [this] (const auto& args, auto completion)
+                                        {
+                                            if (! args.isEmpty() && args[0].isString())
+                                                processorRef.setUiState (args[0].toString());
+                                            completion (juce::var (true));
+                                        })
+                   .withNativeFunction ("loadState", [this] (const auto&, auto completion)
+                                        {
+                                            completion (juce::var (processorRef.getUiState()));
                                         }))
 {
     addAndMakeVisible (webView);
@@ -127,6 +138,18 @@ GodokenEditor::GodokenEditor (GodokenProcessor& p)
 
     if (! processorRef.isStandalone())
         startTimerHz (5);
+
+    processorRef.addChangeListener (this);
+}
+
+GodokenEditor::~GodokenEditor()
+{
+    processorRef.removeChangeListener (this);
+}
+
+void GodokenEditor::changeListenerCallback (juce::ChangeBroadcaster*)
+{
+    webView.emitEventIfBrowserIsVisible ("stateRestored", juce::var (processorRef.getUiState()));
 }
 
 juce::var GodokenEditor::hostInfo() const

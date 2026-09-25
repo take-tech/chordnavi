@@ -1,5 +1,6 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
+#include "PluginState.h"
 
 GodokenProcessor::GodokenProcessor()
     : AudioProcessor (BusesProperties().withOutput ("Output", juce::AudioChannelSet::stereo(), true))
@@ -27,6 +28,36 @@ void GodokenProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mid
                 hostBpm.store (*bpm);
 
     previewSynth.render (buffer);
+}
+
+void GodokenProcessor::getStateInformation (juce::MemoryBlock& destData)
+{
+    destData = PluginState::serialise (getUiState());
+}
+
+void GodokenProcessor::setStateInformation (const void* data, int sizeInBytes)
+{
+    const auto json = PluginState::deserialise (data, sizeInBytes);
+    if (json.isEmpty())
+        return;
+
+    {
+        const juce::ScopedLock sl (stateLock);
+        uiState = json;
+    }
+    sendChangeMessage();   // 非同期でメッセージスレッドに届く
+}
+
+void GodokenProcessor::setUiState (const juce::String& json)
+{
+    const juce::ScopedLock sl (stateLock);
+    uiState = json;
+}
+
+juce::String GodokenProcessor::getUiState() const
+{
+    const juce::ScopedLock sl (stateLock);
+    return uiState;
 }
 
 juce::AudioProcessorEditor* GodokenProcessor::createEditor()

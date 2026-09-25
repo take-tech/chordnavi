@@ -17,14 +17,15 @@ public:
 
 class GodokenEditor : public juce::AudioProcessorEditor,
                       public juce::DragAndDropContainer,
-                      private juce::Timer
+                      private juce::Timer,
+                      private juce::ChangeListener
 {
 public:
     static constexpr int baseWidth  = 1280;
     static constexpr int baseHeight = 780;
 
     explicit GodokenEditor (GodokenProcessor&);
-    ~GodokenEditor() override = default;
+    ~GodokenEditor() override;
 
     void resized() override;
 
@@ -47,6 +48,9 @@ private:
     // JS: playNotes({ notes: [midi...], dur, timbre }) — 鍵盤・指板のクリック。他の試聴は止めない
     void playNotes (const juce::Array<juce::var>& args,
                     juce::WebBrowserComponent::NativeFunctionCompletion completion);
+
+    // DAW が状態を復元したら JS へ "stateRestored" イベントで送る
+    void changeListenerCallback (juce::ChangeBroadcaster*) override;
 
     // DAW のテンポが変わったら JS へ "hostTempo" イベントで通知する
     void timerCallback() override;

@@ -24,6 +24,7 @@ Source/
   PluginEditor.h/.cpp         … WebBrowserComponent を載せる
   MidiExport.h/.cpp           … コード列 → .mid ファイル生成、外部ドラッグ
   PreviewSynth.h/.cpp         … 試聴用の簡易シンセ（三角波＋エンベロープ、ロックフリーのキュー）
+  PluginState.h/.cpp          … 保存データ（UI 状態の JSON を ValueTree で包む）
 ui/
   index.html                  … プロトタイプを分割・整理したもの
   app.js / theory.js / midi.js / audio.js / staff.js / style.css
@@ -76,6 +77,13 @@ WebView上のマウス操作から外部ドラッグを開始できるかはOS�
 - 進行の試聴は「ループ」で繰り返せる。再生中は「試聴」ボタンが「停止」になる。音色の既定はオルガン。
 - 進行の試聴中は、鳴っているコードのチップを着色し、鍵盤・指板・五線譜にそのコードを表示する（終了後は元の表示に戻る）。キー・進行・派生を切り替えたら音も止める。
 - Standalone でも同じく鳴ること。
+
+## 状態の保存
+
+- UI の状態を JSON にして C++ に預け（`saveState`）、`getStateInformation` で保存する。`setStateInformation` で復元したら、開いている UI に `stateRestored` で反映する。
+- 保存するもの：キー・モード・スケール・音名／度数・鍵盤／五線譜・4和音／3和音・選択中の進行と派生（メジャー／マイナー別）・テンポ（手入力値）・DAW同期・音色・ループ・リズム½。
+- 保存しないもの：選択中のコード、コード判別の選択音、再生状態。
+- 読み込んだ値は1つずつ検証し、不正な値は既定値のままにする。
 
 ## マイルストーン（この順で進め、各段階で動作確認してから次へ）
 

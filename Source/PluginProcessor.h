@@ -3,7 +3,9 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "PreviewSynth.h"
 
-class GodokenProcessor : public juce::AudioProcessor
+// setStateInformation で状態が差し替わったら ChangeBroadcaster で開いているエディタへ知らせる
+class GodokenProcessor : public juce::AudioProcessor,
+                         public juce::ChangeBroadcaster
 {
 public:
     GodokenProcessor();
@@ -30,8 +32,12 @@ public:
     const juce::String getProgramName (int) override { return {}; }
     void changeProgramName (int, const juce::String&) override {}
 
-    void getStateInformation (juce::MemoryBlock&) override {}
-    void setStateInformation (const void*, int) override {}
+    void getStateInformation (juce::MemoryBlock&) override;
+    void setStateInformation (const void*, int) override;
+
+    // UI の状態（JSON 文字列）。UI が変わるたびにエディタから送られる
+    void setUiState (const juce::String& json);
+    juce::String getUiState() const;
 
     // 試聴（メッセージスレッドから呼ぶ）
     PreviewSynth& getPreviewSynth() { return previewSynth; }
@@ -42,6 +48,9 @@ public:
 
 private:
     std::atomic<double> hostBpm { 0.0 };
+
+    juce::CriticalSection stateLock;   // get/setStateInformation はメッセージスレッド以外から呼ばれることがある
+    juce::String uiState;
 
     PreviewSynth previewSynth;
 
