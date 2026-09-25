@@ -37,6 +37,15 @@ export function playNotes(notes,timbre){
   webAudioNotes(notes,0,NOTE_DUR);
 }
 
+// ミュート（C++ の出力を無音にする。ブラウザでの確認時は WebAudio を鳴らさない）
+const nativeSetMute=juce?juce.getNativeFunction('setMute'):null;
+let muted=false;
+export function setMuted(on){
+  muted=!!on;
+  if(nativeSetMute)nativeSetMute(muted).catch(err=>console.error(err));
+  else if(muted&&ac){ac.close();ac=null;}
+}
+
 // MIDI キーボードで弾く音の音色を C++ に伝える
 const nativeSetTimbre=juce?juce.getNativeFunction('setTimbre'):null;
 export function setLiveTimbre(timbre){if(nativeSetTimbre)nativeSetTimbre(timbre).catch(err=>console.error(err));}
@@ -59,6 +68,7 @@ export function playProgression(chords,timbre,bpm){
 let ac=null;
 function webAudioChord(ch,when,dur){webAudioNotes(voicing(ch),when,dur);}
 function webAudioNotes(notes,when,dur){
+  if(muted)return;
   ac=ac||new (window.AudioContext||window.webkitAudioContext)();
   const t=ac.currentTime+when;
   for(const n of notes){

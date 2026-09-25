@@ -139,6 +139,12 @@ GodokenEditor::GodokenEditor (GodokenProcessor& p)
                                                 processorRef.setUiTheme (args[0].toString());
                                             completion (juce::var (true));
                                         })
+                   // JS: setMute(bool) — ChordNavi の音をすべて消す
+                   .withNativeFunction ("setMute", [this] (const auto& args, auto completion)
+                                        {
+                                            processorRef.setMuted (! args.isEmpty() && (bool) args[0]);
+                                            completion (juce::var (true));
+                                        })
                    // JS: setTimbre(name) — MIDI キーボードで弾く音の音色
                    .withNativeFunction ("setTimbre", [this] (const auto& args, auto completion)
                                         {

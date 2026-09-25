@@ -48,6 +48,9 @@ public:
 
     // MIDI 入力で鳴っている音（押している音＋サステインペダルで伸ばしている音）。UI の表示用
     std::vector<int> getLiveNotes() const;
+    // ミュート：出力を無音にする（試聴・MIDI 入力の音すべて。表示は動いたまま）
+    void setMuted (bool m) { muted.store (m); }
+
     // MIDI 入力を鳴らす音色（UI の音色メニューと同じ）
     void setLiveTimbre (PreviewSynth::Timbre t) { liveTimbre.store ((int) t); }
 
@@ -63,6 +66,7 @@ private:
     bool sustainPedal = false;
     std::array<std::atomic<juce::uint64>, 2> liveMask {};
     std::atomic<int> liveTimbre { (int) PreviewSynth::Timbre::organ };
+    std::atomic<bool> muted { false };
     void handleMidi (const juce::MidiMessage&);
 
     juce::CriticalSection stateLock;   // get/setStateInformation はメッセージスレッド以外から呼ばれることがある

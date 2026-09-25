@@ -39,6 +39,9 @@ void GodokenProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mid
     liveMask[1].store (mask[1]);
 
     previewSynth.render (buffer);
+
+    if (muted.load())
+        buffer.clear();
 }
 
 void GodokenProcessor::handleMidi (const juce::MidiMessage& m)

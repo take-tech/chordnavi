@@ -125,6 +125,7 @@ svg text{font-family:inherit}
 .sync[aria-pressed=true]{background:var(--ink);border-color:var(--ink);color:var(--on-ink)}
 .sync[hidden]{display:none}
 .sync:disabled{opacity:.4;cursor:default}
+#muteBtn[aria-pressed=true]{background:#C4456A;border-color:#C4456A;color:#fff}
 .legend[hidden]{display:none}
 .seg[hidden]{display:none}
 /* DAW 上だけ出すテーマのボタン（Standalone はメニューの「オプション → テーマ」） */

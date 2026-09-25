@@ -9,7 +9,7 @@ import {
 import {renderStaff} from './staff.js';
 import {threePositions,nearestVoicing,TAB_AREAS} from './guitar.js';
 import {attachMidiDrag,saveMidi} from './midi.js';
-import {playChord as play1,playProgression as playN,playNote,playNotes,stopPreview,setLiveTimbre,TIMBRES} from './audio.js';
+import {playChord as play1,playProgression as playN,playNote,playNotes,stopPreview,setLiveTimbre,setMuted,TIMBRES} from './audio.js';
 import {getHostInfo,onHostTempo,onMidiNotes,onSetTheme,reportTheme} from './host.js';
 import {loadState,saveState,onStateRestored} from './persist.js';
 
@@ -738,6 +738,12 @@ document.getElementById('progPlay').onclick=()=>{
   else playProgression(progChords);
 };
 document.getElementById('progLoop').onclick=()=>{state.loop=!state.loop;render();};
+// ミュート（保存しない：開き直したら音が出る状態から）
+let isMuted=false;
+document.getElementById('muteBtn').onclick=()=>{
+  isMuted=!isMuted;setMuted(isMuted);
+  document.getElementById('muteBtn').setAttribute('aria-pressed',isMuted);
+};
 // Space キーで試聴／停止（試聴ボタンと同じ）。入力欄・選択メニュー・五度圏のキー操作中は横取りしない。
 // ボタンにフォーカスがあるときの「Space でそのボタンを押す」動作は止めて、試聴を優先する
 document.addEventListener('keydown',e=>{
