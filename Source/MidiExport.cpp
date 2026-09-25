@@ -120,7 +120,7 @@ juce::String safeFileName (const juce::String& name)
 
 juce::File writeTempFile (const std::vector<Chord>& chords, double bpm, const juce::String& name)
 {
-    auto dir = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("GodokenNavigator");
+    auto dir = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("ChordNavi");
 
     if (! dir.createDirectory())
         return {};

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(GodokenNavigator VERSION 0.1.0)
+project(ChordNavi VERSION 0.1.0)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -34,13 +34,13 @@ juce_add_binary_data(GodokenUIData
 # ──────────────────────────────────────────────────────
 # Plugin Target
 # ──────────────────────────────────────────────────────
-juce_add_plugin(GodokenNavigator
+juce_add_plugin(ChordNavi
     VERSION                     0.1.0
     COMPANY_NAME                Ranze
     PLUGIN_MANUFACTURER_CODE    Rnze
     PLUGIN_CODE                 Gdkn
     FORMATS                     VST3 AU Standalone
-    PRODUCT_NAME                "Godoken Navigator"
+    PRODUCT_NAME                "ChordNavi"
     IS_SYNTH                    TRUE
     NEEDS_MIDI_INPUT            TRUE
     NEEDS_MIDI_OUTPUT           FALSE
@@ -50,7 +50,7 @@ juce_add_plugin(GodokenNavigator
     AU_MAIN_TYPE                kAudioUnitType_MusicDevice
 )
 
-target_sources(GodokenNavigator PRIVATE
+target_sources(ChordNavi PRIVATE
     Source/PluginProcessor.cpp
     Source/PluginEditor.cpp
     Source/MidiExport.cpp
@@ -58,13 +58,13 @@ target_sources(GodokenNavigator PRIVATE
     Source/PluginState.cpp
 )
 
-target_compile_definitions(GodokenNavigator PUBLIC
+target_compile_definitions(ChordNavi PUBLIC
     JUCE_WEB_BROWSER=1
     JUCE_USE_CURL=0
     JUCE_VST3_CAN_REPLACE_VST2=0
 )
 
-target_link_libraries(GodokenNavigator
+target_link_libraries(ChordNavi
     PRIVATE
         GodokenUIData
         juce::juce_audio_utils

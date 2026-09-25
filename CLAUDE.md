@@ -1,6 +1,8 @@
-# 五度圏ナビゲーター（DAWプラグイン）
+# ChordNavi（五度圏・コード進行のDAWプラグイン）
 
 ## このプロジェクトについて
+
+製品名は **ChordNavi**（旧名 Godoken Navigator。プラグインコード `Rnze`/`Gdkn` は変えないので既存のプロジェクトはそのまま開ける）。
 
 五度圏・スケール・ギター指板・コード進行を1画面で確認し、コードをMIDIとしてDAWへドラッグ＆ドロップできるプラグイン。
 完成イメージは `reference/prototype.html`（ブラウザで動くプロトタイプ）。**UI・音楽理論ロジック・挙動はこのプロトタイプを正とする。** 迷ったらプロトタイプの挙動に合わせること。
@@ -102,14 +104,14 @@ WebView上のマウス操作から外部ドラッグを開始できるかはOS�
 ```
 # 構成（手元の JUCE を使う場合は -DFETCHCONTENT_SOURCE_DIR_JUCE=<JUCE のパス>）
 cmake -S . -B build-release -DCMAKE_BUILD_TYPE=Release
-cmake --build build-release --target GodokenNavigator_VST3 GodokenNavigator_AU GodokenNavigator_Standalone -j8
+cmake --build build-release --target ChordNavi_VST3 ChordNavi_AU ChordNavi_Standalone -j8
 
 # 単体テスト
 cmake --build build --target MidiExportTests && ./build/MidiExportTests_artefacts/Debug/MidiExportTests
 
 # インストール（ユーザーのプラグインフォルダ）と AU の検証
-cp -R "build-release/GodokenNavigator_artefacts/Release/VST3/Godoken Navigator.vst3" ~/Library/Audio/Plug-Ins/VST3/
-cp -R "build-release/GodokenNavigator_artefacts/Release/AU/Godoken Navigator.component" ~/Library/Audio/Plug-Ins/Components/
+cp -R "build-release/ChordNavi_artefacts/Release/VST3/ChordNavi.vst3" ~/Library/Audio/Plug-Ins/VST3/
+cp -R "build-release/ChordNavi_artefacts/Release/AU/ChordNavi.component" ~/Library/Audio/Plug-Ins/Components/
 auval -v aumu Gdkn Rnze
 ```
 
