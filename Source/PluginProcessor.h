@@ -42,12 +42,24 @@ public:
     // 試聴（メッセージスレッドから呼ぶ）
     PreviewSynth& getPreviewSynth() { return previewSynth; }
 
+    // MIDI 入力で鳴っている音（押している音＋サステインペダルで伸ばしている音）。UI の表示用
+    std::vector<int> getLiveNotes() const;
+    // MIDI 入力を鳴らす音色（UI の音色メニューと同じ）
+    void setLiveTimbre (PreviewSynth::Timbre t) { liveTimbre.store ((int) t); }
+
     // DAW のテンポ（取得できていなければ 0）。Standalone では常に 0
     double getHostBpm() const { return hostBpm.load(); }
     bool isStandalone() const { return wrapperType == wrapperType_Standalone; }
 
 private:
     std::atomic<double> hostBpm { 0.0 };
+
+    // MIDI 入力の状態（オーディオスレッドだけが書く。表示用の liveMask は UI から読む）
+    std::array<bool, 128> keyDown {}, sustained {};
+    bool sustainPedal = false;
+    std::array<std::atomic<juce::uint64>, 2> liveMask {};
+    std::atomic<int> liveTimbre { (int) PreviewSynth::Timbre::organ };
+    void handleMidi (const juce::MidiMessage&);
 
     juce::CriticalSection stateLock;   // get/setStateInformation はメッセージスレッド以外から呼ばれることがある
     juce::String uiState;

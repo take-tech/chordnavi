@@ -3,17 +3,21 @@ import {
   mod12,tonicOf,isFlatKey,noteName,keyName as keyNameOf,degLabel,chordName as chordNameOf,chordDeg,chordRootName,
   chordPcs,scaleById,spellChordTone,variantsOf,chordAt,sameChord,voicing,keySignature,
   progressionChords,progressionDegrees,BEATS_PER_BAR,detectChords,VARIANT_FILE,
+  CONFORM_SCALES,conformBars,diatonicOf,
   CHORD,spellScaleTone,spellChordInterval,convertChordSize
 } from './theory.js';
 import {renderStaff} from './staff.js';
 import {threePositions,nearestVoicing,TAB_AREAS} from './guitar.js';
 import {attachMidiDrag,saveMidi} from './midi.js';
-import {playChord as play1,playProgression as playN,playNote,playNotes,stopPreview,TIMBRES} from './audio.js';
-import {getHostInfo,onHostTempo} from './host.js';
+import {playChord as play1,playProgression as playN,playNote,playNotes,stopPreview,setLiveTimbre,TIMBRES} from './audio.js';
+import {getHostInfo,onHostTempo,onMidiNotes} from './host.js';
 import {loadState,saveState,onStateRestored} from './persist.js';
 
 /* ---------- 状態 ---------- */
-const state={idx:0,mode:'major',scale:'major',label:'name',view:'kb',dia:'7',sel:null,prog:{major:0,minor:0},vari:{major:0,minor:0},timbre:'organ',loop:false,syncTempo:false,half:false,pick:false,editIdx:null,fbView:'fb',tabArea:'low'};
+const state={idx:0,mode:'major',scale:'major',label:'name',view:'kb',dia:'7',sel:null,prog:{major:0,minor:0},vari:{major:0,minor:0},timbre:'organ',loop:false,syncTempo:false,half:false,pick:false,editIdx:null,fbView:'fb',tabArea:'low',conform:false};
+// 「スケールに沿う」が効いているか（対象の 7 音のスケールのときだけ）
+const conformOn=()=>state.conform&&CONFORM_SCALES.includes(state.scale);
+const conformed=(bars,mode=state.mode)=>conformOn()?conformBars(bars,mode,state.scale):bars;
 // コード判別で選んだ音。キーは 'kb:<MIDI>'（鍵盤）または 's<弦番号>'（指板：1本の弦に1音）、値は MIDI
 const picks=new Map();
 const pickedNotes=()=>[...new Set(picks.values())];
@@ -171,14 +175,21 @@ bindSeg('fbViewSeg','fbView',()=>render());
 bindSeg('tabAreaSeg','tabArea',()=>render());
 // 選択中のコードも3和音／4和音の対応する和音に切り替えて、鍵盤・指板の着色に反映し、試聴する
 bindSeg('diaSeg','dia',()=>{
-  if(state.sel){state.sel=convertChordSize(state.sel,state.dia,state.mode);playChord(state.sel);}
+  if(state.sel){
+    if(conformOn()){
+      // スケールのダイアトニックから同じ度数の和音を探す（無ければそのまま）
+      const it=diatonicOf(state.scale,state.dia==='3'?3:4).find(([off])=>off===state.sel.off);
+      if(it)state.sel={...chordAt(tonic(),it),...(state.sel.bass!=null?{bass:state.sel.bass,boff:state.sel.boff}:{})};
+    }else state.sel=convertChordSize(state.sel,state.dia,state.mode);
+    playChord(state.sel);
+  }
   render();
 });
 document.getElementById('selClear').addEventListener('click',()=>{stopPlayback(true);state.sel=null;state.editIdx=null;render();});
 const timbreSel=document.getElementById('timbre');
 for(const t of TIMBRES){const o=document.createElement('option');o.value=t.id;o.textContent=t.name;timbreSel.appendChild(o);}
 timbreSel.value=state.timbre;
-timbreSel.addEventListener('change',()=>{state.timbre=timbreSel.value;persist();});
+timbreSel.addEventListener('change',()=>{state.timbre=timbreSel.value;setLiveTimbre(state.timbre);persist();});
 
 function setKey(i,m){
   if(m!==state.mode){state.scale=m==='major'?'major':'nminor';}
@@ -217,31 +228,51 @@ function renderKeyboard(){
   const WPC=[0,2,4,5,7,9,11], BLK={1:0,3:1,6:3,8:4,10:5}, BASE=48;   // 左端 C3
   const g=el('g',{transform:'translate(1,1)'},svg);
   for(let w=0;w<whites;w++){
-    const pc=WPC[w%7], midi=BASE+Math.floor(w/7)*12+pc, {n,ds,on}=keyStyle(midi);
-    el('rect',{x:w*W,y:0,width:W,height:H,fill:on?'#E4DDF5':n.inChord?'#F6D6DF':'#fff',stroke:'#1E2742','stroke-width':1,rx:3,'data-note':midi},g);
+    const pc=WPC[w%7], midi=BASE+Math.floor(w/7)*12+pc, {n,ds,on,live}=keyStyle(midi);
+    el('rect',{x:w*W,y:0,width:W,height:H,fill:live?'#D6E4FA':on?'#E4DDF5':n.inChord?'#F6D6DF':'#fff',stroke:'#1E2742','stroke-width':1,rx:3,'data-note':midi},g);
     if(ds){el('circle',{cx:w*W+W/2,cy:H-19,r:13,fill:ds.fill,opacity:ds.op},g);
       txt(g,w*W+W/2,H-19,n.label,{fill:'#fff','font-size':n.label.length>2?10:12,'font-weight':700,opacity:ds.op===1?1:.6});}
   }
   for(let o=0;o<octs;o++)for(const pc in BLK){
-    const midi=BASE+o*12+(+pc), x=(o*7+BLK[pc]+1)*W-BW/2, {n,ds,on}=keyStyle(midi);
-    el('rect',{x,y:0,width:BW,height:BH,fill:on?'#4B3590':n.inChord?'#8E2346':'#1E2742',rx:2,'data-note':midi},g);
+    const midi=BASE+o*12+(+pc), x=(o*7+BLK[pc]+1)*W-BW/2, {n,ds,on,live}=keyStyle(midi);
+    el('rect',{x,y:0,width:BW,height:BH,fill:live?'#1F4FA8':on?'#4B3590':n.inChord?'#8E2346':'#1E2742',rx:2,'data-note':midi},g);
     if(ds){el('circle',{cx:x+BW/2,cy:BH-14,r:10.5,fill:ds.fill,opacity:ds.op,stroke:'#fff','stroke-width':1.5},g);
       txt(g,x+BW/2,BH-14,n.label,{fill:'#fff','font-size':9,'font-weight':700,opacity:ds.op===1?1:.6});}
   }
 }
 
 // 1つの音（MIDI）の表示。コード判別中は選んだ音を紫、それ以外のスケール音を薄く
-function keyStyle(midi){
+/* ---------- MIDI キーボード入力 ---------- */
+// 弾いている音（MIDI 番号）。表示できる範囲の外の音はオクターブを折り返して見せる
+let liveNotes=[];
+const LIVE_COLOR='#2F6FD6';
+const KB_RANGE=[48,84], FB_RANGE=[40,79];   // 鍵盤 C3〜C6、指板 E2〜G5
+const fold=(n,[lo,hi])=>{while(n<lo)n+=12;while(n>hi)n-=12;return n;};
+let liveKb=new Set(), liveFb=new Set();
+onMidiNotes(info=>{
+  liveNotes=[...(info.notes||[])].sort((a,b)=>a-b);
+  liveKb=new Set(liveNotes.map(n=>fold(n,KB_RANGE)));
+  liveFb=new Set(liveNotes.map(n=>fold(n,FB_RANGE)));
+  // 弾くたびに全体は描き直さず、鍵盤・指板・五線譜と見出しだけ
+  renderKeyPanel();renderFretPanel();renderLive();
+});
+
+// 1つの音（MIDI）の表示。MIDI で弾いている音は青、コード判別中は選んだ音を紫。それぞれのとき他のスケール音は薄く
+function keyStyle(midi,where='kb'){
   const n=noteInfo(mod12(midi));
   let ds=dotStyle(n);
+  if(liveNotes.length){
+    if((where==='kb'?liveKb:liveFb).has(midi))return {n,ds:{fill:LIVE_COLOR,op:1},on:true,live:true};
+    return {n,ds:ds&&{...ds,op:.25},on:false};
+  }
   if(!state.pick)return {n,ds,on:false};
   if(isPicked(midi))return {n,ds:{fill:PICK_COLOR,op:1},on:true};
   return {n,ds:ds&&{...ds,op:.25},on:false};
 }
 // 指板の1マス：その弦で選んだ音は濃い紫、鍵盤で選んだ同じ高さの音は薄い紫
 function fretStyle(s,midi){
-  const st=keyStyle(midi);
-  if(!state.pick||!st.on)return st;
+  const st=keyStyle(midi,'fb');
+  if(st.live||!state.pick||!st.on)return st;
   if(stringPick(s)===midi)return st;
   if(picks.has('kb:'+midi))return {...st,ds:{fill:PICK_COLOR,op:.4}};
   // 別の弦で選んだ音：このマスは通常の（薄い）表示
@@ -252,16 +283,17 @@ function fretStyle(s,midi){
 /* ---------- 五線譜 ---------- */
 function renderStaffView(){
   const svg=document.getElementById('staff'), t=tonic(), sig=keySignature(state.idx);
-  if(state.pick){
-    // コード判別：選んだ音を和音で表示（綴りは第1候補のコードから）
-    const cand=detectChords(pickedNotes())[0];
+  if(liveNotes.length||state.pick){
+    // MIDI で弾いている音／コード判別で選んだ音を和音で表示（綴りは第1候補のコードから）
+    const staffNotes=liveNotes.length?liveNotes:pickedNotes(), color=liveNotes.length?LIVE_COLOR:PICK_COLOR;
+    const cand=detectChords(staffNotes)[0];
     const spell=pc=>{
       if(cand){const iv=CHORD[cand.q].iv.find(i=>mod12(cand.root+i)===pc);
         const s=iv!=null&&spellChordInterval(cand.root,nn(cand.root),iv,cand.q);if(s)return s;}
       return nn(pc);
     };
-    const notes=pickedNotes().sort((a,b)=>a-b).map(midi=>{const n=noteInfo(mod12(midi)),name=spell(mod12(midi));
-      return {midi,name,label:state.label==='name'?name:n.label,fill:PICK_COLOR,op:1,col:0};});
+    const notes=[...staffNotes].sort((a,b)=>a-b).map(midi=>{const n=noteInfo(mod12(midi)),name=spell(mod12(midi));
+      return {midi,name,label:state.label==='name'?name:n.label,fill:color,op:1,col:0};});
     renderStaff(svg,{sig,notes,columns:1,labelSide:'right'});
     return;
   }
@@ -467,11 +499,24 @@ function pickOnString(s,midi){
 document.getElementById('pickBtn').onclick=()=>{state.pick=!state.pick;if(state.pick)stopPlayback(true);render();};
 document.getElementById('pickClear').onclick=()=>{picks.clear();render();};
 document.getElementById('pickPlay').onclick=()=>{const ns=pickedNotes();if(ns.length)playNotes(ns,state.timbre);};
+// MIDI で弾いている音のコード名（見出しに出す）
+function renderLive(){
+  const box=document.getElementById('liveInfo'), on=liveNotes.length>0;
+  box.classList.toggle('on',on);
+  document.getElementById('kbLegend').hidden=on||state.pick;
+  if(!on)return;
+  const t=tonic();
+  const cands=detectChords(liveNotes).map(c=>({...c,off:mod12(c.root-t),...(c.bass!=null?{boff:mod12(c.bass-t)}:{})}));
+  const res=document.getElementById('liveResult');
+  res.textContent=cands.length
+    ?cands.slice(0,3).map((c,i)=>i===0?`${chordName(c)}（${chordDeg(c.off,c.q,c.boff)}）`:chordName(c)).join(' / ')
+    :liveNotes.map(n=>nn(n)).join(' ');
+}
 function renderPick(){
   const on=state.pick;
   document.getElementById('pickBtn').setAttribute('aria-pressed',on);
   document.getElementById('pickInfo').classList.toggle('on',on);
-  document.getElementById('kbLegend').hidden=on;
+  document.getElementById('kbLegend').hidden=on||liveNotes.length>0;
   if(!on)return;
   const box=document.getElementById('pickResult');box.innerHTML='';
   const t=tonic();
@@ -480,7 +525,7 @@ function renderPick(){
   if(!cands.length){box.textContent='該当なし';return;}
   cands.forEach((ch,i)=>{
     const b=document.createElement('button');b.className=i===0?'best':'';
-    b.textContent=i===0?`${chordName(ch)}（${chordDeg(ch.off,ch.q,ch.boff)}）`:chordName(ch);
+    b.textContent=i===0?`${chordName(ch)}（${chordDeg(ch.off,ch.q,ch.boff,ch.deg)}）`:chordName(ch);
     b.title='クリックで試聴／DAWへドラッグでMIDI';
     b.onclick=()=>{playChord(ch);state.sel={...ch};};
     attachMidiDrag(b,()=>({name:chordName(ch),bpm:bpm(),chords:[{...ch,beats:BEATS_PER_BAR}]}));
@@ -513,9 +558,10 @@ function renderProgs(){
   more.onclick=()=>toggleMore(list);
   pills.appendChild(more);
   const p=list[cur], t=tonic(), vars=variantsOf(p), vi=Math.min(state.vari[state.mode],vars.length-1), v=vars[vi];
-  const ekey=`${state.mode}:${cur}:${vi}`;
+  const vc=conformed(v.c);   // 「スケールに沿う」を当てた元の進行
+  const ekey=`${state.mode}:${cur}:${vi}:${conformOn()?state.scale:''}`;
   if(edits.key!==ekey){edits.key=ekey;edits.bars=null;state.editIdx=null;}
-  const bars=edits.bars??v.c, edited=!!edits.bars;
+  const bars=edits.bars??vc, edited=!!edits.bars;
   // コード番号 → 小節の位置（b 小節目の k 番目）
   const where=bars.flatMap((bar,b)=>barItemsOf(bar).map((_,k)=>({b,k})));
   const vbox=document.getElementById('variants');vbox.innerHTML='';
@@ -526,9 +572,10 @@ function renderProgs(){
   }
   // リズム½：各コードの長さを半分に（1小節→2拍、2拍→1拍）
   const rate=state.half?.5:1;
-  const chords=progressionChords(t,bars).map((c,i)=>({...c,beats:c.beats*rate,...(sameJSON(bars[where[i].b],v.c[where[i].b])?{}:{edited:true})}));
+  const chords=progressionChords(t,bars).map((c,i)=>({...c,beats:c.beats*rate,...(sameJSON(bars[where[i].b],vc[where[i].b])?{}:{edited:true})}));
   // ファイル名は英字のみ（例：C_Canon_BassLine_half、変更ありは _custom）
-  const title=`${nn(t)}${state.mode==='minor'?'m':''}_${p.file}${vi>0?'_'+VARIANT_FILE[v.name]:''}${state.half?'_half':''}${edited?'_custom':''}`;
+  const scaleTag=conformOn()&&state.scale!==(state.mode==='major'?'major':'nminor')?'_'+state.scale:'';
+  const title=`${nn(t)}${state.mode==='minor'?'m':''}_${p.file}${vi>0?'_'+VARIANT_FILE[v.name]:''}${scaleTag}${state.half?'_half':''}${edited?'_custom':''}`;
   const nameEl=document.getElementById('progName'), degEl=document.getElementById('progDeg');
   nameEl.textContent=nameEl.title=p.name+(vi>0?`（${v.name}）`:'')+(edited?'＊':'');
   degEl.textContent=progressionDegrees(bars);
@@ -552,7 +599,7 @@ function renderProgs(){
     if(playback&&playback.index===i)chip.classList.add('playing');
     box.appendChild(chip);
   });
-  renderEditBar(chords,{t,orig:v.c,bars,where});
+  renderEditBar(chords,{t,orig:vc,bars,where});
 }
 
 // 選んだ進行のコードのルート・種類を変え、1小節のコードを分割・結合するバー（ヒントの位置に出す）
@@ -624,7 +671,7 @@ function toggleMore(list){
     const b=document.createElement('button');b.setAttribute('aria-pressed',i===cur);
     b.innerHTML='<span class="n"></span><span class="d"></span>';
     b.querySelector('.n').textContent=p.name;
-    b.querySelector('.d').textContent=progressionChords(t,p.c).map(c=>chordName(c)).join(' – ');
+    b.querySelector('.d').textContent=progressionChords(t,conformed(p.c)).map(c=>chordName(c)).join(' – ');
     b.title=p.name;
     b.onclick=()=>selectProgression(i);
     pop.appendChild(b);
@@ -643,7 +690,7 @@ function makeChip(ch,progIndex=null){
   if(sameChord(state.sel,ch))b.classList.add('sel');
   b.innerHTML='<span class="n"></span><span class="d"></span>';
   b.querySelector('.n').textContent=chordName(ch);
-  b.querySelector('.d').textContent=chordDeg(ch.off,ch.q,ch.boff);
+  b.querySelector('.d').textContent=chordDeg(ch.off,ch.q,ch.boff,ch.deg);
   b.title='クリックで試聴／DAWへドラッグでMIDI';
   // 進行のチップを選ぶと、そのコードの種類を変えるバーが出る
   b.onclick=()=>{playChord(ch);state.sel={...ch};state.editIdx=progIndex;render();};
@@ -653,7 +700,8 @@ function makeChip(ch,progIndex=null){
 }
 function renderDiatonic(){
   const box=document.getElementById('dia');box.innerHTML='';const t=tonic();
-  for(const c of DIATONIC[state.dia][state.mode])box.appendChild(makeChip(chordAt(t,c)));
+  const items=conformOn()?diatonicOf(state.scale,state.dia==='3'?3:4):DIATONIC[state.dia][state.mode];
+  for(const c of items)box.appendChild(makeChip(chordAt(t,c)));
 }
 attachMidiDrag(document.getElementById('progDrag'),()=>({name:progTitle,bpm:bpm(),chords:progChords}));
 // 試聴ボタンは再生中「停止」になる。ループ中は止めるまで繰り返す
@@ -663,6 +711,7 @@ document.getElementById('progPlay').onclick=()=>{
 };
 document.getElementById('progLoop').onclick=()=>{state.loop=!state.loop;render();};
 document.getElementById('progHalf').onclick=()=>{stopPlayback(true);state.half=!state.half;render();};
+document.getElementById('conformBtn').onclick=()=>{stopPlayback(true);state.conform=!state.conform;state.sel=null;render();};
 document.getElementById('progDl').onclick=()=>saveMidi({name:progTitle,bpm:bpm(),chords:progChords});
 
 /* ---------- ウィンドウに合わせて拡縮 ---------- */
@@ -686,12 +735,16 @@ function render(){
 
   const si=document.getElementById('selInfo');
   const shown=shownChord();
-  if(shown&&!state.pick){si.classList.add('on');document.getElementById('selName').textContent=`${chordName(shown)}（${chordDeg(shown.off,shown.q,shown.boff)}）`;}
+  if(shown&&!state.pick){si.classList.add('on');document.getElementById('selName').textContent=`${chordName(shown)}（${chordDeg(shown.off,shown.q,shown.boff,shown.deg)}）`;}
   else si.classList.remove('on');
   document.getElementById('progPlay').textContent=playback?'停止':'試聴';
   renderTempo();
   document.getElementById('progLoop').setAttribute('aria-pressed',state.loop);
   document.getElementById('progHalf').setAttribute('aria-pressed',state.half);
+  const cb=document.getElementById('conformBtn'), usable=CONFORM_SCALES.includes(state.scale);
+  cb.disabled=!usable;cb.setAttribute('aria-pressed',conformOn());
+  cb.title=usable?'コードの機能はそのまま、構成音を選んだスケールの音にする（キーの外から借りたコードは元のまま）'
+                 :'このスケールでは使えません（メジャー・各マイナー・チャーチモードのみ）';
   renderPick();
   // 進行のコード（progChords）を先に作ってから TAB譜を描く
   renderKeyPanel();renderProgs();renderFretPanel();renderDiatonic();
@@ -702,7 +755,7 @@ function render(){
 function persist(){
   saveState({idx:state.idx,mode:state.mode,scale:state.scale,label:state.label,view:state.view,dia:state.dia,
     prog:state.prog,vari:state.vari,timbre:state.timbre,loop:state.loop,half:state.half,
-    syncTempo:!!state.syncTempo,bpm:inputBpm(),fbView:state.fbView,tabArea:state.tabArea});
+    syncTempo:!!state.syncTempo,bpm:inputBpm(),fbView:state.fbView,tabArea:state.tabArea,conform:state.conform});
 }
 // 読み込んだ値は1つずつ確かめてから使う（古い・壊れたデータでも落ちないように）
 function applySaved(saved){
@@ -719,7 +772,7 @@ function applySaved(saved){
   pick('fbView',oneOf(['fb','chart','tab']));
   pick('tabArea',oneOf(Object.keys(TAB_AREAS)));
   pick('timbre',oneOf(TIMBRES.map(t=>t.id)));
-  pick('loop',bool);pick('half',bool);
+  pick('loop',bool);pick('half',bool);pick('conform',bool);
   if(!host.standalone)pick('syncTempo',bool);
   for(const key of ['prog','vari'])
     for(const m of ['major','minor']){
@@ -735,7 +788,7 @@ function applySaved(saved){
   if(Number.isFinite(saved.bpm))document.getElementById('bpm').value=Math.min(240,Math.max(40,Math.round(saved.bpm)));
   state.sel=null;picks.clear();state.pick=false;
   stopPlayback(true);
-  timbreSel.value=state.timbre;
+  timbreSel.value=state.timbre;setLiveTimbre(state.timbre);
   syncSeg('labelSeg','label');syncSeg('viewSeg','view');syncSeg('diaSeg','dia');syncSeg('fbViewSeg','fbView');syncSeg('tabAreaSeg','tabArea');
   // 五度圏はアニメーションせずにその位置へ
   cancelAnimationFrame(anim);rot=-state.idx*30;applyRot(rot);
@@ -745,4 +798,5 @@ onStateRestored(applySaved);
 
 applyRot(0);
 applySaved(await loadState());
+setLiveTimbre(state.timbre);
 render();

@@ -39,6 +39,7 @@
         <button id="pickBtn" class="sync" aria-pressed="false" title="鍵盤・指板で音を選んでコードを判別">コード判別</button>
         <span class="spacer"></span>
         <div class="selinfo" id="selInfo"><span><b id="selName"></b> の構成音</span><button id="selClear">スケールに戻す</button></div>
+        <div class="pickinfo live" id="liveInfo"><span class="pk">MIDI：</span><span id="liveResult"></span></div>
         <div class="pickinfo" id="pickInfo"><span class="pk">判別：</span><span id="pickResult"></span><button id="pickPlay">鳴らす</button><button id="pickClear">クリア</button></div>
         <div class="legend" id="kbLegend">
           <span><i style="background:var(--root)"></i>ルート</span>
@@ -62,6 +63,7 @@
     <div class="panel prog-panel">
       <div class="head">
         <h2>コード進行</h2><span class="spacer"></span>
+        <button id="conformBtn" class="sync" aria-pressed="false">スケールに沿う</button>
         <label class="bpm" for="timbre">音色 <select id="timbre"></select></label>
         <label class="bpm" for="bpm">テンポ <input id="bpm" type="number" min="40" max="240" value="120"></label>
         <button id="bpmSync" class="sync" aria-pressed="false" hidden>DAW同期</button>

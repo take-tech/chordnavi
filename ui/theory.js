@@ -41,7 +41,11 @@ export const CHORD={
   // 以下はコード判別用（進行データでも使える）
   sus2:{s:'sus2',iv:[0,2,7]}, '6':{s:'6',iv:[0,4,7,9]}, m6:{s:'m6',iv:[0,3,7,9]},
   add9:{s:'add9',iv:[0,4,7,14]}, mM7:{s:'mM7',iv:[0,3,7,11]}, '9':{s:'9',iv:[0,4,7,10,14]},
-  M9:{s:'M9',iv:[0,4,7,11,14]}, m9:{s:'m9',iv:[0,3,7,10,14]}, '5':{s:'5',iv:[0,7]}
+  M9:{s:'M9',iv:[0,4,7,11,14]}, m9:{s:'m9',iv:[0,3,7,10,14]}, '5':{s:'5',iv:[0,7]},
+  // 以下は「スケールに沿う」でモードに合わせたときに出る形
+  'M7#5':{s:'M7♯5',iv:[0,4,8,11]}, mb6:{s:'m(♭6)',iv:[0,3,7,8]}, 'dimb6':{s:'dim(♭6)',iv:[0,3,6,8]},
+  'sus#4':{s:'sus♯4',iv:[0,6,7]}, sus4b5:{s:'sus4(♭5)',iv:[0,5,6]}, '7sus4b5':{s:'7sus4(♭5)',iv:[0,5,6,10]},
+  M7sus4:{s:'M7sus4',iv:[0,5,7,11]}, 'M7sus#4':{s:'M7sus♯4',iv:[0,6,7,11]}
 };
 
 // file はファイル名用の英字名。c は小節の並び。1小節は [ルートの度数(半音), 種類, ベースの度数(分数コードのみ)]、
@@ -153,7 +157,8 @@ export const WHEEL_CELLS={
 };
 
 // 4和音 → 3和音
-const TRIAD_OF={M7:'',7:'',m7:'m',m7b5:'dim',dim7:'dim','7sus4':'sus4'};
+const TRIAD_OF={M7:'',7:'',m7:'m',m7b5:'dim',dim7:'dim','7sus4':'sus4','M7#5':'aug',mM7:'m',
+  M7sus4:'sus4','M7sus#4':'sus#4','7sus4b5':'sus4b5'};
 
 // 3和音／4和音の切替に合わせて選択中のコードを対応する和音に置き換える。
 // 3和音へは7thを落とす。4和音へはダイアトニックの度数に一致するときだけその4和音にする
@@ -161,6 +166,43 @@ export function convertChordSize(ch,size,mode){
   if(size==='3')return ch.q in TRIAD_OF?{...ch,q:TRIAD_OF[ch.q]}:ch;
   const i=DIATONIC['3'][mode].findIndex(([off,q])=>off===ch.off&&q===ch.q);
   return i<0?ch:{...ch,q:DIATONIC['7'][mode][i][1]};
+}
+
+/* ---------- スケールに沿う ---------- */
+// 対象のスケール（7音のモード）。それ以外のスケールでは今まで通り
+export const CONFORM_SCALES=['major','nminor','hminor','mminor','dorian','phrygian','lydian','mixo','locrian'];
+// 進行・ダイアトニックの元になっているスケール：メジャーの進行はメジャー、マイナーの進行はナチュラル・マイナー
+export const BASE_SCALE={major:[0,2,4,5,7,9,11],minor:[0,2,3,5,7,8,10]};
+const ivKey=iv=>[...iv].sort((a,b)=>a-b).join(',');
+const QUALITY_BY_IV=new Map(Object.entries(CHORD).map(([q,c])=>[ivKey(c.iv),q]));
+
+/**
+ * コード 1 つ（[度数, 種類, ベース度数]）を、同じ度数・同じ構成（3度・5度・7度…）のまま target のスケールの音で作り直す。
+ * 元のスケール（base）の音だけでできたコードだけが対象。キーの外の音を含むコード（セカンダリードミナント・借用・裏コード）は元のまま
+ */
+export function conformItem(item,base,target){
+  const [off,q,boff]=item;
+  const iv=CHORD[q].iv;
+  if(!iv.every(i=>base.includes(mod12(off+i)))||(boff!=null&&!base.includes(boff)))return item;
+  const d=base.indexOf(off), root=target[d];
+  const newIv=iv.map(i=>mod12(target[base.indexOf(mod12(off+i))]-root)+(i>=12?12:0));
+  const nq=QUALITY_BY_IV.get(ivKey(newIv));
+  if(nq==null)return item;
+  const nb=boff!=null?target[base.indexOf(boff)]:null;
+  return [root,nq,nb!=null&&nb!==root?nb:undefined,d+1];
+}
+export function conformBars(bars,mode,scaleId){
+  const base=BASE_SCALE[mode], target=scaleById(scaleId).iv;
+  const one=it=>conformItem(it,base,target);
+  return bars.map(bar=>Array.isArray(bar[0])?bar.map(one):one(bar));
+}
+// スケールのダイアトニックコード（size 3＝3和音、4＝4和音）
+export function diatonicOf(scaleId,size){
+  const s=scaleById(scaleId).iv;
+  return s.map((root,d)=>{
+    const iv=[...Array(size)].map((_,j)=>mod12(s[(d+2*j)%7]-root));
+    return [root,QUALITY_BY_IV.get(ivKey(iv))??(size===4?'7':''),undefined,d+1];
+  });
 }
 
 /* ---------- コード判別 ---------- */
@@ -206,8 +248,8 @@ const DEGREE_NUM=[1,2,2,3,3,4,4,5,6,6,7,7];
 const AWKWARD=['E♯','B♯','C♭','F♭'];
 export function chordRootName(ch,flat,tonic){
   const plain=noteName(ch.root,flat);
-  if(ch.off==null||tonic==null||!/[♭♯]/.test(ROMAN[ch.off]))return plain;
-  const s=spellWithLetter(ch.root,shiftLetter(noteName(tonic,flat),DEGREE_NUM[ch.off]-1));
+  if(ch.off==null||tonic==null||!/[♭♯]/.test(romanOf(ch.off,ch.deg)))return plain;
+  const s=spellWithLetter(ch.root,shiftLetter(noteName(tonic,flat),(ch.deg??DEGREE_NUM[ch.off])-1));
   return !s||/𝄫|𝄪/u.test(s)||AWKWARD.includes(s)?plain:s;
 }
 export const chordName=(ch,flat,tonic)=>{
@@ -217,11 +259,19 @@ export const chordName=(ch,flat,tonic)=>{
     ?chordRootName({root:ch.bass,off:ch.boff},flat,tonic):spellChordTone(ch.bass,ch.root,flat,root);
   return root+CHORD[ch.q].s+(bass?'/'+bass:'');
 };
-export const chordDeg=(off,q,boff)=>ROMAN[off]+CHORD[q].s+(boff!=null?'/'+ROMAN[boff]:'');
+// 度数の表記。deg（1〜7）が分かっているときはそれを使う（例：ロクリアンの 5 度は ♯IV ではなく ♭V）
+const ROMAN_NUM=['I','II','III','IV','V','VI','VII'], MAJOR_IV=[0,2,4,5,7,9,11];
+export function romanOf(off,deg){
+  if(deg==null)return ROMAN[off];
+  const d=mod12(off-MAJOR_IV[deg-1]);
+  return (d===1?'♯':d===11?'♭':'')+ROMAN_NUM[deg-1];
+}
+export const chordDeg=(off,q,boff,deg)=>romanOf(off,deg)+CHORD[q].s+(boff!=null?'/'+ROMAN[boff]:'');
 export const chordPcs=ch=>{const pcs=CHORD[ch.q].iv.map(x=>mod12(ch.root+x));return hasBass(ch)&&!pcs.includes(ch.bass)?[...pcs,ch.bass]:pcs;};
 export const sameChord=(a,b)=>!!a&&!!b&&a.root===b.root&&a.q===b.q&&(a.bass??a.root)===(b.bass??b.root);
 // [度数, 種類, ベース度数] → コード（tonic 基準）
-export const chordAt=(t,[off,q,boff])=>({root:mod12(t+off),q,off,...(boff!=null?{bass:mod12(t+boff),boff}:{})});
+// 4 つめの要素 deg はスケールの何度か（「スケールに沿う」で作り直したコードだけが持つ）
+export const chordAt=(t,[off,q,boff,deg])=>({root:mod12(t+off),q,off,...(boff!=null?{bass:mod12(t+boff),boff}:{}),...(deg!=null?{deg}:{})});
 
 export const BEATS_PER_BAR=4;
 const barItems=bar=>Array.isArray(bar[0])?bar:[bar];
@@ -231,7 +281,7 @@ export const progressionChords=(t,bars)=>bars.flatMap(bar=>{
   return items.map(c=>({...chordAt(t,c),beats:BEATS_PER_BAR/items.length}));
 });
 // ディグリー表記：小節は「 – 」、小節内は「・」でつなぐ
-export const progressionDegrees=bars=>bars.map(bar=>barItems(bar).map(([o,q,bo])=>chordDeg(o,q,bo)).join('・')).join(' – ');
+export const progressionDegrees=bars=>bars.map(bar=>barItems(bar).map(([o,q,bo,dg])=>chordDeg(o,q,bo,dg)).join('・')).join(' – ');
 
 // MIDI と同じボイシング：ベース（C2〜B2）＋上声（ルートを C3〜B3 に置いて積む）
 export const voicing=ch=>[36+(ch.bass??ch.root),...CHORD[ch.q].iv.map(i=>48+ch.root+i)];

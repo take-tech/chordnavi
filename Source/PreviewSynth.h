@@ -29,6 +29,11 @@ public:
     // 鳴っている音をフェードアウトし、予約中の音を取り消す
     bool stopAll();
 
+    // MIDI キーボードからの演奏（オーディオスレッドから呼ぶ）。離すまで鳴らし続け、離したらリリース
+    void noteOn (int note, float velocity, Timbre timbre);
+    void noteOff (int note);
+    void allNotesOff();
+
     // バッファを上書きで書き込む（全チャンネル同じ信号）
     void render (juce::AudioBuffer<float>& buffer);
 
@@ -48,6 +53,9 @@ private:
     {
         bool active = false;
         Timbre timbre = Timbre::triangle;
+        int midiNote = -1;            // MIDI 入力で鳴らしている音（試聴は -1）
+        bool liveRelease = false;     // 三角波を離したときもリリースで消す
+        float velGain = 1.0f;
         juce::int64 startIn = 0;      // 鳴り始めまでのサンプル数
         juce::int64 age = 0;          // 鳴り始めてからのサンプル数
         juce::int64 length = 0;       // 押さえている長さ（この後リリース）
@@ -75,7 +83,7 @@ private:
     };
 
     void handleRequest (const Request&);
-    void startVoice (Voice&, int note, juce::int64 startIn, juce::int64 length, Timbre);
+    void startVoice (Voice&, int note, juce::int64 startIn, juce::int64 length, Timbre, double decayHintSeconds = 0);
     Voice& findFreeVoice();
     float renderSample (Voice&);
 

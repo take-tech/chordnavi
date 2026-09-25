@@ -8,6 +8,11 @@ export async function getHostInfo(){
   try{return await nativeInfo();}catch(e){console.error(e);return {standalone:true,bpm:0};}
 }
 
+// MIDI キーボード（DAW から来る MIDI を含む）で鳴っている音が変わったときに呼ばれる：{ notes: [MIDI 番号…] }
+export function onMidiNotes(cb){
+  if(window.__JUCE__)window.__JUCE__.backend.addEventListener('midiNotes',info=>cb(info));
+}
+
 // DAW のテンポが変わったときに呼ばれる
 export function onHostTempo(cb){
   if(window.__JUCE__)window.__JUCE__.backend.addEventListener('hostTempo',info=>cb(info));

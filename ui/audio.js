@@ -37,6 +37,10 @@ export function playNotes(notes,timbre){
   webAudioNotes(notes,0,NOTE_DUR);
 }
 
+// MIDI キーボードで弾く音の音色を C++ に伝える
+const nativeSetTimbre=juce?juce.getNativeFunction('setTimbre'):null;
+export function setLiveTimbre(timbre){if(nativeSetTimbre)nativeSetTimbre(timbre).catch(err=>console.error(err));}
+
 // 試聴中の音と予約をすべて止める
 const nativeStop=juce?juce.getNativeFunction('stopPreview'):null;
 export function stopPreview(){

@@ -52,10 +52,11 @@ private:
     // DAW が状態を復元したら JS へ "stateRestored" イベントで送る
     void changeListenerCallback (juce::ChangeBroadcaster*) override;
 
-    // DAW のテンポが変わったら JS へ "hostTempo" イベントで通知する
+    // DAW のテンポが変わったら "hostTempo"、MIDI 入力の音が変わったら "midiNotes" を JS へ送る
     void timerCallback() override;
     juce::var hostInfo() const;
     double lastSentBpm = -1.0;
+    std::vector<int> lastSentLiveNotes;
 
     GodokenProcessor& processorRef;
     std::unique_ptr<juce::FileChooser> fileChooser;

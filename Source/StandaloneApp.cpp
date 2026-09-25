@@ -160,7 +160,9 @@ public:
 
     void initialise (const String&) override
     {
-        holder = std::make_unique<StandalonePluginHolder> (appProperties.getUserSettings(), false);
+        // MIDI キーボードをつないだらすぐ使えるよう、MIDI 入力は自動で開く
+        holder = std::make_unique<StandalonePluginHolder> (appProperties.getUserSettings(), false, String{}, nullptr,
+                                                           Array<StandalonePluginHolder::PluginInOuts>{}, true);
 
         window = std::make_unique<MainWindow> (getApplicationName(), *holder);
         window->setVisible (true);

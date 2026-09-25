@@ -131,6 +131,13 @@ GodokenEditor::GodokenEditor (GodokenProcessor& p)
                    .withNativeFunction ("loadState", [this] (const auto&, auto completion)
                                         {
                                             completion (juce::var (processorRef.getUiState()));
+                                        })
+                   // JS: setTimbre(name) — MIDI キーボードで弾く音の音色
+                   .withNativeFunction ("setTimbre", [this] (const auto& args, auto completion)
+                                        {
+                                            if (! args.isEmpty())
+                                                processorRef.setLiveTimbre (timbreFromName (args[0].toString()));
+                                            completion (juce::var (true));
                                         }))
 {
     addAndMakeVisible (webView);
@@ -143,8 +150,7 @@ GodokenEditor::GodokenEditor (GodokenProcessor& p)
 
     webView.goToURL (juce::WebBrowserComponent::getResourceProviderRoot());
 
-    if (! processorRef.isStandalone())
-        startTimerHz (5);
+    startTimerHz (30);   // MIDI 入力の表示（と DAW のテンポ）
 
     processorRef.addChangeListener (this);
 }
@@ -169,11 +175,25 @@ juce::var GodokenEditor::hostInfo() const
 
 void GodokenEditor::timerCallback()
 {
-    const auto bpm = processorRef.getHostBpm();
-    if (! juce::exactlyEqual (bpm, lastSentBpm))
+    if (! processorRef.isStandalone())
     {
-        lastSentBpm = bpm;
-        webView.emitEventIfBrowserIsVisible ("hostTempo", hostInfo());
+        const auto bpm = processorRef.getHostBpm();
+        if (! juce::exactlyEqual (bpm, lastSentBpm))
+        {
+            lastSentBpm = bpm;
+            webView.emitEventIfBrowserIsVisible ("hostTempo", hostInfo());
+        }
+    }
+
+    auto notes = processorRef.getLiveNotes();
+    if (notes != lastSentLiveNotes)
+    {
+        lastSentLiveNotes = notes;
+        juce::Array<juce::var> list;
+        for (auto n : notes) list.add (n);
+        auto* obj = new juce::DynamicObject();
+        obj->setProperty ("notes", list);
+        webView.emitEventIfBrowserIsVisible ("midiNotes", juce::var (obj));
     }
 }
 

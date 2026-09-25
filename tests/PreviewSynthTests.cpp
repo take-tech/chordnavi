@@ -142,6 +142,39 @@ public:
             expectEquals (synth.getNumActiveVoices(), 0);
         }
 
+        for (auto [timbre, label] : { std::pair { Timbre::triangle, "triangle" }, std::pair { Timbre::organ, "organ" },
+                                      std::pair { Timbre::piano, "piano" } })
+        {
+            beginTest (juce::String ("Live MIDI (") + label + "): sounds while held, stops after note-off");
+            PreviewSynth synth;
+            synth.prepare (sr);
+            synth.noteOn (60, 1.0f, timbre);
+            expect (renderSeconds (synth, 0.3) > 0.01f);
+            expectEquals (synth.getNumActiveVoices(), 1);
+            synth.noteOff (60);
+            renderSeconds (synth, 0.6);                 // リリース
+            expectEquals (synth.getNumActiveVoices(), 0);
+            expectEquals (renderSeconds (synth, 0.1), 0.0f);
+        }
+
+        beginTest ("Live MIDI: velocity scales the level, re-trigger does not stack voices");
+        {
+            PreviewSynth loud, soft;
+            loud.prepare (sr); soft.prepare (sr);
+            loud.noteOn (60, 1.0f, Timbre::organ);
+            soft.noteOn (60, 0.2f, Timbre::organ);
+            float pl = 0, ps = 0;
+            renderSeconds (loud, 0.2, &pl); renderSeconds (soft, 0.2, &ps);
+            expect (ps < pl * 0.5f, "soft " + juce::String (ps) + " loud " + juce::String (pl));
+
+            loud.noteOn (60, 1.0f, Timbre::organ);      // 同じ音を弾き直す
+            renderSeconds (loud, 0.3);
+            expectEquals (loud.getNumActiveVoices(), 1);
+            loud.allNotesOff();
+            renderSeconds (loud, 0.5);
+            expectEquals (loud.getNumActiveVoices(), 0);
+        }
+
         beginTest ("Rejects empty requests");
         {
             PreviewSynth synth;

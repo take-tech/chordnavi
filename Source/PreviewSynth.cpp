@@ -1,6 +1,7 @@
 #include "PreviewSynth.h"
 
 #include <cmath>
+#include <limits>
 
 namespace
 {
@@ -123,7 +124,41 @@ void PreviewSynth::handleRequest (const Request& r)
     }
 }
 
-void PreviewSynth::startVoice (Voice& v, int note, juce::int64 startIn, juce::int64 length, Timbre timbre)
+void PreviewSynth::noteOn (int note, float velocity, Timbre timbre)
+{
+    noteOff (note);   // 同じ音を弾き直したら前の音はリリース
+    // 押している間は鳴らし続ける（長さは実質無限）。三角波は 2 秒かけて減衰
+    auto& v = findFreeVoice();
+    startVoice (v, juce::jlimit (0, 127, note), 0, std::numeric_limits<juce::int64>::max() / 4, timbre, 2.0);
+    v.midiNote = note;
+    v.velGain  = std::pow (juce::jlimit (0.0f, 1.0f, velocity), 0.7f) * 1.2f;
+}
+
+void PreviewSynth::noteOff (int note)
+{
+    for (auto& v : voices)
+    {
+        if (! v.active || v.midiNote != note || v.age >= v.length)
+            continue;
+
+        v.length = juce::jmax<juce::int64> (1, v.age);   // ここからリリース
+        v.midiNote = -1;
+        if (v.timbre == Timbre::triangle)
+        {
+            v.liveRelease = true;
+            v.releaseRate = decayPerSample (0.08, sampleRate);
+        }
+    }
+}
+
+void PreviewSynth::allNotesOff()
+{
+    for (auto& v : voices)
+        if (v.active && v.midiNote >= 0)
+            noteOff (v.midiNote);
+}
+
+void PreviewSynth::startVoice (Voice& v, int note, juce::int64 startIn, juce::int64 length, Timbre timbre, double decayHintSeconds)
 {
     // 遅延線のメモリは使い回す（オーディオスレッドで確保・解放しない）
     auto delay = std::move (v.delay);
@@ -142,8 +177,9 @@ void PreviewSynth::startVoice (Voice& v, int note, juce::int64 startIn, juce::in
         {
             // WebAudio の exponentialRampToValueAtTime と同じく、アタック後に peak → 0.001 へ指数減衰
             const auto attack = attackSeconds * sampleRate;
+            const auto decayLength = decayHintSeconds > 0 ? decayHintSeconds * sampleRate : (double) length;
             v.phaseInc  = freq / sampleRate;
-            v.decayRate = (float) std::pow (0.001 / peakGain, 1.0 / juce::jmax (1.0, (double) length - attack));
+            v.decayRate = (float) std::pow (0.001 / peakGain, 1.0 / juce::jmax (1.0, decayLength - attack));
             break;
         }
 
@@ -256,7 +292,8 @@ float PreviewSynth::renderSample (Voice& v)
     {
         case Timbre::triangle:
         {
-            if (! held) { v.active = false; return 0; }
+            if (! held && ! v.liveRelease) { v.active = false; return 0; }
+            if (v.gain < 1.0e-5f && v.age > (juce::int64) (attackSeconds * sampleRate)) { v.active = false; return 0; }
 
             const auto attack = (juce::int64) (attackSeconds * sampleRate);
             if (v.age < attack)
@@ -326,6 +363,8 @@ float PreviewSynth::renderSample (Voice& v)
             break;
         }
     }
+
+    out *= v.velGain;
 
     // 押さえている時間が過ぎたらダンパーで止める（三角波は上で終了済み）
     if (! held)

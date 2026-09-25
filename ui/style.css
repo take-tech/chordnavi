@@ -103,6 +103,7 @@ svg text{font-family:inherit}
 .sync{font:inherit;font-size:11px;border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:4px;padding:3px 8px;cursor:pointer}
 .sync[aria-pressed=true]{background:var(--ink);border-color:var(--ink);color:#fff}
 .sync[hidden]{display:none}
+.sync:disabled{opacity:.4;cursor:default}
 .legend[hidden]{display:none}
 .seg[hidden]{display:none}
 /* TAB譜：列を押すとその形を鳴らす */
@@ -110,6 +111,9 @@ svg text{font-family:inherit}
 #tab .col:hover .colbg{fill:rgba(30,39,66,.05)}
 .pickinfo{display:none;align-items:center;gap:5px;font-size:12px;background:#fff;border:1px solid #6B4FBB;border-radius:4px;padding:2px 4px 2px 8px;min-width:0}
 .pickinfo.on{display:flex}
+.pickinfo.live{border-color:#2F6FD6}
+.pickinfo.live .pk{color:#2F6FD6}
+#liveResult{color:#1E2742;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .pickinfo .pk{color:#6B4FBB;font-weight:700;white-space:nowrap}
 #pickResult{display:flex;gap:4px;align-items:center;color:var(--muted);white-space:nowrap;overflow:hidden}
 #pickResult button{font:inherit;font-size:12px;border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:3px;padding:0 6px;cursor:grab}
