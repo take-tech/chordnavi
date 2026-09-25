@@ -104,6 +104,17 @@ export const WHEEL_CELLS={
   minor:[[-1,1,'♭VI'],[0,1,'♭III'],[1,1,'♭VII'],[-1,0,'IVm'],[0,0,'Im',1],[1,0,'Vm'],[2,0,'IIm♭5']]
 };
 
+// 4和音 → 3和音
+const TRIAD_OF={M7:'',7:'',m7:'m',m7b5:'dim',dim7:'dim','7sus4':'sus4'};
+
+// 3和音／4和音の切替に合わせて選択中のコードを対応する和音に置き換える。
+// 3和音へは7thを落とす。4和音へはダイアトニックの度数に一致するときだけその4和音にする
+export function convertChordSize(ch,size,mode){
+  if(size==='3')return ch.q in TRIAD_OF?{...ch,q:TRIAD_OF[ch.q]}:ch;
+  const i=DIATONIC['3'][mode].findIndex(([off,q])=>off===ch.off&&q===ch.q);
+  return i<0?ch:{...ch,q:DIATONIC['7'][mode][i][1]};
+}
+
 /* ---------- 純粋関数 ---------- */
 export const mod12=n=>((n%12)+12)%12;
 export const tonicOf=(idx,mode)=>mode==='major'?PC_CIRCLE[idx]:mod12(PC_CIRCLE[idx]+9);

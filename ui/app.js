@@ -2,7 +2,7 @@ import {
   MAJ_LABEL,MIN_LABEL,SIG,SCALES,PROGRESSIONS,DIATONIC,WHEEL_CELLS,
   mod12,tonicOf,isFlatKey,noteName,keyName as keyNameOf,degLabel,chordName as chordNameOf,chordDeg,
   chordPcs,scaleById,spellChordTone,variantsOf,chordAt,sameChord,voicing,keySignature,
-  CHORD,spellScaleTone,spellChordInterval
+  CHORD,spellScaleTone,spellChordInterval,convertChordSize
 } from './theory.js';
 import {renderStaff} from './staff.js';
 import {attachMidiDrag,saveMidi} from './midi.js';
@@ -99,7 +99,8 @@ function bindSeg(id,key,onChange){
 const syncSeg=(id,key)=>document.querySelectorAll(`#${id} button`).forEach(x=>x.setAttribute('aria-pressed',x.dataset.v===state[key]));
 bindSeg('labelSeg','label',()=>{renderKeyPanel();renderFretboard();});
 bindSeg('viewSeg','view',()=>render());
-bindSeg('diaSeg','dia',()=>renderDiatonic());
+// 選択中のコードも3和音／4和音の対応する和音に切り替えて、鍵盤・指板の着色に反映する
+bindSeg('diaSeg','dia',()=>{if(state.sel)state.sel=convertChordSize(state.sel,state.dia,state.mode);render();});
 document.getElementById('selClear').addEventListener('click',()=>{state.sel=null;render();});
 
 function setKey(i,m){
