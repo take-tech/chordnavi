@@ -60,9 +60,11 @@ target_sources(ChordNavi PRIVATE
     Source/MidiExport.cpp
     Source/PreviewSynth.cpp
     Source/PluginState.cpp
+    Source/StandaloneApp.cpp
 )
 
 target_compile_definitions(ChordNavi PUBLIC
+    JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP=1   # Standalone は Source/StandaloneApp.cpp（ネイティブのタイトルバーとメニューバー）
     JUCE_WEB_BROWSER=1
     JUCE_USE_CURL=0
     JUCE_VST3_CAN_REPLACE_VST2=0

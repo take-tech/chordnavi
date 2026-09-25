@@ -27,6 +27,8 @@ Source/
   MidiExport.h/.cpp           … コード列 → .mid ファイル生成、外部ドラッグ
   PreviewSynth.h/.cpp         … 試聴用の簡易シンセ（三角波＋エンベロープ、ロックフリーのキュー）
   PluginState.h/.cpp          … 保存データ（UI 状態の JSON を ValueTree で包む）
+  StandaloneApp.cpp           … Standalone 版のアプリ本体（macOS 標準のタイトルバー、上部メニューバーの「オプション」）
+assets/icon/                  … アプリアイコンの案（SVG と 1024px PNG）
 ui/
   index.html                  … プロトタイプを分割・整理したもの
   app.js / theory.js / midi.js / audio.js / staff.js / style.css
