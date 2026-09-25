@@ -13,8 +13,8 @@ export const TIMBRES=[
   {id:'piano',name:'ピアノ'},
   {id:'electricPiano',name:'エレピ'},
   {id:'guitar',name:'ギター'},
-  {id:'organ',name:'オルガン（減衰なし）'},
-  {id:'pad',name:'パッド（減衰なし）'}
+  {id:'organ',name:'オルガン'},
+  {id:'pad',name:'パッド'}
 ];
 
 // events: [{ch, start, dur}]（秒）。呼ぶたびにそれまでの試聴は止まる（C++ 側）

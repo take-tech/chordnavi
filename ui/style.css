@@ -61,6 +61,8 @@ svg text{font-family:inherit}
 .actions{margin-left:auto;display:flex;gap:6px;align-items:center}
 .actions button,.handle{font:inherit;font-size:12px;border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:4px;padding:3px 10px;cursor:pointer}
 .handle{cursor:grab;border-style:dashed;border-color:var(--ink2)}
+.actions button[aria-pressed=true]{background:var(--ink);border-color:var(--ink);color:#fff}
+#progPlay{min-width:4.5em}
 .handle:active{cursor:grabbing}
 .chips{display:grid;grid-template-columns:repeat(8,1fr);gap:6px}
 .chip{font:inherit;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:4px;padding:5px 8px;cursor:grab;text-align:left;min-width:0}

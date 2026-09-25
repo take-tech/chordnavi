@@ -10,7 +10,7 @@ import {attachMidiDrag,saveMidi} from './midi.js';
 import {playChord as play1,playProgression as playN,stopPreview,TIMBRES} from './audio.js';
 
 /* ---------- 状態 ---------- */
-const state={idx:0,mode:'major',scale:'major',label:'name',view:'kb',dia:'7',sel:null,prog:{major:0,minor:0},vari:{major:0,minor:0},timbre:'triangle'};
+const state={idx:0,mode:'major',scale:'major',label:'name',view:'kb',dia:'7',sel:null,prog:{major:0,minor:0},vari:{major:0,minor:0},timbre:'organ',loop:false};
 const tonic=()=>tonicOf(state.idx,state.mode);
 const playChord=ch=>{stopPlayback(false);play1(ch,state.timbre);};
 
@@ -26,7 +26,11 @@ function playProgression(chords){
     timers.push(setTimeout(()=>{playback.index=i;render();},t*1000));
     t+=(ch.beats??BEATS_PER_BAR)*beat;
   });
-  timers.push(setTimeout(()=>{playback=null;render();},t*1000));
+  // 最後まで鳴ったら、ループ中は頭から（テンポ・音色の変更はここで反映）
+  timers.push(setTimeout(()=>{
+    if(state.loop)playProgression(progChords);
+    else{playback=null;render();}
+  },t*1000));
   playN(chords,state.timbre,bpm());
 }
 // 表示を止める（silence なら音も止める）。キー・進行を変えたときは音も止めて表示とずれないようにする
@@ -135,6 +139,7 @@ bindSeg('diaSeg','dia',()=>{
 document.getElementById('selClear').addEventListener('click',()=>{stopPlayback(true);state.sel=null;render();});
 const timbreSel=document.getElementById('timbre');
 for(const t of TIMBRES){const o=document.createElement('option');o.value=t.id;o.textContent=t.name;timbreSel.appendChild(o);}
+timbreSel.value=state.timbre;
 timbreSel.addEventListener('change',()=>{state.timbre=timbreSel.value;});
 
 function setKey(i,m){
@@ -292,7 +297,12 @@ function renderDiatonic(){
   for(const c of DIATONIC[state.dia][state.mode])box.appendChild(makeChip(chordAt(t,c)));
 }
 attachMidiDrag(document.getElementById('progDrag'),()=>({name:progTitle,bpm:bpm(),chords:progChords}));
-document.getElementById('progPlay').onclick=()=>playProgression(progChords);
+// 試聴ボタンは再生中「停止」になる。ループ中は止めるまで繰り返す
+document.getElementById('progPlay').onclick=()=>{
+  if(playback){stopPlayback(true);render();}
+  else playProgression(progChords);
+};
+document.getElementById('progLoop').onclick=()=>{state.loop=!state.loop;render();};
 document.getElementById('progDl').onclick=()=>saveMidi({name:progTitle,bpm:bpm(),chords:progChords});
 
 /* ---------- ウィンドウに合わせて拡縮 ---------- */
@@ -318,6 +328,8 @@ function render(){
   const shown=shownChord();
   if(shown){si.classList.add('on');document.getElementById('selName').textContent=`${chordName(shown)}（${chordDeg(shown.off,shown.q,shown.boff)}）`;}
   else si.classList.remove('on');
+  document.getElementById('progPlay').textContent=playback?'停止':'試聴';
+  document.getElementById('progLoop').setAttribute('aria-pressed',state.loop);
   renderKeyPanel();renderFretboard();renderProgs();renderDiatonic();
 }
 applyRot(0);render();
