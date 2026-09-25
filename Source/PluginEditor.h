@@ -34,6 +34,11 @@ private:
     void startMidiDrag (const juce::Array<juce::var>& args,
                         juce::WebBrowserComponent::NativeFunctionCompletion completion);
 
+    // JS: saveMidi({ name, bpm, chords }) — ネイティブの保存ダイアログで .mid を保存
+    void saveMidi (const juce::Array<juce::var>& args,
+                   juce::WebBrowserComponent::NativeFunctionCompletion completion);
+
+    std::unique_ptr<juce::FileChooser> fileChooser;
     GodokenWebView webView;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (GodokenEditor)

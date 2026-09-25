@@ -47,6 +47,24 @@ namespace
 
         return chords;
     }
+
+    struct MidiRequest
+    {
+        std::vector<MidiExport::Chord> chords;
+        int bpm = 120;
+        juce::String name;
+    };
+
+    MidiRequest parseRequest (const juce::Array<juce::var>& args)
+    {
+        const auto request = args.isEmpty() ? juce::var() : args[0];
+        MidiRequest r;
+        r.chords = parseChords (request["chords"]);
+        if (request.hasProperty ("bpm"))
+            r.bpm = (int) request["bpm"];
+        r.name = request["name"].toString();
+        return r;
+    }
 }
 
 GodokenEditor::GodokenEditor (GodokenProcessor& p)
@@ -58,6 +76,10 @@ GodokenEditor::GodokenEditor (GodokenProcessor& p)
                    .withNativeFunction ("startMidiDrag", [this] (const auto& args, auto completion)
                                         {
                                             startMidiDrag (args, std::move (completion));
+                                        })
+                   .withNativeFunction ("saveMidi", [this] (const auto& args, auto completion)
+                                        {
+                                            saveMidi (args, std::move (completion));
                                         }))
 {
     addAndMakeVisible (webView);
@@ -98,17 +120,15 @@ std::optional<juce::WebBrowserComponent::Resource> GodokenEditor::serveResource 
 void GodokenEditor::startMidiDrag (const juce::Array<juce::var>& args,
                                    juce::WebBrowserComponent::NativeFunctionCompletion completion)
 {
-    const auto request = args.isEmpty() ? juce::var() : args[0];
-    const auto chords  = parseChords (request["chords"]);
+    const auto request = parseRequest (args);
 
-    if (chords.empty())
+    if (request.chords.empty())
     {
         completion (juce::var ("error: no chords"));
         return;
     }
 
-    const auto bpm  = request.hasProperty ("bpm") ? (int) request["bpm"] : 120;
-    const auto file = MidiExport::writeTempFile (chords, bpm, request["name"].toString());
+    const auto file = MidiExport::writeTempFile (request.chords, request.bpm, request.name);
 
     if (! file.existsAsFile())
     {
@@ -122,4 +142,43 @@ void GodokenEditor::startMidiDrag (const juce::Array<juce::var>& args,
 
     completion (juce::var (started ? "started:" + file.getFileName()
                                    : juce::String ("error: drag not started")));
+}
+
+void GodokenEditor::saveMidi (const juce::Array<juce::var>& args,
+                              juce::WebBrowserComponent::NativeFunctionCompletion completion)
+{
+    const auto request = parseRequest (args);
+
+    if (request.chords.empty())
+    {
+        completion (juce::var ("error: no chords"));
+        return;
+    }
+
+    const auto initial = juce::File::getSpecialLocation (juce::File::userDesktopDirectory)
+                             .getChildFile (MidiExport::safeFileName (request.name) + ".mid");
+
+    fileChooser = std::make_unique<juce::FileChooser> ("MIDIファイルを保存", initial, "*.mid");
+
+    const auto flags = juce::FileBrowserComponent::saveMode
+                     | juce::FileBrowserComponent::canSelectFiles
+                     | juce::FileBrowserComponent::warnAboutOverwriting;
+
+    fileChooser->launchAsync (flags, [request, completion] (const juce::FileChooser& chooser)
+    {
+        auto file = chooser.getResult();
+
+        if (file == juce::File())
+        {
+            completion (juce::var ("cancelled"));
+            return;
+        }
+
+        file = file.withFileExtension ("mid");
+        const auto data = MidiExport::buildMidi (request.chords, request.bpm);
+
+        completion (juce::var (file.replaceWithData (data.getData(), data.getSize())
+                                   ? "saved:" + file.getFullPathName()
+                                   : juce::String ("error: failed to write file")));
+    });
 }

@@ -1,0 +1,70 @@
+:root{
+  --bg:#E7EAF0; --panel:#F6F7FA; --ink:#1E2742; --ink2:#39456B; --muted:#6A7390;
+  --line:#C9CFDC; --root:#E3A21A; --tone:#2E8C80; --chord:#C4456A;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden;background:#D5D9E2}
+body{color:var(--ink);font-family:"Hiragino Sans","Yu Gothic UI","Noto Sans JP",sans-serif;font-size:14px;line-height:1.5}
+/* 固定サイズのステージをウィンドウに合わせて拡大縮小（スクロールなし） */
+.stage{position:absolute;left:50%;top:50%;width:1280px;height:780px;transform-origin:center center;
+  background:var(--bg);display:grid;grid-template-columns:320px 1fr;gap:16px;padding:18px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:12px 16px;min-height:0}
+.left{display:flex;flex-direction:column;min-height:0}
+.left .panel{flex:1;display:flex;flex-direction:column}
+h1{font-size:22px;font-weight:900;letter-spacing:.02em;margin:0 0 10px}
+h2{font-size:15px;font-weight:700;margin:0}
+.head{display:flex;align-items:center;gap:12px;margin-bottom:8px;min-height:26px}
+.head .spacer{flex:1}
+#wheel{width:100%;height:auto;display:block;user-select:none}
+#wheel .wedge{cursor:pointer;transition:filter .15s}
+#wheel .wedge:hover{filter:brightness(1.25)}
+#wheel .wedge:focus{outline:none;stroke:var(--root);stroke-width:3}
+.controls{display:grid;grid-template-columns:64px 1fr;gap:8px 10px;align-items:center;margin-top:12px}
+.controls label{font-size:12px;color:var(--muted)}
+select,input[type=number]{font:inherit;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:4px;padding:5px 8px;width:100%}
+input[type=number]{width:64px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:4px;overflow:hidden;justify-self:start}
+.seg button{font:inherit;font-size:12px;border:0;background:#fff;color:var(--ink);padding:4px 14px;cursor:pointer}
+.seg button[aria-pressed=true]{background:var(--ink);color:#fff}
+.dia{margin-top:14px;padding-top:10px;border-top:1px solid var(--line)}
+.dia-head{font-size:12px;color:var(--muted);margin-bottom:6px}
+.dia-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:5px}
+.dia-grid .chip{padding:4px 6px}
+.dia-grid .chip .n{font-size:14px}
+.notes{margin-top:auto;padding-top:10px;border-top:1px solid var(--line);font-size:12px;color:var(--muted)}
+.notes b{display:block;color:var(--ink);font-size:15px;letter-spacing:.06em;font-weight:700}
+button:focus-visible,select:focus-visible,input:focus-visible,.chip:focus-visible{outline:3px solid var(--root);outline-offset:2px}
+.right{display:grid;grid-template-rows:auto auto 1fr;gap:14px;min-height:0}
+.right svg{display:block;width:100%;height:auto}
+svg text{font-family:inherit}
+.legend{display:flex;gap:12px;font-size:11px;color:var(--muted)}
+.legend i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px;vertical-align:-1px}
+.selinfo{display:none;align-items:center;gap:8px;font-size:12px;background:#fff;border:1px solid var(--chord);border-radius:4px;padding:2px 4px 2px 10px}
+.selinfo.on{display:flex}
+.selinfo b{color:var(--chord)}
+.selinfo button{font:inherit;font-size:11px;border:1px solid var(--line);background:var(--panel);border-radius:3px;padding:1px 8px;cursor:pointer}
+.prog-panel{display:flex;flex-direction:column}
+.pills{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.pills button{font:inherit;font-size:12px;border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:14px;padding:3px 12px;cursor:pointer}
+.pills button[aria-pressed=true]{background:var(--ink);border-color:var(--ink);color:#fff}
+.detail{border-top:1px solid var(--line);padding-top:10px;flex:1;display:flex;flex-direction:column;min-height:0}
+.detail-head{display:flex;align-items:baseline;gap:10px;margin-bottom:8px}
+.detail-head h3{font-size:16px;margin:0;font-weight:700}
+.detail-head .deg{font-size:12px;color:var(--muted)}
+.actions{margin-left:auto;display:flex;gap:6px;align-items:center}
+.actions button,.handle{font:inherit;font-size:12px;border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:4px;padding:3px 10px;cursor:pointer}
+.handle{cursor:grab;border-style:dashed;border-color:var(--ink2)}
+.handle:active{cursor:grabbing}
+.chips{display:grid;grid-template-columns:repeat(8,1fr);gap:6px}
+.chip{font:inherit;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:4px;padding:5px 8px;cursor:grab;text-align:left;min-width:0}
+.chip:hover{border-color:var(--ink2)}
+.chip.sel{border-color:var(--chord);box-shadow:inset 0 0 0 1px var(--chord)}
+.chip .n{display:block;font-weight:700;font-size:16px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chip .d{display:block;font-size:11px;color:var(--muted);white-space:nowrap}
+.hint{font-size:11px;color:var(--muted);margin:auto 0 0;padding-top:6px}
+.bpm{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+/* WebView 内：テキスト選択と WebKit 標準のドラッグを無効化（MIDIドラッグはネイティブで行う） */
+body{-webkit-user-select:none;user-select:none}
+input,select{-webkit-user-select:auto;user-select:auto}
+button,svg{-webkit-user-drag:none}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}

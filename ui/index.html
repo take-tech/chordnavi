@@ -2,51 +2,75 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>五度圏ナビゲーター</title>
-<style>
-  html,body{margin:0;height:100%;overflow:hidden;background:#E7EAF0;color:#1E2742;
-    font-family:"Hiragino Sans","Yu Gothic UI","Noto Sans JP",sans-serif;font-size:14px;
-    -webkit-user-select:none;user-select:none}
-  main{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px}
-  h1{font-size:22px;font-weight:900;margin:0}
-  .handle{font:inherit;font-size:16px;font-weight:700;color:#1E2742;background:#fff;
-    border:1px dashed #39456B;border-radius:4px;padding:10px 28px;cursor:grab;-webkit-user-drag:none}
-  .handle:active{cursor:grabbing}
-  #log{font-size:12px;color:#6A7390;min-height:1.5em}
-</style>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
-<main>
-  <h1>五度圏ナビゲーター（MIDIドラッグ検証）</h1>
-  <button class="handle" id="drag" draggable="false">C をドラッグ</button>
-  <div id="log">ボタンを DAW のトラックやデスクトップへドラッグしてください</div>
-</main>
-<script type="module">
-import { getNativeFunction } from "./juce/index.js";
+<div class="stage" id="stage">
+  <section class="left">
+    <div class="panel">
+      <h1>五度圏ナビゲーター</h1>
+      <svg id="wheel" viewBox="-210 -215 420 425" role="group" aria-label="五度圏"></svg>
+      <div class="controls">
+        <label for="keySel">キー</label>
+        <select id="keySel"></select>
+        <label for="scaleSel">スケール</label>
+        <select id="scaleSel"></select>
+        <label>表示</label>
+        <div class="seg" id="labelSeg">
+          <button data-v="name" aria-pressed="true">音名</button>
+          <button data-v="degree" aria-pressed="false">度数</button>
+        </div>
+      </div>
+      <div class="dia">
+        <div class="dia-head">ダイアトニックコード</div>
+        <div class="dia-grid" id="dia"></div>
+      </div>
+      <div class="notes">スケール構成音<b id="scaleNotes"></b></div>
+    </div>
+  </section>
 
-const startMidiDrag = getNativeFunction("startMidiDrag");
-const log = s => { document.getElementById("log").textContent = s; };
+  <section class="right">
+    <div class="panel">
+      <div class="head">
+        <h2 id="kbTitle">鍵盤</h2>
+        <span class="spacer"></span>
+        <div class="selinfo" id="selInfo"><span><b id="selName"></b> の構成音</span><button id="selClear">スケールに戻す</button></div>
+        <div class="legend">
+          <span><i style="background:var(--root)"></i>ルート</span>
+          <span><i style="background:var(--tone)"></i>スケール音</span>
+          <span><i style="background:var(--chord)"></i>コード構成音</span>
+        </div>
+      </div>
+      <svg id="kb"></svg>
+    </div>
 
-// mousedown + 数px の移動でネイティブのファイルドラッグを開始する
-function attachNativeDrag(node, getRequest) {
-  let origin = null;
-  node.addEventListener("mousedown", e => {
-    if (e.button !== 0) return;
-    e.preventDefault();
-    origin = { x: e.clientX, y: e.clientY };
-  });
-  window.addEventListener("mousemove", e => {
-    if (!origin || (e.buttons & 1) === 0) { origin = null; return; }
-    if (Math.hypot(e.clientX - origin.x, e.clientY - origin.y) < 4) return;
-    origin = null;
-    startMidiDrag(getRequest()).then(r => log(String(r))).catch(err => log("error: " + err));
-  });
-  window.addEventListener("mouseup", () => { origin = null; });
-}
+    <div class="panel">
+      <div class="head"><h2 id="fbTitle">ギター指板</h2><span class="spacer"></span><span class="legend">レギュラーチューニング・上が1弦</span></div>
+      <svg id="fb"></svg>
+    </div>
 
-attachNativeDrag(document.getElementById("drag"), () => ({
-  name: "C", bpm: 120, chords: [{ root: 0, iv: [0, 4, 7] }]
-}));
-</script>
+    <div class="panel prog-panel">
+      <div class="head">
+        <h2>コード進行</h2><span class="spacer"></span>
+        <label class="bpm" for="bpm">テンポ <input id="bpm" type="number" min="40" max="240" value="120"></label>
+      </div>
+      <div class="pills" id="pills"></div>
+      <div class="detail">
+        <div class="detail-head">
+          <h3 id="progName"></h3><span class="deg" id="progDeg"></span>
+          <div class="actions">
+            <button class="handle" id="progDrag" title="DAWのトラックへドラッグ">進行をドラッグ</button>
+            <button id="progPlay">試聴</button><button id="progDl">MIDI保存</button>
+          </div>
+        </div>
+        <div class="chips" id="chips"></div>
+        <p class="hint">コードをクリックで試聴と構成音表示。コードや「進行をドラッグ」をDAWへドラッグするとMIDIを配置できます（1コード＝1小節）。</p>
+      </div>
+    </div>
+  </section>
+</div>
+<script type="module" src="app.js"></script>
 </body>
 </html>
