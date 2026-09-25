@@ -12,13 +12,15 @@ import {playChord as play1,playProgression as playN,TIMBRES} from './audio.js';
 const state={idx:0,mode:'major',scale:'major',label:'name',view:'kb',dia:'7',sel:null,prog:{major:0,minor:0},vari:{major:0,minor:0},timbre:'triangle'};
 const tonic=()=>tonicOf(state.idx,state.mode);
 const playChord=ch=>play1(ch,state.timbre);
-const playProgression=chords=>playN(chords,state.timbre);
+const playProgression=chords=>playN(chords,state.timbre,bpm());
 const useFlat=()=>isFlatKey(state.idx);
 const nn=pc=>noteName(pc,useFlat());
 const scaleObj=()=>scaleById(state.scale);
 const keyName=()=>keyNameOf(state.idx,state.mode);
 const chordName=ch=>chordNameOf(ch,useFlat());
-const bpm=()=>Math.min(240,Math.max(40,+document.getElementById('bpm').value||120));
+const bpm=()=>Math.min(240,Math.max(40,Math.round(+document.getElementById('bpm').value)||120));
+// 範囲外・空欄の入力は確定時に 40〜240 に丸めて表示し直す
+document.getElementById('bpm').addEventListener('change',e=>{e.target.value=bpm();});
 
 const NS='http://www.w3.org/2000/svg';
 function el(tag,attrs={},parent){const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);if(parent)parent.appendChild(e);return e;}

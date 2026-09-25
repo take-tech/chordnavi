@@ -5,7 +5,7 @@ import {CHORD,voicing} from './theory.js';
 const juce=window.__JUCE__?await import('./juce/index.js'):null;
 const nativePlay=juce?juce.getNativeFunction('playChords'):null;
 
-const SINGLE_DUR=1.1, PROG_STEP=0.9;
+const SINGLE_DUR=1.1, BEATS_PER_CHORD=4;   // 進行の試聴は MIDI と同じく 1コード＝1小節（4/4）
 
 // 試聴の音色（MIDI 出力には影響しない）。id は C++ 側 PreviewSynth::Timbre に対応
 export const TIMBRES=[
@@ -26,8 +26,11 @@ function play(chords,interval,duration,timbre){
   chords.forEach((ch,i)=>webAudioChord(ch,i*interval,duration));
 }
 
-export function playChord(ch,timbre){play([ch],PROG_STEP,SINGLE_DUR,timbre);}
-export function playProgression(chords,timbre){play(chords,PROG_STEP,PROG_STEP,timbre);}
+export function playChord(ch,timbre){play([ch],SINGLE_DUR,SINGLE_DUR,timbre);}
+export function playProgression(chords,timbre,bpm){
+  const bar=BEATS_PER_CHORD*60/bpm;
+  play(chords,bar,bar,timbre);
+}
 
 let ac=null;
 function webAudioChord(ch,when,dur){
