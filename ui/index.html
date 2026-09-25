@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>五度圏ナビゲーター</title>
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#E7EAF0;color:#1E2742;
+    font-family:"Hiragino Sans","Yu Gothic UI","Noto Sans JP",sans-serif;font-size:14px;
+    -webkit-user-select:none;user-select:none}
+  main{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px}
+  h1{font-size:22px;font-weight:900;margin:0}
+  .handle{font:inherit;font-size:16px;font-weight:700;color:#1E2742;background:#fff;
+    border:1px dashed #39456B;border-radius:4px;padding:10px 28px;cursor:grab;-webkit-user-drag:none}
+  .handle:active{cursor:grabbing}
+  #log{font-size:12px;color:#6A7390;min-height:1.5em}
+</style>
+</head>
+<body>
+<main>
+  <h1>五度圏ナビゲーター（MIDIドラッグ検証）</h1>
+  <button class="handle" id="drag" draggable="false">C をドラッグ</button>
+  <div id="log">ボタンを DAW のトラックやデスクトップへドラッグしてください</div>
+</main>
+<script type="module">
+import { getNativeFunction } from "./juce/index.js";
+
+const startMidiDrag = getNativeFunction("startMidiDrag");
+const log = s => { document.getElementById("log").textContent = s; };
+
+// mousedown + 数px の移動でネイティブのファイルドラッグを開始する
+function attachNativeDrag(node, getRequest) {
+  let origin = null;
+  node.addEventListener("mousedown", e => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    origin = { x: e.clientX, y: e.clientY };
+  });
+  window.addEventListener("mousemove", e => {
+    if (!origin || (e.buttons & 1) === 0) { origin = null; return; }
+    if (Math.hypot(e.clientX - origin.x, e.clientY - origin.y) < 4) return;
+    origin = null;
+    startMidiDrag(getRequest()).then(r => log(String(r))).catch(err => log("error: " + err));
+  });
+  window.addEventListener("mouseup", () => { origin = null; });
+}
+
+attachNativeDrag(document.getElementById("drag"), () => ({
+  name: "C", bpm: 120, chords: [{ root: 0, iv: [0, 4, 7] }]
+}));
+</script>
+</body>
+</html>
