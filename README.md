@@ -51,7 +51,7 @@ ChordNavi は、五度圏・スケール・鍵盤・ギター指板・コード�
 ### macOS
 
 1. [Releases](../../releases) から `ChordNavi-<バージョン>-macOS.pkg` をダウンロードします。
-2. `.pkg` を開いてインストールします。次の場所に入ります。
+2. `.pkg` を開いてインストールします。「インストールの種類」の画面で、入れるもの（AU・VST3・Standalone）を選べます（既定はすべて）。次の場所に入ります。
    - AU：`/Library/Audio/Plug-Ins/Components/ChordNavi.component`
    - VST3：`/Library/Audio/Plug-Ins/VST3/ChordNavi.vst3`
    - Standalone：`/Applications/ChordNavi.app`
@@ -67,7 +67,7 @@ ChordNavi は、五度圏・スケール・鍵盤・ギター指板・コード�
 
 ### アンインストール（macOS）
 
-次の3つを削除します。
+入れたものを削除します（すべて入れた場合は次の3つ）。
 
 ```
 /Library/Audio/Plug-Ins/Components/ChordNavi.component
@@ -77,7 +77,7 @@ ChordNavi は、五度圏・スケール・鍵盤・ギター指板・コード�
 
 ### Windows
 
-1. [Releases](../../releases) から `ChordNavi-<バージョン>-Windows-x64-Setup.exe` をダウンロードして実行します。
+1. [Releases](../../releases) から `ChordNavi-<バージョン>-Windows-x64-Setup.exe` をダウンロードして実行します。「コンポーネントの選択」で、入れるもの（VST3・Standalone）を選べます（既定は両方）。
    - VST3：`C:\Program Files\Common Files\VST3\ChordNavi.vst3`
    - Standalone：`C:\Program Files\ChordNavi\ChordNavi.exe`（スタートメニューに登録）
 2. 「Windows によって PC が保護されました」と表示されたら、**「詳細情報」→「実行」** を選びます（署名していないため）。

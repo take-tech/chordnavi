@@ -1,6 +1,7 @@
 ﻿; ChordNavi の Windows 用インストーラー（Inno Setup 6）
 ;   VST3       → C:\Program Files\Common Files\VST3\ChordNavi.vst3
 ;   Standalone → C:\Program Files\ChordNavi\ChordNavi.exe（スタートメニューにショートカット）
+; インストール時の「コンポーネントの選択」で VST3・Standalone のどちらを入れるか選べる
 ; ビルド済みの場所は環境変数 CHORDNAVI_VST3_DIR / CHORDNAVI_APP_EXE で渡す（GitHub Actions から）
 
 #define MyAppName "ChordNavi"
@@ -44,15 +45,23 @@ UninstallDisplayIcon={app}\ChordNavi.exe
 Name: "japanese"; MessagesFile: "compiler:Languages\Japanese.isl"
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
+[Types]
+Name: "full"; Description: "すべて（VST3 と Standalone）"
+Name: "custom"; Description: "カスタム"; Flags: iscustom
+
+[Components]
+Name: "vst3"; Description: "VST3 プラグイン（Ableton Live・Cubase・Studio One・FL Studio など）"; Types: full custom
+Name: "standalone"; Description: "Standalone（DAW なしで使える単体アプリ）"; Types: full custom
+
 [Files]
-Source: "{#SourceVst3}\*"; DestDir: "{commoncf64}\VST3\ChordNavi.vst3"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "{#SourceApp}"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#SourceVst3}\*"; DestDir: "{commoncf64}\VST3\ChordNavi.vst3"; Components: vst3; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#SourceApp}"; DestDir: "{app}"; Components: standalone; Flags: ignoreversion
 
 [Icons]
-Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\ChordNavi.exe"
+Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\ChordNavi.exe"; Components: standalone
 
 [InstallDelete]
-Type: filesandordirs; Name: "{commoncf64}\VST3\ChordNavi.vst3"
+Type: filesandordirs; Name: "{commoncf64}\VST3\ChordNavi.vst3"; Components: vst3
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{commoncf64}\VST3\ChordNavi.vst3"
