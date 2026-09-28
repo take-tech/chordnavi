@@ -161,6 +161,7 @@ button,svg{-webkit-user-drag:none}
 .panel{min-width:0}
 /* 選択中のコード名が長いときは見出しの中で縮める */
 .head>.selinfo{flex-shrink:1;min-width:0}
+#kbTitle{flex-shrink:0;max-width:55%}   /* スケール名はコード名より優先して見せる */
 .selinfo>span{overflow:hidden;text-overflow:ellipsis;min-width:0}
 .selinfo>button{flex-shrink:0}
 .legend span,.selinfo span{white-space:nowrap}

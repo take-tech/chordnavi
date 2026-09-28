@@ -17,10 +17,11 @@ export const TIMBRES=[
   {id:'pad',name:'パッド'}
 ];
 
-// events: [{ch, start, dur}]（秒）。呼ぶたびにそれまでの試聴は止まる（C++ 側）
-function play(events,timbre){
+// events: [{ch, start, dur}]（秒）。呼ぶたびにそれまでの試聴は止まる（C++ 側）。
+// opts.session を付けると進行として扱い、鳴っているコードが "previewPos" で返る。opts.append なら前の進行の直後に続ける
+function play(events,timbre,opts={}){
   if(nativePlay){
-    nativePlay({timbre,chords:events.map(({ch,start,dur})=>
+    nativePlay({timbre,...opts,chords:events.map(({ch,start,dur})=>
       ({root:ch.root,iv:CHORD[ch.q].iv,start,dur,...(ch.bass!=null?{bass:ch.bass}:{})}))})
       .catch(err=>console.error(err));
     return;
@@ -60,10 +61,12 @@ export function stopPreview(){
 export function playChord(ch,timbre){play([{ch,start:0,dur:SINGLE_DUR}],timbre);}
 
 // 進行は MIDI と同じ長さ：各コードの拍数 × テンポ
-export function playProgression(chords,timbre,bpm){
+export function playProgression(chords,timbre,bpm,opts){
   const beat=60/bpm;let t=0;
-  play(chords.map(ch=>{const dur=(ch.beats??4)*beat, e={ch,start:t,dur};t+=dur;return e;}),timbre);
+  play(chords.map(ch=>{const dur=(ch.beats??4)*beat, e={ch,start:t,dur};t+=dur;return e;}),timbre,opts);
 }
+// プラグイン内では、進行の表示とループを C++ の時計（"previewPos"）に合わせる
+export const nativeClock=!!nativePlay;
 
 let ac=null;
 function webAudioChord(ch,when,dur){webAudioNotes(voicing(ch),when,dur);}

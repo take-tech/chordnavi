@@ -2,6 +2,7 @@
 
 #include <juce_audio_basics/juce_audio_basics.h>
 #include <array>
+#include <atomic>
 #include <vector>
 
 // 試聴用の簡易シンセ。三角波はプロトタイプの playChord() と同じ音色・エンベロープ。
@@ -13,6 +14,7 @@ public:
 
     static constexpr int maxNotesPerChord = 8;
     static constexpr int maxVoices        = 64;
+    static constexpr int maxScheduled     = 128;   // 鳴る前の予約（コード単位。ボイスは鳴り始めるときに割り当てる）
     static constexpr int maxPartials      = 8;
     static constexpr float peakGain       = 0.12f;
     static constexpr double attackSeconds = 0.02;
@@ -29,6 +31,27 @@ public:
     // 鳴っている音をフェードアウトし、予約中の音を取り消す
     bool stopAll();
 
+    // 進行の試聴。session は JS が付ける番号で、何番目のコードが鳴っているかを getPosition() で返すのに使う。
+    // append なら、予約済みの進行の終わりにすき間なく続ける（ループ）。そうでなければ他の試聴を止めてから鳴らす
+    struct ChordEvent
+    {
+        std::vector<int> notes;
+        double startSeconds = 0, durationSeconds = 0;
+    };
+    bool queueProgression (const std::vector<ChordEvent>& chords, Timbre timbre, int session, bool append);
+
+    // 今鳴っている進行のコード（オーディオの時計で更新する。どのスレッドから読んでもよい）
+    struct Position
+    {
+        int session = -1;     // 最後に鳴り始めたコードの session
+        int index = -1;       // そのコードの番号（止めたら -1）
+        bool playing = false; // 進行の最後のコードが鳴り終わるまで true
+
+        bool operator== (const Position& o) const { return session == o.session && index == o.index && playing == o.playing; }
+        bool operator!= (const Position& o) const { return ! (*this == o); }
+    };
+    Position getPosition() const;
+
     // MIDI キーボードからの演奏（オーディオスレッドから呼ぶ）。離すまで鳴らし続け、離したらリリース
     void noteOn (int note, float velocity, Timbre timbre);
     void noteOff (int note);
@@ -37,6 +60,7 @@ public:
     // バッファを上書きで書き込む（全チャンネル同じ信号）
     void render (juce::AudioBuffer<float>& buffer);
 
+    // 鳴っているボイスと、予約中の音の数
     int getNumActiveVoices() const;
 
 private:
@@ -47,6 +71,15 @@ private:
         double delaySeconds = 0, durationSeconds = 0;
         Timbre timbre = Timbre::triangle;
         bool stopOthers = false;
+        bool groupStart = true;   // 時刻の基準を決め直す（queue() は毎回、進行は先頭のコードだけ）
+        bool append = false;      // 基準を「予約済みの進行の終わり」にする
+        int session = -1, tag = -1;   // 進行のコード（tag はコードの番号）。単体の試聴は -1
+    };
+
+    struct Scheduled
+    {
+        Request request;
+        juce::int64 at = 0;       // 鳴り始める時刻（clock と同じ、サンプル数）
     };
 
     struct Voice
@@ -83,6 +116,8 @@ private:
     };
 
     void handleRequest (const Request&);
+    void startDue (juce::int64 now);
+    void renderVoices (float* out, int from, int to);
     void startVoice (Voice&, int note, juce::int64 startIn, juce::int64 length, Timbre, double decayHintSeconds = 0);
     Voice& findFreeVoice();
     float renderSample (Voice&);
@@ -91,6 +126,17 @@ private:
     std::array<Voice, maxVoices> voices {};
     juce::Random random;
 
-    juce::AbstractFifo fifo { 64 };
-    std::array<Request, 64> requests {};
+    juce::AbstractFifo fifo { 128 };
+    std::array<Request, 128> requests {};
+
+    // ここから下はオーディオスレッドだけが触る（position* は公開用）
+    std::array<Scheduled, maxScheduled> scheduled {};
+    int numScheduled = 0;
+    juce::int64 clock = 0;          // render() で進めたサンプル数
+    juce::int64 groupBase = 0;      // 今の予約グループの時刻の基準
+    juce::int64 progressionEnd = 0; // 予約済みの進行が鳴り終わる時刻
+    int lastSession = -1, lastIndex = -1;
+
+    std::atomic<int> positionSession { -1 }, positionIndex { -1 };
+    std::atomic<bool> positionPlaying { false };
 };

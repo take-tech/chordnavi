@@ -43,8 +43,9 @@ private:
     void saveMidi (const juce::Array<juce::var>& args,
                    juce::WebBrowserComponent::NativeFunctionCompletion completion);
 
-    // JS: playChords({ chords: [{ root, iv, bass?, start, dur }], timbre }) — 各コードを start 秒後に dur 秒鳴らす。
-    // 呼ぶたびにそれまでの試聴は止める
+    // JS: playChords({ chords: [{ root, iv, bass?, start, dur }], timbre, session?, append? }) — 各コードを start 秒後に dur 秒鳴らす。
+    // 呼ぶたびにそれまでの試聴は止める。session を付けると進行として扱い、鳴っているコードを "previewPos" で返す。
+    // append なら止めずに、予約済みの進行の終わりから続ける（ループ）
     void playChords (const juce::Array<juce::var>& args,
                      juce::WebBrowserComponent::NativeFunctionCompletion completion);
 
@@ -55,11 +56,13 @@ private:
     // DAW が状態を復元したら JS へ "stateRestored" イベントで送る
     void changeListenerCallback (juce::ChangeBroadcaster*) override;
 
-    // DAW のテンポが変わったら "hostTempo"、MIDI 入力の音が変わったら "midiNotes" を JS へ送る
+    // DAW のテンポが変わったら "hostTempo"、MIDI 入力の音が変わったら "midiNotes"、
+    // 試聴中の進行で鳴っているコードが変わったら "previewPos" を JS へ送る
     void timerCallback() override;
     juce::var hostInfo() const;
     double lastSentBpm = -1.0;
     std::vector<int> lastSentLiveNotes;
+    PreviewSynth::Position lastSentPosition;
 
     GodokenProcessor& processorRef;
     std::unique_ptr<juce::FileChooser> fileChooser;

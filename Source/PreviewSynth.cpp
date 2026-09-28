@@ -72,7 +72,41 @@ bool PreviewSynth::queue (const std::vector<int>& notes, double delaySeconds, do
     r.durationSeconds = durationSeconds;
     r.timbre          = timbre;
     r.stopOthers      = stopOthers;
+    r.groupStart      = true;
+    r.append          = false;
+    r.session         = -1;
+    r.tag             = -1;
     return true;
+}
+
+bool PreviewSynth::queueProgression (const std::vector<ChordEvent>& chords, Timbre timbre, int session, bool append)
+{
+    if (chords.empty() || fifo.getFreeSpace() < (int) chords.size())
+        return false;
+
+    for (size_t i = 0; i < chords.size(); ++i)
+    {
+        const auto& c = chords[i];
+        const auto scope = fifo.write (1);
+        auto& r = requests[(size_t) (scope.blockSize1 > 0 ? scope.startIndex1 : scope.startIndex2)];
+        r.numNotes = juce::jmin ((int) c.notes.size(), maxNotesPerChord);
+        for (int n = 0; n < r.numNotes; ++n)
+            r.notes[(size_t) n] = juce::jlimit (0, 127, c.notes[(size_t) n]);
+        r.delaySeconds    = juce::jmax (0.0, c.startSeconds);
+        r.durationSeconds = juce::jmax (attackSeconds * 2, c.durationSeconds);
+        r.timbre          = timbre;
+        r.groupStart      = i == 0;
+        r.append          = append;
+        r.stopOthers      = i == 0 && ! append;
+        r.session         = session;
+        r.tag             = (int) i;
+    }
+    return true;
+}
+
+PreviewSynth::Position PreviewSynth::getPosition() const
+{
+    return { positionSession.load(), positionIndex.load(), positionPlaying.load() };
 }
 
 bool PreviewSynth::stopAll()
@@ -84,6 +118,10 @@ bool PreviewSynth::stopAll()
     auto& r = requests[(size_t) (scope.blockSize1 > 0 ? scope.startIndex1 : scope.startIndex2)];
     r.numNotes   = 0;
     r.stopOthers = true;
+    r.groupStart = true;
+    r.append     = false;
+    r.session    = -1;
+    r.tag        = -1;
     return true;
 }
 
@@ -101,6 +139,9 @@ PreviewSynth::Voice& PreviewSynth::findFreeVoice()
 
 void PreviewSynth::handleRequest (const Request& r)
 {
+    if (r.groupStart)
+        groupBase = r.append ? juce::jmax (progressionEnd, clock) : clock;
+
     if (r.stopOthers)
     {
         const auto fade = (juce::int64) (fadeSeconds * sampleRate);
@@ -108,19 +149,45 @@ void PreviewSynth::handleRequest (const Request& r)
         for (auto& v : voices)
         {
             if (! v.active) continue;
-            if (v.startIn > 0)       v.active = false;        // まだ鳴っていない予約は取り消し
+            if (v.startIn > 0)       v.active = false;        // まだ鳴っていない音（ギターのストローク）は取り消し
             else if (v.fadeLeft < 0) v.fadeLeft = fade;
         }
+
+        numScheduled   = 0;                                   // 予約も取り消し
+        progressionEnd = clock;
+        lastIndex      = -1;
     }
 
-    const auto startIn = (juce::int64) (r.delaySeconds * sampleRate);
-    const auto length  = (juce::int64) (r.durationSeconds * sampleRate);
+    if (r.numNotes == 0 || numScheduled >= maxScheduled)
+        return;
 
-    for (int n = 0; n < r.numNotes; ++n)
+    const auto at = groupBase + (juce::int64) (r.delaySeconds * sampleRate);
+    if (r.tag >= 0)
+        progressionEnd = juce::jmax (progressionEnd, at + (juce::int64) (r.durationSeconds * sampleRate));
+
+    scheduled[(size_t) numScheduled++] = { r, at };
+}
+
+// 時刻 now までに鳴り始める予約のボイスを割り当てる
+void PreviewSynth::startDue (juce::int64 now)
+{
+    for (int i = 0; i < numScheduled;)
     {
-        // ギターは低い弦から順に少しずらして鳴らす（ストローク）
-        const auto strum = r.timbre == Timbre::guitar ? (juce::int64) (n * strumSeconds * sampleRate) : 0;
-        startVoice (findFreeVoice(), r.notes[(size_t) n], startIn + strum, juce::jmax<juce::int64> (1, length - strum), r.timbre);
+        if (scheduled[(size_t) i].at > now) { ++i; continue; }
+
+        const auto& r = scheduled[(size_t) i].request;
+        const auto length = (juce::int64) (r.durationSeconds * sampleRate);
+
+        for (int n = 0; n < r.numNotes; ++n)
+        {
+            // ギターは低い弦から順に少しずらして鳴らす（ストローク）
+            const auto strum = r.timbre == Timbre::guitar ? (juce::int64) (n * strumSeconds * sampleRate) : 0;
+            startVoice (findFreeVoice(), r.notes[(size_t) n], strum, juce::jmax<juce::int64> (1, length - strum), r.timbre);
+        }
+
+        if (r.tag >= 0) { lastSession = r.session; lastIndex = r.tag; }
+
+        scheduled[(size_t) i] = scheduled[(size_t) --numScheduled];   // 順番は気にしない
     }
 }
 
@@ -384,6 +451,19 @@ float PreviewSynth::renderSample (Voice& v)
     return out;
 }
 
+void PreviewSynth::renderVoices (float* out, int from, int to)
+{
+    for (auto& v : voices)
+    {
+        for (int s = from; s < to && v.active; ++s)
+        {
+            if (v.startIn > 0) { --v.startIn; continue; }
+            const auto x = renderSample (v);
+            if (out != nullptr) out[s] += x;
+        }
+    }
+}
+
 void PreviewSynth::render (juce::AudioBuffer<float>& buffer)
 {
     {
@@ -394,20 +474,27 @@ void PreviewSynth::render (juce::AudioBuffer<float>& buffer)
 
     const int numSamples = buffer.getNumSamples();
     buffer.clear();
+    auto* out = buffer.getNumChannels() > 0 ? buffer.getWritePointer (0) : nullptr;
 
-    if (buffer.getNumChannels() == 0)
-        return;
-
-    auto* out = buffer.getWritePointer (0);
-
-    for (auto& v : voices)
+    // 予約の鳴り始めの位置でブロックを区切り、サンプル単位の正確な時刻で鳴らす
+    for (int pos = 0; pos < numSamples;)
     {
-        for (int s = 0; s < numSamples && v.active; ++s)
-        {
-            if (v.startIn > 0) { --v.startIn; continue; }
-            out[s] += renderSample (v);
-        }
+        startDue (clock + pos);
+
+        auto next = clock + numSamples;
+        for (int i = 0; i < numScheduled; ++i)
+            next = juce::jmin (next, scheduled[(size_t) i].at);
+
+        const auto end = (int) juce::jlimit<juce::int64> (pos + 1, numSamples, next - clock);
+        renderVoices (out, pos, end);
+        pos = end;
     }
+
+    clock += numSamples;
+
+    positionSession.store (lastSession);
+    positionIndex.store (lastIndex);
+    positionPlaying.store (lastIndex >= 0 && clock < progressionEnd);
 
     for (int ch = 1; ch < buffer.getNumChannels(); ++ch)
         buffer.copyFrom (ch, 0, buffer, 0, 0, numSamples);
@@ -418,5 +505,7 @@ int PreviewSynth::getNumActiveVoices() const
     int n = 0;
     for (const auto& v : voices)
         n += v.active ? 1 : 0;
+    for (int i = 0; i < numScheduled; ++i)
+        n += scheduled[(size_t) i].request.numNotes;
     return n;
 }

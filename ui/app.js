@@ -9,8 +9,8 @@ import {
 import {renderStaff} from './staff.js';
 import {threePositions,nearestVoicing,TAB_AREAS} from './guitar.js';
 import {attachMidiDrag,saveMidi} from './midi.js';
-import {playChord as play1,playProgression as playN,playNote,playNotes,stopPreview,setLiveTimbre,setMuted,TIMBRES} from './audio.js';
-import {getHostInfo,onHostTempo,onMidiNotes,onSetTheme,reportTheme} from './host.js';
+import {playChord as play1,playProgression as playN,playNote,playNotes,stopPreview,setLiveTimbre,setMuted,nativeClock,TIMBRES} from './audio.js';
+import {getHostInfo,onHostTempo,onMidiNotes,onPreviewPos,onSetTheme,reportTheme} from './host.js';
 import {loadState,saveState,onStateRestored} from './persist.js';
 
 /* ---------- 状態 ---------- */
@@ -29,9 +29,17 @@ const playChord=ch=>{stopPlayback(false);play1(ch,state.timbre);};
 
 /* ---------- 進行の試聴と、鳴っているコードの表示 ---------- */
 // playback: { chords, index, timers }。index は今鳴っているコード（-1 は鳴る前）
-let playback=null;
+// プラグイン内では C++ の時計に合わせる（sessions：1周ごとの番号 → その周のコード、last：最後に予約した周）
+let playback=null, sessionSeq=0;
 function playProgression(chords){
   stopPlayback(false);
+  if(nativeClock){
+    const session=++sessionSeq;
+    playback={chords,index:-1,timers:[],sessions:new Map([[session,chords]]),last:session};
+    playN(chords,state.timbre,bpm(),{session});
+    return;
+  }
+  // ブラウザで確認するとき：画面のタイマーで表示とループを進める
   const beat=60/bpm(), timers=[];
   playback={chords,index:-1,timers};
   let t=0;
@@ -46,6 +54,22 @@ function playProgression(chords){
   },t*1000));
   playN(chords,state.timbre,bpm());
 }
+// プラグイン内：C++ から今鳴っているコードが届く（音と同じ時計）。
+// ループは、最後のコードが鳴り始めたら次の1周を「今の周の直後から」予約する（すき間なくつながる。テンポ・音色の変更はここで反映）
+onPreviewPos(({session,index,playing})=>{
+  if(!playback||!playback.sessions)return;
+  const chords=playback.sessions.get(session);
+  if(!chords)return;                       // 前に止めた試聴の知らせ
+  if(!playing){if(session===playback.last){playback=null;render();}return;}
+  if(index<0)return;
+  for(const k of playback.sessions.keys())if(k<session)playback.sessions.delete(k);
+  if(chords!==playback.chords||index!==playback.index){playback.chords=chords;playback.index=index;render();}
+  if(state.loop&&session===playback.last&&index===chords.length-1){
+    const next=++sessionSeq;
+    playback.sessions.set(next,progChords);playback.last=next;
+    playN(progChords,state.timbre,bpm(),{session:next,append:true});
+  }
+});
 // 表示を止める（silence なら音も止める）。キー・進行を変えたときは音も止めて表示とずれないようにする
 function stopPlayback(silence){
   if(!playback)return;
@@ -517,11 +541,15 @@ function pickOnString(s,midi){
 document.getElementById('pickBtn').onclick=()=>{state.pick=!state.pick;if(state.pick)stopPlayback(true);else picks.clear();render();};
 document.getElementById('pickClear').onclick=()=>{picks.clear();render();};
 document.getElementById('pickPlay').onclick=()=>{const ns=pickedNotes();if(ns.length)playNotes(ns,state.timbre);};
+// 鍵盤の凡例：MIDI 入力・コード判別・コードの構成音の表示中は隠す（見出しのスケール名を隠さないため）
+function syncKbLegend(){
+  document.getElementById('kbLegend').hidden=liveNotes.length>0||state.pick||document.getElementById('selInfo').classList.contains('on');
+}
 // MIDI で弾いている音のコード名（見出しに出す）
 function renderLive(){
   const box=document.getElementById('liveInfo'), on=liveNotes.length>0;
   box.classList.toggle('on',on);
-  document.getElementById('kbLegend').hidden=on||state.pick;
+  syncKbLegend();
   if(!on)return;
   const t=tonic();
   const cands=detectChords(liveNotes).map(c=>({...c,off:mod12(c.root-t),...(c.bass!=null?{boff:mod12(c.bass-t)}:{})}));
@@ -536,7 +564,7 @@ function renderPick(){
   const clear=document.getElementById('pickClear');
   clear.hidden=!on;clear.disabled=!picks.size;
   document.getElementById('pickInfo').classList.toggle('on',on);
-  document.getElementById('kbLegend').hidden=on||liveNotes.length>0;
+  syncKbLegend();
   if(!on)return;
   const box=document.getElementById('pickResult');box.innerHTML='';
   const t=tonic();
@@ -793,6 +821,7 @@ function render(){
   const shown=shownChord();
   if(shown&&!state.pick){si.classList.add('on');document.getElementById('selName').textContent=`${chordName(shown)}（${chordDeg(shown.off,shown.q,shown.boff,shown.deg)}）`;}
   else si.classList.remove('on');
+  syncKbLegend();
   document.getElementById('progPlay').textContent=playback?'停止':'試聴';
   renderTempo();
   document.getElementById('progLoop').setAttribute('aria-pressed',state.loop);

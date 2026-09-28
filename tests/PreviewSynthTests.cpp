@@ -182,6 +182,77 @@ public:
             expect (! synth.queue ({}, 0.0, 1.0));
             expect (! synth.queue ({ 60 }, 0.0, 0.0));
         }
+
+        using Events = std::vector<PreviewSynth::ChordEvent>;
+        const auto twoChords = [] { return Events { { { 48, 52, 55 }, 0.0, 0.5 }, { { 50, 53, 57 }, 0.5, 0.5 } }; };
+
+        beginTest ("Progression reports the sounding chord on the audio clock");
+        {
+            PreviewSynth synth;
+            synth.prepare (sr);
+            expect (synth.queueProgression (twoChords(), Timbre::organ, 7, false));
+            renderSeconds (synth, 0.1);
+            auto p = synth.getPosition();
+            expectEquals (p.session, 7);
+            expectEquals (p.index, 0);
+            expect (p.playing);
+
+            renderSeconds (synth, 0.5);                    // 0.6 秒：2つ目
+            expectEquals (synth.getPosition().index, 1);
+
+            renderSeconds (synth, 0.5);                    // 1.1 秒：鳴り終わり
+            expect (! synth.getPosition().playing);
+        }
+
+        beginTest ("Appended progression starts exactly where the previous one ends");
+        {
+            PreviewSynth synth;
+            synth.prepare (sr);
+            expect (synth.queueProgression (twoChords(), Timbre::organ, 1, false));
+            renderSeconds (synth, 0.7);                    // 最後のコードが鳴っている間に次の周を予約
+            expect (synth.queueProgression (twoChords(), Timbre::organ, 2, true));
+
+            juce::AudioBuffer<float> buf (2, 48);          // 1ms ずつ
+            int switchedAt = -1;
+            for (int i = 0; i < 600 && switchedAt < 0; ++i)
+            {
+                synth.render (buf);
+                if (synth.getPosition().session == 2) switchedAt = 700 + i;   // このブロックの頭の時刻（ms）
+                else expect (synth.getPosition().playing);                   // 周の間でも止まらない
+            }
+            expectEquals (switchedAt, 1000);               // 1.000〜1.001 秒のブロックで次の周の先頭が鳴り始める
+            expectEquals (synth.getPosition().index, 0);
+        }
+
+        beginTest ("Starting a progression stops the previous one and its reservations");
+        {
+            PreviewSynth synth;
+            synth.prepare (sr);
+            expect (synth.queueProgression (twoChords(), Timbre::organ, 1, false));
+            renderSeconds (synth, 0.1);
+            expect (synth.queueProgression ({ { { 60 }, 0.0, 0.3 } }, Timbre::organ, 2, false));
+            renderSeconds (synth, 0.1);
+            expectEquals (synth.getPosition().session, 2);
+            expectEquals (synth.getNumActiveVoices(), 1);  // 前の周の音はフェード済み、2つ目の予約も消えた
+            renderSeconds (synth, 0.6);
+            expect (! synth.getPosition().playing);
+            expectEquals (renderSeconds (synth, 0.3), 0.0f);
+        }
+
+        beginTest ("Long progressions do not run out of voices");
+        {
+            PreviewSynth synth;
+            synth.prepare (sr);
+            Events chords;
+            for (int i = 0; i < 16; ++i)
+                chords.push_back ({ { 36, 48, 52, 55, 59 }, i * 0.25, 0.25 });   // 16 コード × 5 音
+            expect (synth.queueProgression (chords, Timbre::organ, 1, false));
+            renderSeconds (synth, 0.1);
+            expectEquals (synth.getNumActiveVoices(), 80);    // 鳴っている 5 音＋予約 75 音
+            renderSeconds (synth, 3.8);                       // 最後のコード
+            expectEquals (synth.getPosition().index, 15);
+            expect (renderSeconds (synth, 0.1) > 0.05f);
+        }
     }
 };
 

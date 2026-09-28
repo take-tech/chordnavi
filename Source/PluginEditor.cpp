@@ -208,6 +208,18 @@ void GodokenEditor::timerCallback()
         obj->setProperty ("notes", list);
         webView.emitEventIfBrowserIsVisible ("midiNotes", juce::var (obj));
     }
+
+    // 進行の試聴で今鳴っているコード（音と同じオーディオの時計）
+    const auto pos = processorRef.getPreviewSynth().getPosition();
+    if (pos != lastSentPosition)
+    {
+        lastSentPosition = pos;
+        auto* obj = new juce::DynamicObject();
+        obj->setProperty ("session", pos.session);
+        obj->setProperty ("index", pos.index);
+        obj->setProperty ("playing", pos.playing);
+        webView.emitEventIfBrowserIsVisible ("previewPos", juce::var (obj));
+    }
 }
 
 void GodokenEditor::setTheme (const juce::String& name)
@@ -316,14 +328,32 @@ void GodokenEditor::playChords (const juce::Array<juce::var>& args,
     const auto timbre = timbreFromName (request["timbre"].toString());
 
     // 各コードの開始時刻 start・長さ dur（秒）は JS 側でテンポと拍数から計算済み。
-    // 新しい試聴を始めるときは、鳴っている音・予約中の音を止める（先頭のコードで一度だけ）
+    // 進行（session あり）は、鳴っているコードを "previewPos" で返す。append ならループとして前の進行の直後に続ける
     int queued = 0;
-    for (size_t i = 0; i < chords.size(); ++i)
+    if (request.hasProperty ("session"))
     {
-        const auto& c    = list[(int) i];
-        const auto start = juce::jlimit (0.0, 120.0, (double) c.getProperty ("start", 0.0));
-        const auto dur   = juce::jlimit (0.05, 10.0, (double) c.getProperty ("dur", 1.1));
-        queued += processorRef.getPreviewSynth().queue (MidiExport::voicing (chords[i]), start, dur, timbre, i == 0) ? 1 : 0;
+        std::vector<PreviewSynth::ChordEvent> events;
+        for (size_t i = 0; i < chords.size(); ++i)
+        {
+            const auto& c = list[(int) i];
+            events.push_back ({ MidiExport::voicing (chords[i]),
+                                juce::jlimit (0.0, 120.0, (double) c.getProperty ("start", 0.0)),
+                                juce::jlimit (0.05, 10.0, (double) c.getProperty ("dur", 1.1)) });
+        }
+        queued = processorRef.getPreviewSynth().queueProgression (events, timbre, (int) request["session"],
+                                                                  (bool) request.getProperty ("append", false))
+                     ? (int) events.size() : 0;
+    }
+    else
+    {
+        // 単体のコード：鳴っている音・予約中の音を止めてから鳴らす
+        for (size_t i = 0; i < chords.size(); ++i)
+        {
+            const auto& c    = list[(int) i];
+            const auto start = juce::jlimit (0.0, 120.0, (double) c.getProperty ("start", 0.0));
+            const auto dur   = juce::jlimit (0.05, 10.0, (double) c.getProperty ("dur", 1.1));
+            queued += processorRef.getPreviewSynth().queue (MidiExport::voicing (chords[i]), start, dur, timbre, i == 0) ? 1 : 0;
+        }
     }
 
     completion (juce::var (queued));

@@ -25,3 +25,8 @@ export function reportTheme(name){if(nativeReportTheme)nativeReportTheme(name).c
 export function onHostTempo(cb){
   if(window.__JUCE__)window.__JUCE__.backend.addEventListener('hostTempo',info=>cb(info));
 }
+
+// 進行の試聴で鳴っているコードが変わったときに呼ばれる：{ session, index, playing }
+export function onPreviewPos(cb){
+  if(window.__JUCE__)window.__JUCE__.backend.addEventListener('previewPos',info=>cb(info));
+}
