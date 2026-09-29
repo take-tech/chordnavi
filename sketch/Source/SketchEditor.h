@@ -48,6 +48,12 @@ private:
     void saveMidiBytes (const juce::Array<juce::var>& args,
                         juce::WebBrowserComponent::NativeFunctionCompletion completion);
 
+    // 曲ファイル（.chordsketch。中身は JS が作る JSON）：
+    //   songOpen() → { path, name, text }・songSaveAs({ name, text, path }) → { path, name }（どちらも取り消しは "cancelled"）
+    //   songWrite({ path, text }) → true/false（上書き保存）
+    void songOpen (juce::WebBrowserComponent::NativeFunctionCompletion completion);
+    void songSaveAs (const juce::Array<juce::var>& args, juce::WebBrowserComponent::NativeFunctionCompletion completion);
+
     std::unique_ptr<juce::FileChooser> fileChooser;
 
     // 試聴（JS の player.js から）：

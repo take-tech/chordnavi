@@ -39,9 +39,17 @@ function validSong(x){
   s.sections=s.sections.filter(c=>c&&c.bars>0).map(c=>({...newSection(),...c,chords:(c.chords||[]).filter(ch=>ch&&CHORD[ch.q]&&ch.len>0),marks:(c.marks||[]).filter(m=>!m.key||(m.key.idx>=0&&m.key.idx<12&&['major','minor'].includes(m.key.mode)))}));
   return s;
 }
+// 自動保存の読み書き。JUCE 版はネイティブのファイル（Application Support の ChordSketch/session.json）、ブラウザは localStorage
+const nativeSession={load:nativeFn('loadSession'),save:nativeFn('saveSession')};
+async function readSaved(){
+  if(nativeSession.load){try{const t=await nativeSession.load();if(t)return JSON.parse(t);}catch(e){console.error(e);}}
+  return JSON.parse(localStorage.getItem(STORE)||'null');   // ブラウザ、または JUCE 版で session.json がまだ無いとき（前の版は WebView の localStorage に保存していた）
+}
+const str=v=>typeof v==='string'?v:'';
 try{
-  const saved=JSON.parse(localStorage.getItem(STORE)||'null');
-  if(Array.isArray(saved?.docs))docs=saved.docs.map(d=>({song:validSong(d.song),file:typeof d.file==='string'?d.file:''})).filter(d=>d.song);
+  const saved=await readSaved();
+  // path は JUCE 版で保存したファイル（上書き保存の書き込み先）。ブラウザでは書き込み先を覚えておけない
+  if(Array.isArray(saved?.docs))docs=saved.docs.map(d=>({song:validSong(d.song),file:str(d.file),handle:hasNative&&str(d.path)?d.path:null,dirty:!!d.dirty})).filter(d=>d.song);
   else if(saved?.song){const s=validSong(saved.song);if(s)docs=[{song:s,file:saved.ui?.songFile||''}];}   // 前の保存形式（曲1つ）
   active=Math.max(0,Math.min(docs.length-1,saved?.active|0));
   song=docs[active]?.song;
@@ -57,8 +65,9 @@ tl=timeline(song);
 let saveTimer=0;
 // 自動保存：開いているタブを全部（表示中のタブは今の song・ファイル名）
 function persist(){clearTimeout(saveTimer);saveTimer=setTimeout(()=>{
-  const all=docs.map((d,i)=>i===active?{song,file:songFile}:{song:d.song,file:d.file||''});
-  localStorage.setItem(STORE,JSON.stringify({docs:all,active,ui}));
+  const all=docs.map((d,i)=>i===active?{song,file:songFile,path:pathOf(fileHandle),dirty}:{song:d.song,file:d.file||'',path:pathOf(d.handle),dirty:!!d.dirty});
+  const json=JSON.stringify({docs:all,active,ui});
+  if(nativeSession.save)nativeSession.save(json).catch(e=>console.error(e));else localStorage.setItem(STORE,json);
 },300);}
 function snapshot(){undoStack.push(JSON.stringify(song));if(undoStack.length>300)undoStack.shift();redoStack.length=0;}
 function commit(mut){snapshot();mut();changed();}
@@ -1189,11 +1198,16 @@ fileMenu.addEventListener('click',e=>{
   if(act==='saveas')saveFileAs();
 });
 // 上書き保存・名前を付けて保存。ブラウザでは File System Access API（Chrome など）があれば同じファイルに書き込む。
-// 無ければ「名前を付けて保存」は名前を聞いてダウンロード、「上書き保存」は同じ名前でダウンロードし直す（JUCE 版はネイティブのファイルに書く）
-let fileHandle=null, songFile=docs[active]?.file||'', dirty=false;
+// 無ければ「名前を付けて保存」は名前を聞いてダウンロード、「上書き保存」は同じ名前でダウンロードし直す。
+// JUCE 版はネイティブのダイアログとファイル（fileHandle はファイルのパスの文字列）
+let fileHandle=docs[active]?.handle||null, songFile=docs[active]?.file||'', dirty=!!docs[active]?.dirty;
+const nativeFile={open:nativeFn('songOpen'),saveAs:nativeFn('songSaveAs'),write:nativeFn('songWrite')};
 const SONG_EXT='.chordsketch', PICK_TYPES=[{description:'ChordSketch の曲',accept:{'application/json':[SONG_EXT]}}];
 const songJSON=()=>JSON.stringify({app:'ChordSketch',v:1,song},null,1);
-async function writeHandle(hd){const w=await hd.createWritable();await w.write(songJSON());await w.close();}
+async function writeHandle(hd){
+  if(typeof hd==='string'){if(!await nativeFile.write({path:hd,text:songJSON()}))throw new Error('書き込めませんでした: '+hd);return;}
+  const w=await hd.createWritable();await w.write(songJSON());await w.close();}
+const pathOf=hd=>typeof hd==='string'?hd:'';   // JUCE 版のファイルのパス（ブラウザのハンドルは保存できない）
 function setFile(name,handle){songFile=name;fileHandle=handle||null;dirty=false;persist();renderFileState();renderTabs();}
 function renderFileState(){
   $('fileState').hidden=!dirty;
@@ -1201,6 +1215,11 @@ function renderFileState(){
 }
 async function saveFileAs(){
   const suggested=withExtension(songFile||song.title||'song',SONG_EXT);
+  if(hasNative){
+    const r=await nativeFile.saveAs({name:suggested,text:songJSON(),path:pathOf(fileHandle)}).catch(e=>{console.error(e);return null;});
+    if(r?.path)setFile(r.name,r.path);else if(r!=='cancelled'){console.error(r);toast('保存できませんでした');}
+    return;
+  }
   if('showSaveFilePicker' in window){
     try{
       let hd=await showSaveFilePicker({suggestedName:suggested,types:PICK_TYPES});
@@ -1214,11 +1233,22 @@ async function saveFileAs(){
   download(new Blob([songJSON()],{type:'application/json'}),name);setFile(name,null);
 }
 async function saveFile(){
-  if(fileHandle){try{await writeHandle(fileHandle);setFile(songFile,fileHandle);return;}catch(e){console.error(e);}}
-  if(!songFile||'showSaveFilePicker' in window&&!fileHandle){await saveFileAs();return;}   // まだ保存していない、または書き込み先を忘れた
+  if(fileHandle){
+    try{await writeHandle(fileHandle);setFile(songFile,fileHandle);return;}
+    catch(e){console.error(e);if(hasNative){toast('上書き保存できませんでした。保存先を選び直してください');await saveFileAs();return;}}
+  }
+  if(!songFile||(hasNative||'showSaveFilePicker' in window)&&!fileHandle){await saveFileAs();return;}   // まだ保存していない、または書き込み先を忘れた
   download(new Blob([songJSON()],{type:'application/json'}),songFile);setFile(songFile,null);
 }
 async function openFile(){
+  if(hasNative){
+    const r=await nativeFile.open().catch(e=>{console.error(e);return null;});
+    if(typeof r?.text!=='string'){if(r!=='cancelled'){console.error(r);toast('ファイルを開けませんでした');}return;}
+    const open=docs.findIndex((d,i)=>(i===active?fileHandle:d.handle)===r.path);   // もう開いているならそのタブへ
+    if(open>=0){switchTab(open);toast('このファイルはもう開いています');return;}
+    loadSongText(r.text,r.name,r.path);
+    return;
+  }
   if('showOpenFilePicker' in window){
     try{const [hd]=await showOpenFilePicker({types:PICK_TYPES,multiple:false});loadSongText(await (await hd.getFile()).text(),hd.name,hd);}
     catch(e){if(e.name!=='AbortError')console.error(e);}
