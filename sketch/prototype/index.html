@@ -32,7 +32,14 @@
       </div>
     </div>
     <button id="printBtn" title="コード譜のプレビュー（印刷／PDF に保存）">コード譜</button>
-    <button id="themeBtn" class="ic" title="テーマ（ライト→ダーク→自動）"></button>
+    <div class="menu">
+      <button id="themeBtn" class="ic" title="テーマ" aria-haspopup="true"></button>
+      <div class="menu-pop theme-pop" id="themeMenu" hidden>
+        <button data-v="light" aria-checked="false" role="menuitemradio">☀ ライト</button>
+        <button data-v="dark" aria-checked="false" role="menuitemradio">☾ ダーク</button>
+        <button data-v="auto" aria-checked="false" role="menuitemradio">◐ 自動（OS の外観に合わせる）</button>
+      </div>
+    </div>
     <input id="fileInput" type="file" accept=".chordsketch,.json" hidden>
   </header>
 

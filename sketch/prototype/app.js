@@ -949,7 +949,7 @@ function download(blob,name){
 
 /* ---------- ファイル ---------- */
 const fileMenu=$('fileMenu');
-$('fileBtn').onclick=e=>{e.stopPropagation();fileMenu.hidden=!fileMenu.hidden;};
+$('fileBtn').onclick=e=>{e.stopPropagation();$('themeMenu').hidden=true;fileMenu.hidden=!fileMenu.hidden;};
 addEventListener('click',()=>{fileMenu.hidden=true;});
 fileMenu.addEventListener('click',e=>{
   const act=e.target.dataset.act;if(!act)return;
@@ -1145,13 +1145,23 @@ const renderOctUp=octControl('octUp','octave'), renderOctBass=octControl('octBas
 $('octUp').title='上声のオクターブ（ピアノ：0 = ルートが C3〜B3、ギター：0 = フォームのまま）';$('octBass').title='ベースのオクターブ（ピアノ：0 = C2〜B2、ギター：0 = 一番低い弦のまま）';
 
 /* ---------- テーマ ---------- */
-const THEMES=['light','dark','auto'], THEME_NAME={light:'☀',dark:'☾',auto:'◐'};
+const THEMES=['light','dark','auto'], THEME_NAME={light:'☀',dark:'☾',auto:'◐'}, THEME_LABEL={light:'ライト',dark:'ダーク',auto:'自動'};
 const dark=matchMedia('(prefers-color-scheme: dark)');
 function applyTheme(){
   const t=ui.theme==='auto'?(dark.matches?'dark':'light'):ui.theme;
   document.documentElement.dataset.theme=t;$('themeBtn').textContent=THEME_NAME[ui.theme];
+  $('themeBtn').title=`テーマ：${THEME_LABEL[ui.theme]}（押して選ぶ）`;
+  document.querySelectorAll('#themeMenu button').forEach(b=>b.setAttribute('aria-checked',b.dataset.v===ui.theme));
 }
-$('themeBtn').onclick=()=>{ui.theme=THEMES[(THEMES.indexOf(ui.theme)+1)%3];applyTheme();persist();};
+// テーマはメニューから選ぶ（ライト／ダーク／自動）
+const themeMenu=$('themeMenu');
+$('themeBtn').onclick=e=>{e.stopPropagation();fileMenu.hidden=true;themeMenu.hidden=!themeMenu.hidden;};
+themeMenu.addEventListener('click',e=>{
+  // data-theme は使わない（[data-theme=dark] の配色がその要素に効いてしまう）
+  const v=e.target.closest('[data-v]')?.dataset.v;if(!v)return;
+  ui.theme=v;applyTheme();persist();themeMenu.hidden=true;
+});
+addEventListener('click',e=>{if(!e.target.closest('#themeMenu'))themeMenu.hidden=true;});
 dark.addEventListener('change',applyTheme);
 
 /* ---------- 描画 ---------- */

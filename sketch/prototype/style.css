@@ -7,7 +7,7 @@
   --grid:#E3E7EF; --grid2:#EEF1F6; --sel:rgba(47,111,214,.12); --live:#2F6FD6; --pick:#6B4FBB;
   --pressed-bg:var(--ink); --pressed-fg:var(--on-ink);   /* 押されているボタン */
 }
-[data-theme=dark]{
+:root[data-theme=dark]{
   color-scheme:dark;
   /* 文字の多い画面なので、本文は真っ白にせず一段落とす（背景とのコントラスト比 8〜11） */
   --bg:#161A25; --panel:#1F2433; --ink:#C9CEDA; --ink2:#A4ADC5; --muted:#8D96B0; --line:#39415A;
@@ -16,7 +16,7 @@
   --grid:#2C3346; --grid2:#252B3B; --sel:rgba(90,150,255,.16);
   --pressed-bg:#46527A; --pressed-fg:#D3D8E3;   /* 押されているボタンを白く光らせない */
 }
-[data-theme=dark] #wheel text{fill:#D8DCE6}   /* 五度圏の白い文字も少し落とす（中央のキー名は --ink） */
+:root[data-theme=dark] #wheel text{fill:#D8DCE6}   /* 五度圏の白い文字も少し落とす（中央のキー名は --ink） */
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;overflow:hidden;background:var(--page)}
 body{color:var(--ink);font-family:"Hiragino Sans","Yu Gothic UI","Noto Sans JP",sans-serif;font-size:13px;line-height:1.45;
@@ -61,6 +61,9 @@ h1{font-size:17px;font-weight:900;letter-spacing:.02em;margin:0 6px 0 0;white-sp
 .menu-pop[hidden]{display:none}
 .menu-pop button{border:0;text-align:left;background:none;padding:5px 10px}
 .menu-pop button:hover{background:var(--panel)}
+.theme-pop{min-width:210px}
+.theme-pop button[aria-checked=true]{font-weight:700;color:var(--live)}
+.theme-pop button[aria-checked=true]::after{content:' ✓'}
 
 /* ---------- 左 ---------- */
 .left{display:flex;flex-direction:column;padding:9px 12px;gap:5px}
@@ -254,7 +257,7 @@ body.grabbing,body.grabbing *{cursor:grabbing!important}
 .prog-row{display:flex;gap:4px;align-items:center}
 .prog-row select{min-width:0;flex:1}
 #progSel{flex:1.6}
-.prog-row .ins{flex:1;font-weight:700;border-color:var(--ink2)}
+.prog-row .ins{flex:1}   /* 見た目は「試聴」と同じ（幅だけ広げる） */
 .prog-names{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));row-gap:2px;border-right:1px solid var(--ink2)}
 .prog-names .pb{display:flex;gap:1px;align-items:center;min-width:0;border-left:1px solid var(--ink2);padding:0 3px;height:16px;overflow:hidden}
 .prog-names .pb{font-size:10px}
