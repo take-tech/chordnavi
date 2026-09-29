@@ -33,10 +33,9 @@ SketchEditor::SketchEditor (SketchProcessor& p)
     : AudioProcessorEditor (&p), processorRef (p), webView (webViewOptions())
 {
     addAndMakeVisible (webView);
+    // 縦横比は固定しない：縦長にすると画面が縦に伸びてシートが広がる（横長は左右に余白。UI 側の fit()）
     setResizable (true, true);
-    setResizeLimits (960, 585, baseWidth * 2, baseHeight * 2);
-    if (auto* c = getConstrainer())
-        c->setFixedAspectRatio ((double) baseWidth / (double) baseHeight);
+    setResizeLimits (960, 585, maxWidth, maxHeight);
     setSize (baseWidth, baseHeight);
     webView.goToURL (juce::WebBrowserComponent::getResourceProviderRoot());
 }

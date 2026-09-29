@@ -23,6 +23,8 @@ class SketchEditor : public juce::AudioProcessorEditor,
 public:
     static constexpr int baseWidth  = 1280;
     static constexpr int baseHeight = 780;
+    static constexpr int maxWidth   = baseWidth * 2;
+    static constexpr int maxHeight  = baseHeight * 3;   // 縦長にしてシートを広げられるように
 
     explicit SketchEditor (SketchProcessor&);
     ~SketchEditor() override = default;

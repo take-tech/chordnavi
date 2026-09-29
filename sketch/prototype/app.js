@@ -1483,13 +1483,19 @@ function render(){
 }
 
 /* ---------- 画面の拡大縮小（スクロールなし、ChordNavi と同じ） ---------- */
-// 画面（1280×780）をウィンドウに合わせて拡大縮小する。文字がにじまないよう、
-// 拡大率が 1 にほぼ等しいときはちょうど 1 にし、位置は整数のピクセルにそろえる（WKWebView では半端な値でぼやける）
+// 画面をウィンドウに合わせて拡大縮小する。横幅は 1280 を基準にし、ウィンドウが基準（1280×780）より縦長なら
+// 余った高さの分だけ画面を縦に伸ばす（シートが広がる）。横長なら縦に合わせて左右に余白を出す。
+// 文字がにじまないよう、拡大率が 1 にほぼ等しいときはちょうど 1 にし、位置は整数のピクセルにそろえる
+// （JUCE 版の macOS は WebView のページのズームで拡大縮小するので、ここでは倍率 1 になる）
+const BASE_W=1280, BASE_H=780;
 function fit(){
-  let s=Math.min(innerWidth/1280,innerHeight/780);
+  let s=Math.min(innerWidth/BASE_W,innerHeight/BASE_H);
   if(Math.abs(s-1)<.015)s=1;
-  const x=Math.round((innerWidth-1280*s)/2), y=Math.round((innerHeight-780*s)/2);
-  $('stage').style.transform=`translate(${x}px,${y}px) scale(${s})`;
+  const h=Math.max(BASE_H,Math.floor(innerHeight/s));
+  const x=Math.round((innerWidth-BASE_W*s)/2), y=Math.round((innerHeight-h*s)/2);
+  const st=$('stage');
+  st.style.height=h+'px';
+  st.style.transform=`translate(${Math.max(0,x)}px,${Math.max(0,y)}px) scale(${s})`;
 }
 addEventListener('resize',()=>{fit();renderSheet();});
 fit();applyTheme();rotateTo(curKey().idx,true);render();renderLive();renderFileState();

@@ -56,10 +56,9 @@ public:
         setUsingNativeTitleBar (true);
         setResizable (true, false);
 
-        // エディタと同じ縦横比・最小サイズ（ネイティブのタイトルバーは大きさに含まれない）
-        constrainer.setFixedAspectRatio ((double) SketchEditor::baseWidth / (double) SketchEditor::baseHeight);
+        // エディタと同じ最小・最大サイズ（縦横比は固定しない。ネイティブのタイトルバーは大きさに含まれない）
         constrainer.setMinimumSize (960, 585);
-        constrainer.setMaximumSize (SketchEditor::baseWidth * 2, SketchEditor::baseHeight * 2);
+        constrainer.setMaximumSize (SketchEditor::maxWidth, SketchEditor::maxHeight);
         setConstrainer (&constrainer);
 
         updateContent();
