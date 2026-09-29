@@ -373,11 +373,11 @@ function renderSheet(){
       blk.style.left=(s-b.start)/b.ticks*100+'%';blk.style.width=`calc(${(e-s)/b.ticks*100}% - 2px)`;
       const w=(e-s)/b.ticks*laneW;
       if(w<46)blk.classList.add('narrow');
-      if(first&&(p.start-b.start)%beatTicksOf(b.meter)!==0)blk.classList.add('anti');   // 拍の裏から始まるコード（食い）
+      if(first&&(p.start-b.start)%beatTicksOf(b.meter)!==0){blk.classList.add('anti');blk.dataset.sync='1';}   // 拍の裏から始まるコード（シンコペーション）
       if(sel&&sel.id===p.c.id)blk.classList.add('sel');
       if(playingId===p.c.id)blk.classList.add('playing');
       blk.append(h('span','n',first||w>30?nameOf(song,p.c,p.key):''),h('span','d',first?degOfItem(p.c):''));
-      blk.title=`${nameOf(song,p.c,p.key)}（${degOfItem(p.c)}）${fmtLen(p.end-p.start,b.meter)}　パターン：${patternById(p.pattern).name}${p.c.pattern?'（このコードだけ）':''}`;
+      blk.title=`${nameOf(song,p.c,p.key)}（${degOfItem(p.c)}）${fmtLen(p.end-p.start,b.meter)}　パターン：${patternById(p.pattern).name}${p.c.pattern?'（このコードだけ）':''}${blk.dataset.sync?'　拍の裏から（シンコペーション）':''}`;
       if(first&&p.c.pattern){const t=h('span','ptag',patternById(p.c.pattern).short);t.title='このコードだけのパターン：'+patternById(p.c.pattern).name;blk.appendChild(t);blk.classList.add('haspat');}
       if(first)blk.appendChild(Object.assign(h('div','rs rsl'),{title:'ドラッグで頭の位置を変える（前に伸ばすと前のコードを上書き）'}));
       if(e===p.end)blk.appendChild(Object.assign(h('div','rs'),{title:'ドラッグで長さを変える'}));
@@ -999,8 +999,9 @@ function layoutPrint(){
     }
   }
 }
+let usedSync=false, usedAnti=false;
 function buildPrint(){
-  const pr=$('print');pr.innerHTML='';
+  const pr=$('print');pr.innerHTML='';usedSync=false;usedAnti=false;
   pr.appendChild(h('h2','',song.title));
   pr.appendChild(h('div','meta',`Key: ${songKeyLabel()}（${song.key.mode==='major'?'メジャー':'マイナー'}）　♩=${song.bpm}　${song.meter.join('/')}`));
   const pcs=placedChords(song,tl);
@@ -1035,6 +1036,10 @@ function buildPrint(){
           box.style.left=x.frac*100+'%';
           const name=h('span','pc',nameOf(song,x.p.c,x.p.key));
           if(x.anti)name.prepend(Object.assign(h('span','pa','<'),{title:'食い（前の小節から先に鳴る）'}));
+          // シンコペーション：拍の裏から始まるコードの上に「＞」
+          const sb=barOf(x.p.start);
+          if(!x.cont&&sb&&(x.p.start-sb.start)%beatTicksOf(sb.meter)!==0){box.appendChild(Object.assign(h('span','psync','＞'),{title:'拍の裏から（シンコペーション）'}));usedSync=true;}
+          if(x.anti)usedAnti=true;
           box.appendChild(name);
           if($('prDeg').checked&&!x.cont)box.appendChild(h('span','pd',degOfItem(x.p.c)));
           cell.appendChild(box);
@@ -1045,6 +1050,13 @@ function buildPrint(){
     }
     pr.appendChild(ps);
   });
+  // 記号の説明（使っているときだけ）
+  if(usedSync||usedAnti){
+    const lg=h('div','plegend');
+    if(usedSync)lg.appendChild(h('span','','＞ 拍の裏から（シンコペーション）'));
+    if(usedAnti)lg.appendChild(h('span','','< 前の小節から先に鳴る（食い）'));
+    pr.querySelector('.meta').after(lg);
+  }
 }
 $('printBtn').onclick=()=>{buildPrint();$('printWrap').hidden=false;layoutPrint();};
 $('prDeg').onchange=()=>{buildPrint();layoutPrint();};
