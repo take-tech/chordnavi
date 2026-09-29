@@ -176,6 +176,7 @@ h1{font-size:17px;font-weight:900;letter-spacing:.02em;margin:0 6px 0 0;white-sp
 /* 下のバー（選択中のコード・範囲・カーソル） */
 .footer{border-top:1px solid var(--line);padding:6px 12px;display:flex;align-items:center;gap:6px;min-height:40px;font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden}
 .footer b{color:var(--ink);font-size:14px}
+.footer b.pos{font-variant-numeric:tabular-nums;min-width:52px}
 .footer .who{color:var(--chord)}
 .footer select{font-size:12px;padding:1px 3px}
 .footer .keys{margin-left:auto;font-size:10.5px;color:var(--faint);overflow:hidden;text-overflow:ellipsis}
@@ -235,7 +236,7 @@ kbd{font:inherit;font-size:10px;border:1px solid var(--line);border-bottom-width
 .prog-names{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));row-gap:2px;border-right:1px solid var(--ink2)}
 .prog-names .pb{display:flex;gap:1px;align-items:center;min-width:0;border-left:1px solid var(--ink2);padding:0 3px;height:16px;overflow:hidden}
 .prog-names .pb{font-size:10px}
-.prog-names .pc{font-size:1em;font-weight:700;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;letter-spacing:-.02em}
+.prog-names .pc{font-size:1em;font-weight:700;color:var(--ink2);white-space:nowrap;flex-shrink:0;letter-spacing:-.02em}   /* 縮めない：入りきらなければマスごと文字を小さくする（fitText） */
 .prog-names .pc+.pc{font-size:.95em}
 .prog-names .dash{color:var(--muted);font-weight:400;flex-shrink:0}
 .prog-names .pb{padding:0 2px}

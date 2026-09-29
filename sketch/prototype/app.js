@@ -69,10 +69,15 @@ function fmtLen(t,meter){
   const beats=whole||half?(whole?`${whole}拍`:'')+(half?(whole?'半':'半拍'):''):'';
   return (bars?`${bars}小節`:'')+beats||'0';
 }
+// 位置は DAW と同じ「小節.拍.16分」（例：9小節目の3拍目の裏 → 9.3.3）。拍は拍子の分母の音符、16分は4分音符の 1/4
+const SIXTEENTH=PPQ/4;
+function beatSub(pos,meter){
+  const bt=beatTicksOf(meter);
+  return `${Math.floor(pos/bt)+1}.${Math.floor((pos%bt)/SIXTEENTH)+1}`;
+}
 function fmtPos(gi,pos){
   const b=tl.bars[gi];if(!b)return '';
-  const bt=beatTicksOf(b.meter), k=pos/bt;
-  return `${gi+1}小節 ${Math.floor(k)+1}拍目${k%1>.01?'の裏':''}`;
+  return `${gi+1}.${beatSub(pos,b.meter)}`;
 }
 // コードの長さの上限：始まる小節の拍子で2小節
 const MAX_BARS=2;
@@ -255,7 +260,7 @@ function renderProg(){
   names.querySelectorAll('.pb').forEach(cell=>fitText(cell,7.5));
   names.title=progressionDegrees(bars);
   $('progPlay').textContent=progPreview&&player.isPlaying()?'停止':'試聴';
-  $('progIns').title=`${fmtPos(cursor.gi,0).split(' ')[0]}から${bars.length}小節を上書きで入れる（1コード＝1小節）`;
+  $('progIns').title=`カーソルのある小節（${cursor.gi+1}小節目）から${bars.length}小節を上書きで入れる（1コード＝1小節）`;
 }
 progSel.addEventListener('change',()=>{ui.prog[song.key.mode]=+progSel.value;ui.progVar=0;stopProgPreview();renderProg();persist();});
 progVar.addEventListener('change',()=>{ui.progVar=+progVar.value;stopProgPreview();renderProg();persist();});
@@ -414,7 +419,7 @@ function barCell(b,rowEnd,songEnd){
   const sec=song.sections[b.si];
   for(const m of sec.marks.filter(m=>m.bar===b.bar).sort((x,y)=>(y.meter?1:0)-(x.meter?1:0)||(x.pos||0)-(y.pos||0))){
     if(m.meter)no.appendChild(Object.assign(h('span','mark meter',m.meter.join('/')),{title:'拍子の変更（クリックで編集）'}));
-    if(m.bpm){const t=h('span','mark tempo',`♩=${m.bpm}${m.pos?' @'+(m.pos/beatTicksOf(b.meter)+1)+'拍':''}`);t.title='テンポの変更（クリックで編集）';t.dataset.pos=m.pos||0;no.appendChild(t);}
+    if(m.bpm){const t=h('span','mark tempo',`♩=${m.bpm}${m.pos?' @'+beatSub(m.pos,b.meter):''}`);t.title='テンポの変更（クリックで編集）';t.dataset.pos=m.pos||0;no.appendChild(t);}
   }
   if(b.gi===0){no.appendChild(Object.assign(h('span','mark meter',song.meter.join('/')),{title:'曲の拍子（上の「拍子」で変更）'}));no.appendChild(Object.assign(h('span','mark tempo',`♩=${song.bpm}`),{title:'曲のテンポ（上の「♩=」で変更）'}));}
   const lane=h('div','lane');
@@ -566,12 +571,12 @@ function openMarkPop(gi,pos,anchor){
   const sec=song.sections[b.si], atStart=gi===0&&pos===0;
   const tm=sec.marks.find(m=>m.bar===b.bar&&m.bpm&&(m.pos||0)===pos), mm=sec.marks.find(m=>m.bar===b.bar&&m.meter);
   pop.innerHTML='';
-  pop.appendChild(h('h4','',`${fmtPos(gi,pos)}からの変更`));
+  pop.appendChild(h('h4','',`${fmtPos(gi,pos)} からの変更`));
   const bpm=h('input','');bpm.type='number';bpm.min=MIN_BPM;bpm.max=MAX_BPM;
   bpm.value=atStart?song.bpm:tm?.bpm??'';bpm.placeholder=String(Math.round(tempoAt(tl.tempos,b.start+pos)));
   const posSel=h('select','');
   const bt=beatTicksOf(b.meter);
-  for(let t=0;t<b.ticks;t+=bt/2)posSel.appendChild(Object.assign(h('option','',`${Math.floor(t/bt)+1}拍目${t%bt?'の裏':''}`),{value:t}));
+  for(let t=0;t<b.ticks;t+=bt/2)posSel.appendChild(Object.assign(h('option','',`${gi+1}.${beatSub(t,b.meter)}`),{value:t}));
   posSel.value=pos;posSel.disabled=atStart;
   const met=h('select','');met.appendChild(Object.assign(h('option','','変更なし'),{value:''}));
   for(const m of METERS)met.appendChild(Object.assign(h('option','',m.join('/')),{value:m.join('/')}));
@@ -659,19 +664,19 @@ function renderFooter(){
     const loop=h('button','','この範囲をループ再生');loop.onclick=()=>{ui.loop=true;render();startPlay();};
     const copy=h('button','','コピー');copy.onclick=copySel;
     const clear=h('button','','コードを消す');clear.onclick=deleteSel;
-    const ins=h('button','','前に小節を挿入');ins.onclick=()=>insertBarsAtCursor(n);
-    const rm=h('button','','小節を削除');rm.onclick=()=>deleteRangeBars();
-    f.append(h('b','',rangeLabel(range)),h('span','',`（${n}小節）を選択`),loop,copy,clear,ins,rm);
+    const ins=h('button','','挿入');ins.onclick=()=>insertBarsAtCursor(n);ins.title=`選択範囲の前に${n}小節を入れる`;
+    const rm=h('button','','削除');rm.onclick=()=>deleteRangeBars();rm.title='選択範囲の小節を消す';
+    f.append(h('b','',rangeLabel(range)),h('span','',`（${n}小節）を選択`),loop,copy,clear,h('span','sep'),'小節',ins,rm);
     keys.innerHTML='<kbd>⌘C</kbd>コピー <kbd>⌘V</kbd>貼り付け <kbd>⌫</kbd>コードを消す <kbd>Esc</kbd>解除';
   }else{
     const b=tl.bars[cursor.gi];
     const markBtn=h('button','','テンポ・拍子を変更…');markBtn.onclick=()=>openMarkPop(cursor.gi,cursor.pos,markBtn);
-    const ins=h('button','','小節を挿入');ins.onclick=()=>insertBarsAtCursor(1);
-    const rm=h('button','','この小節を削除');rm.onclick=()=>{range={from:cursor.gi,to:cursor.gi+1};deleteRangeBars();};
+    const ins=h('button','','挿入');ins.onclick=()=>insertBarsAtCursor(1);ins.title='カーソルのある小節の前に1小節入れる';
+    const rm=h('button','','削除');rm.onclick=()=>{range={from:cursor.gi,to:cursor.gi+1};deleteRangeBars();};rm.title='カーソルのある小節を消す';
     const paste=h('button','','貼り付け');paste.disabled=!clip;paste.onclick=pasteSel;
-    const split=h('button','','ここでセクションを分割');split.disabled=!b||b.bar===0;split.onclick=splitAtCursor;
+    const split=h('button','','セクション分割');split.disabled=!b||b.bar===0;split.onclick=splitAtCursor;
     split.title='カーソルのある小節の頭でセクションを2つに分ける';
-    f.append('カーソル',h('b','',b?fmtPos(cursor.gi,cursor.pos):'—'),markBtn,ins,rm,split,paste);
+    f.append('カーソル',h('b','pos',b?fmtPos(cursor.gi,cursor.pos):'—'),markBtn,h('span','sep'),'小節',ins,rm,h('span','sep'),split,paste);
     keys.innerHTML='<kbd>1</kbd>〜<kbd>7</kbd>ダイアトニックを入力 <kbd>←</kbd><kbd>→</kbd>カーソル <kbd>Space</kbd>再生 <kbd>⌘A</kbd>全選択';
   }
   f.appendChild(keys);
@@ -798,7 +803,7 @@ function onPos(abs,counting){
   if(abs==null){if(lastPos!=='count'){disp.textContent='カウント';lastPos='count';}return;}
   playTick=abs;
   const b=tl.bars.find(x=>abs>=x.start&&abs<x.start+x.ticks)||tl.bars.at(-1);
-  const s=`${b.gi+1} : ${Math.floor((abs-b.start)/beatTicksOf(b.meter))+1}`;
+  const s=fmtPos(b.gi,Math.floor((abs-b.start)/SIXTEENTH)*SIXTEENTH);
   if(s!==lastPos){disp.textContent=s;lastPos=s;scrollToBar(b.gi);}
   const p=placedChords(song,tl).find(x=>abs>=x.start&&abs<x.end);
   const id=p?.c.id??null;
@@ -1022,7 +1027,7 @@ function render(){
   $('areaSeg').hidden=song.voicing!=='guitar';
   const playing=player.isPlaying(), pb=$('playBtn');
   pb.textContent=playing?'■':'▶';pb.setAttribute('aria-label',playing?'停止':'再生');pb.classList.toggle('on',playing);
-  if(!playing){$('posDisp').textContent=`${cursor.gi+1} : ${Math.floor(cursor.pos/beatTicksOf(tl.bars[cursor.gi]?.meter||song.meter))+1}`;$('posDisp').classList.remove('count');lastPos='';}
+  if(!playing){$('posDisp').textContent=fmtPos(cursor.gi,cursor.pos)||'1.1.1';$('posDisp').classList.remove('count');lastPos='';}
   $('undo').disabled=!undoStack.length;$('redo').disabled=!redoStack.length;
   keySel.value=song.key.idx+':'+song.key.mode;
   cKey.textContent=keyLabel();cSig.textContent=SIG[song.key.idx];cMode.textContent=song.key.mode==='major'?'メジャー':'マイナー';
