@@ -490,6 +490,19 @@ sheet.addEventListener('pointerdown',e=>{
   if(no&&bar){e.preventDefault();sheet.focus({preventScroll:true});startRangeDrag(e,+bar.dataset.gi,true);return;}
   if(lane&&bar){e.preventDefault();sheet.focus({preventScroll:true});startRangeDrag(e,+bar.dataset.gi,false);}
 });
+// マウスを乗せた小節に、クリックでカーソルが入る位置を薄い線で出す
+const hoverLine=h('div','hover-cursor');
+sheet.addEventListener('pointermove',e=>{
+  if(e.buttons||player.isPlaying()){hoverLine.remove();return;}
+  const lane=e.target.closest?.('.lane'), hit=lane&&hitBar(e.clientX,e.clientY);
+  if(!hit){hoverLine.remove();return;}
+  const st=snapOf(hit.b.meter), pos=Math.min(hit.b.ticks-st,Math.round(hit.tick/st)*st);
+  if(hoverLine.parentNode!==lane)lane.appendChild(hoverLine);
+  hoverLine.style.left=pos/hit.b.ticks*100+'%';
+  hoverLine.title=fmtPos(hit.b.gi,pos);
+});
+sheet.addEventListener('pointerleave',()=>hoverLine.remove());
+
 // ダブルクリックは自前で判定する（1回目のクリックでシートを描き直すため、dblclick イベントは要素に届かない）
 let lastNo={gi:-1,t:0};
 const rangeLabel=r=>r.to-r.from===1?`${r.from+1}小節`:`${r.from+1}〜${r.to}小節`;
@@ -567,8 +580,9 @@ function startBlockDrag(e,blkEl){
   const resizing=e.target.classList.contains('rs');
   const hit0=hitBar(e.clientX,e.clientY), grab=hit0?hit0.b.start+hit0.tick-p.start:0;
   const x0=e.clientX,y0=e.clientY;let moved=false,target=null;
-  sel={si,id};range=null;cursor={gi:tl.bars.find(b=>p.start>=b.start&&p.start<b.start+b.ticks).gi,pos:0};
-  cursor.pos=p.start-tl.bars[cursor.gi].start;
+  // 選ぶと同時に、クリックした位置（スナップ）にカーソルを置く
+  sel={si,id};range=null;
+  if(hit0){const st=snapOf(hit0.b.meter);cursor={gi:hit0.b.gi,pos:Math.min(hit0.b.ticks-st,Math.round(hit0.tick/st)*st)};}
   render();
   // 長さの変更：伸ばした先のコードは上書きするので、動かすたびにドラッグ前の状態からやり直す（縮め直すと戻る）
   const base=resizing?JSON.stringify(song):null, maxLen=maxLenAt(p.start);

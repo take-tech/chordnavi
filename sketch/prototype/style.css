@@ -147,13 +147,13 @@ body.grabbing,body.grabbing *{cursor:grabbing!important}
 .mark{font-size:10px;font-weight:700;border-radius:3px;padding:0 4px;line-height:14px;cursor:pointer}
 .mark.tempo{background:var(--ink2);color:var(--on-ink)}
 .mark.meter{background:var(--root);color:#fff}
-.lane{position:relative;height:42px;background:var(--card);border-top:1px solid var(--grid);border-bottom:1px solid var(--grid);cursor:crosshair}
+.lane{position:relative;height:50px;background:var(--card);border-top:1px solid var(--grid);border-bottom:1px solid var(--grid);cursor:crosshair}
 .lane .beat{position:absolute;top:0;bottom:0;width:0;border-left:1px solid var(--grid)}
 .lane .half{position:absolute;top:28px;bottom:0;width:0;border-left:1px dotted var(--grid)}
 .bar.insel .lane{background:linear-gradient(var(--sel),var(--sel)),var(--card)}
 .bar.insel .bar-no{color:var(--live);font-weight:700}
 .bar.play .bar-no{color:var(--chord);font-weight:700}
-.blk{position:absolute;top:3px;bottom:3px;border-radius:4px;background:var(--panel);border:1px solid var(--ink2);
+.blk{position:absolute;top:3px;bottom:14px;border-radius:4px;background:var(--panel);border:1px solid var(--ink2);
   padding:1px 6px 0 5px;overflow:hidden;cursor:grab;touch-action:none;min-width:6px}
 .blk .n{display:block;font-weight:700;font-size:15px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .blk .d{display:block;font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -168,6 +168,10 @@ body.grabbing,body.grabbing *{cursor:grabbing!important}
 .blk.anti::before{content:'';position:absolute;left:0;top:0;border-top:7px solid var(--root);border-right:7px solid transparent}
 .blk .rs{position:absolute;right:0;top:0;bottom:0;width:7px;cursor:ew-resize}
 .blk .rs:hover{background:rgba(196,69,106,.25)}
+.lane::after{content:'';position:absolute;left:0;right:0;bottom:0;height:11px;background:var(--grid2);border-top:1px dashed var(--grid);pointer-events:none}   /* カーソル帯：いつでもクリックでカーソル・ドラッグで範囲 */
+.lane:hover::after{background:rgba(47,111,214,.10)}
+.hover-cursor{position:absolute;top:0;bottom:0;width:0;border-left:2px solid var(--live);opacity:.35;pointer-events:none;z-index:2}
+.drop{bottom:14px!important}
 .cursor{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--live);pointer-events:none;z-index:3}
 .cursor::before{content:'';position:absolute;top:-4px;left:-4px;border:5px solid transparent;border-top-color:var(--live)}
 .playhead{position:absolute;top:0;bottom:0;width:2px;background:var(--chord);pointer-events:none;z-index:4}
