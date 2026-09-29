@@ -11,7 +11,8 @@
 
 ```
 sketch/prototype/
-  index.html / style.css   … 画面。色の変数は ChordNavi と同じ名前・値
+  index.html / style.css   … 画面。色の変数は ChordNavi と同じ名前（値はダークの文字色だけ ChordSketch で落としている：
+                             文字が多いので本文 --ink を #C9CEDA・--ink2 を #A4ADC5 に。押されているボタンは --pressed-bg/-fg で、ダークでは白くしない）
   song.js                  … 曲データと MIDI 生成の純粋関数（UI を置かない）
   player.js                … ブラウザでの試聴（WebAudio：音色・ドラム・先読みスケジューラ）。プラグインでは C++ に置き換える
   app.js                   … UI（五度圏・パレット・シート・操作・印刷・保存・MIDI 入力）

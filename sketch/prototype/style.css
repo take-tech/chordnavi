@@ -5,14 +5,18 @@
   --page:#D5D9E2; --card:#fff; --on-ink:#fff; --faint:#9AA2B8; --faint2:#B5BCCD;
   --chord-tint:#F6D6DF; --wheel-outer:#1E2742; --wheel-inner:#39456B;
   --grid:#E3E7EF; --grid2:#EEF1F6; --sel:rgba(47,111,214,.12); --live:#2F6FD6; --pick:#6B4FBB;
+  --pressed-bg:var(--ink); --pressed-fg:var(--on-ink);   /* 押されているボタン */
 }
 [data-theme=dark]{
   color-scheme:dark;
-  --bg:#161A25; --panel:#1F2433; --ink:#E6E9F2; --ink2:#B7C0DA; --muted:#8D96B0; --line:#39415A;
+  /* 文字の多い画面なので、本文は真っ白にせず一段落とす（背景とのコントラスト比 8〜11） */
+  --bg:#161A25; --panel:#1F2433; --ink:#C9CEDA; --ink2:#A4ADC5; --muted:#8D96B0; --line:#39415A;
   --page:#0E1118; --card:#283044; --on-ink:#161A25; --faint:#5F6780; --faint2:#4E556B;
   --chord-tint:#4E2536; --wheel-outer:#2B3558; --wheel-inner:#3B4772;
   --grid:#2C3346; --grid2:#252B3B; --sel:rgba(90,150,255,.16);
+  --pressed-bg:#46527A; --pressed-fg:#D3D8E3;   /* 押されているボタンを白く光らせない */
 }
+[data-theme=dark] #wheel text{fill:#D8DCE6}   /* 五度圏の白い文字も少し落とす（中央のキー名は --ink） */
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;overflow:hidden;background:var(--page)}
 body{color:var(--ink);font-family:"Hiragino Sans","Yu Gothic UI","Noto Sans JP",sans-serif;font-size:13px;line-height:1.45;
@@ -29,7 +33,7 @@ button:disabled{opacity:.4;cursor:default}
 select,input[type=number],input[type=text],.title{background:var(--card);border:1px solid var(--line);border-radius:4px;padding:3px 6px;font-size:12px}
 input[type=number]{width:58px}
 button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid var(--root);outline-offset:1px}
-.tg[aria-pressed=true],.seg button[aria-pressed=true]{background:var(--ink);border-color:var(--ink);color:var(--on-ink)}
+.tg[aria-pressed=true],.seg button[aria-pressed=true]{background:var(--pressed-bg);border-color:var(--pressed-bg);color:var(--pressed-fg)}
 .seg{display:inline-flex;border:1px solid var(--line);border-radius:4px;overflow:hidden}
 .seg button{border:0;border-radius:0;padding:2px 10px}
 .seg button+button{border-left:1px solid var(--line)}
@@ -45,7 +49,7 @@ button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid 
 h1{font-size:17px;font-weight:900;letter-spacing:.02em;margin:0 6px 0 0;white-space:nowrap}
 .title{width:170px;font-size:14px;font-weight:700}
 .transport{display:flex;align-items:center;gap:4px;margin:0 4px}
-.play{min-width:40px;font-size:14px;font-weight:700;background:var(--ink);color:var(--on-ink);border-color:var(--ink)}
+.play{min-width:40px;font-size:14px;font-weight:700;background:var(--pressed-bg);color:var(--pressed-fg);border-color:var(--pressed-bg)}
 #muteBtn{min-width:30px;font-weight:900}
 #muteBtn[aria-pressed=true]{background:#C4456A;border-color:#C4456A;color:#fff}
 .play.on{background:var(--chord);border-color:var(--chord)}
