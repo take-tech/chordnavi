@@ -608,6 +608,7 @@ addEventListener('keydown',e=>{
   if(mod&&k==='d'){e.preventDefault();duplicateSel();return;}
   if(mod)return;
   if(e.key===' '){e.preventDefault();togglePlay();return;}
+  if(k==='m'){e.preventDefault();toggleMute();return;}
   if(e.key==='Escape'&&!$('printWrap').hidden){$('printWrap').hidden=true;return;}
   if(!$('printWrap').hidden)return;
   if(e.key==='Escape'){sel=null;range=null;pop.hidden=true;render();return;}
@@ -840,6 +841,10 @@ $('metro').addEventListener('change',e=>{uiSet('metro',e.target.value);player.re
 $('timbre').addEventListener('change',e=>{uiSet('timbre',e.target.value);player.refresh();});
 $('insLen').addEventListener('change',e=>uiSet('insLen',e.target.value));
 $('countIn').onclick=()=>uiSet('countIn',!ui.countIn);
+// ミュートは保存しない（開き直すと音が出る状態に戻る）
+let muted=false;
+function toggleMute(){muted=!muted;player.setMuted(muted);$('muteBtn').setAttribute('aria-pressed',muted);}
+$('muteBtn').onclick=toggleMute;
 $('loopBtn').onclick=()=>uiSet('loop',!ui.loop);
 $('stepBtn').onclick=()=>{uiSet('step',!ui.step);renderLive();};
 $('keepNames').onclick=()=>uiSet('keepNames',!ui.keepNames);

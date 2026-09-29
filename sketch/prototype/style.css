@@ -41,11 +41,12 @@ button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid 
 .sep{width:1px;align-self:stretch;background:var(--line);margin:0 2px}
 
 /* ---------- 上部 ---------- */
-.top{grid-column:1/-1;display:flex;align-items:center;gap:6px;padding:0 12px}
-h1{font-size:19px;font-weight:900;letter-spacing:.02em;margin:0 6px 0 0;white-space:nowrap}
+.top{grid-column:1/-1;display:flex;align-items:center;gap:5px;padding:0 10px}
+h1{font-size:17px;font-weight:900;letter-spacing:.02em;margin:0 6px 0 0;white-space:nowrap}
 .title{width:170px;font-size:14px;font-weight:700}
 .transport{display:flex;align-items:center;gap:4px;margin:0 4px}
 .play{min-width:74px;font-weight:700;background:var(--ink);color:var(--on-ink);border-color:var(--ink)}
+#muteBtn[aria-pressed=true]{background:#C4456A;border-color:#C4456A;color:#fff}
 .play.on{background:var(--chord);border-color:var(--chord)}
 .pos{font-variant-numeric:tabular-nums;font-size:15px;font-weight:700;min-width:62px;text-align:center;color:var(--ink2)}
 .pos.count{color:var(--chord)}
@@ -94,7 +95,7 @@ h1{font-size:19px;font-weight:900;letter-spacing:.02em;margin:0 6px 0 0;white-sp
 .lbl.strong{font-weight:700;color:var(--ink2)}
 #metro{width:120px}
 #outInfo{flex-shrink:1;min-width:0;overflow:hidden;text-overflow:ellipsis;font-size:11px}
-.title{width:120px!important}
+.title{width:100px!important}
 .timbre{margin-top:4px}
 .timbre select{flex:1}
 .oct{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:4px;overflow:hidden;background:var(--card)}

@@ -9,12 +9,13 @@ export const METRONOMES=[
   {id:'off',name:'メトロノームなし'},{id:'click',name:'♪ クリック'},{id:'8beat',name:'♪ 8ビート'},{id:'16beat',name:'♪ 16ビート'},{id:'shuffle',name:'♪ シャッフル'}
 ];
 
-let ac=null, master=null, noise=null;
+let ac=null, master=null, noise=null, muted=false;
+const LEVEL=.8;
 function ctx(){
   if(ac)return ac;
   ac=new (window.AudioContext||window.webkitAudioContext)();
   const comp=ac.createDynamicsCompressor();comp.threshold.value=-10;comp.ratio.value=4;
-  master=ac.createGain();master.gain.value=.8;master.connect(comp).connect(ac.destination);
+  master=ac.createGain();master.gain.value=muted?0:LEVEL;master.connect(comp).connect(ac.destination);
   noise=ac.createBuffer(1,ac.sampleRate,ac.sampleRate);
   const d=noise.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;
   return ac;
@@ -179,6 +180,12 @@ export function stop(){
   const bus=run.bus, t=ac.currentTime;
   bus.gain.setTargetAtTime(0,t,.01);setTimeout(()=>bus.disconnect(),200);
   run=null;
+}
+
+// ミュート：出力をすべて無音にする（試聴・メトロノーム・MIDI 鍵盤。再生と表示は進んだまま）
+export function setMuted(on){
+  muted=!!on;
+  if(master)master.gain.setTargetAtTime(muted?0:LEVEL,ac.currentTime,.01);
 }
 
 /* ---------- 単発（コードのクリック、MIDI 鍵盤） ---------- */

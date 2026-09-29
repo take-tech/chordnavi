@@ -21,6 +21,7 @@
     <label class="fld" title="1小節目の拍子">拍子 <select id="meter"></select></label>
     <select id="metro" title="メトロノーム（試聴のみ）"></select>
     <button id="countIn" class="tg" aria-pressed="false" title="再生の前に1小節クリック">カウント</button>
+    <button id="muteBtn" class="tg" aria-pressed="false" title="ChordSketch の音をすべて消す（表示は動いたまま。M キー）">ミュート</button>
     <span class="spacer"></span>
     <button id="undo" class="ic" title="元に戻す（⌘Z）">↶</button><button id="redo" class="ic" title="やり直し（⇧⌘Z）">↷</button>
     <div class="menu">
@@ -30,7 +31,7 @@
         <button data-act="open">開く…</button><button data-act="save">保存（.chordsketch）</button>
       </div>
     </div>
-    <button id="printBtn" title="コード譜を印刷／PDF に保存">コード譜 PDF</button>
+    <button id="printBtn" title="コード譜のプレビュー（印刷／PDF に保存）">コード譜</button>
     <button id="themeBtn" class="ic" title="テーマ（ライト→ダーク→自動）"></button>
     <input id="fileInput" type="file" accept=".chordsketch,.json" hidden>
   </header>
