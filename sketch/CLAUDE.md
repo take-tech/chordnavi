@@ -114,7 +114,7 @@ sketch/prototype/
 
 1. ~~共通部品の切り出し~~（済み・2026-09-29）：`shared/ui/`（theory・guitar・wheel・juce-bridge）と `shared/cpp/`（MidiExport・PreviewSynth・PluginState・WebResources。INTERFACE ライブラリ RanzeShared）。ChordNavi は画面（五度圏の SVG・文字）が切り出し前と一致、テスト 39 件（配信のテスト4件を追加）、Standalone・VST3・AU のビルドを確認。Debug ビルドの Standalone を起動して、表示・五度圏・試聴が動くことを確認（ユーザー確認）。MIDI ドラッグの JS・テーマは製品ごとに違うので、2〜3 で ChordSketch 用を作るときに共通化を見直す
 2. ~~CMake に ChordSketch のターゲットを追加~~（済み・2026-09-29）：Standalone のみ、プロトタイプの UI を埋め込んで表示。ChordNavi のビルド・テストは変わらないことを確認
-3. MIDI の書き出しをネイティブにつなぐ：SMF は JS（song.js の `buildSmf`。テスト済み）で作り、そのバイト列を C++ に渡す。C++ は一時ファイルに書いて外部ドラッグ（`performExternalDragDropOfFiles`）と、保存ダイアログで書くだけ（SMF を作る処理を 2 か所に持たない。当初の「MidiExport をノート列を受ける形に広げる」から変更）
+3. MIDI の書き出しをネイティブにつなぐ：SMF は JS（song.js の `buildSmf`。テスト済み）で作り、そのバイト列を C++ に渡す。C++ は一時ファイルに書いて外部ドラッグ（`performExternalDragDropOfFiles`）と、保存ダイアログで書くだけ（SMF を作る処理を 2 か所に持たない。当初の「MidiExport をノート列を受ける形に広げる」から変更）。（済み・2026-09-29）Standalone で Finder・DAW へのドラッグと MIDI 保存を確認（ユーザー確認）
 4. 試聴：C++ のシンセに曲全体を予約し、再生位置を C++ の時計で UI へ返す。ドラム音も C++ に
 5. MIDI 入力（C++ の `midiNotes`）、状態の保存（曲データの JSON）、Standalone のファイルを開く／保存（ネイティブのダイアログ）
 6. PDF：WebView で `print()` が使えるか確認する。使えなければ C++ 側で PDF を作る（要相談）
