@@ -4,7 +4,7 @@ import {MAJ_LABEL,MIN_LABEL,SIG,WHEEL_CELLS,DIATONIC,CHORD,chordDeg,chordAt,chor
 import {PPQ,METERS,SNAPS,snapTicks,barTicksOf,beatTicksOf,SECTION_COLORS,SECTION_PRESETS,PATTERNS,MIN_BPM,MAX_BPM,
   newSong,demoSong,newSection,newChord,cloneSection,timeline,placedChords,placeChord,removeChord,resizeChord,
   setSectionBars,insertBars,appendSectionFrom,stretchChord,stretchChordStart,pruneMarks,mergeSections,splitSection,insertProgression,setMark,rangeTicks,copyRange,pasteAt,renderSong,buildSmf,safeFileName,
-  songTonic,songFlat,nameOf,tempoAt,SKETCH_SCALES,keyScale,defaultScale,meterAt,tickToSec,withExtension,keyTonic,sameKey,setKeyMark,keyRegion,transposeBars,voicingOf,patternById,VOICINGS,GUITAR_AREAS} from './song.js';
+  songTonic,songFlat,nameOf,tempoAt,NEW_TITLE,SKETCH_SCALES,keyScale,defaultScale,meterAt,tickToSec,withExtension,keyTonic,sameKey,setKeyMark,keyRegion,transposeBars,voicingOf,patternById,VOICINGS,GUITAR_AREAS} from './song.js';
 import * as player from './player.js';
 
 /* ---------- 状態 ---------- */
@@ -1246,8 +1246,8 @@ function switchTab(i){
   player.stop();progPreview=false;playTick=null;playingId=null;
   stashDoc();loadDoc(i);persist();
 }
-// 何も入力していない「新しい曲」のタブ（ここに開くならタブを増やさない）
-const pristine=()=>!dirty&&!songFile&&song.title==='新しい曲'&&song.sections.every(s=>!s.chords.length);
+// 何も入力していない新規の曲のタブ（ここに開くならタブを増やさない）
+const pristine=()=>!dirty&&!songFile&&song.title===NEW_TITLE&&song.sections.every(s=>!s.chords.length);
 function openInTab(s,name='',handle=null){
   player.stop();progPreview=false;playTick=null;playingId=null;
   if(!TABS||!pristine()){if(TABS){stashDoc();docs.push({});active=docs.length-1;}}

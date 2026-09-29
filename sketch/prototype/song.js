@@ -24,8 +24,10 @@ export const newSection=(name='Aメロ',color=1,bars=8)=>({id:uid(),name,color,b
 export const newChord=(bar,pos,len,off,q,boff)=>({id:uid(),bar,pos,len,off,q,...(boff!=null?{boff}:{})});
 export const cloneSection=s=>({...structuredClone(s),id:uid(),chords:s.chords.map(c=>({...c,id:uid()}))});
 
+// 新規で作る曲の名前
+export const NEW_TITLE='newsong';
 export function newSong(){
-  return {v:1,title:'新しい曲',key:{idx:0,mode:'major'},bpm:120,meter:[4,4],
+  return {v:1,title:NEW_TITLE,key:{idx:0,mode:'major'},bpm:120,meter:[4,4],
     pattern:'whole',voicing:'piano',guitarArea:'low',octave:0,bassOctave:0,bass:true,sections:[newSection('Aメロ',1,8)]};
 }
 
