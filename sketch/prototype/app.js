@@ -3,7 +3,7 @@ import {MAJ_LABEL,MIN_LABEL,SIG,WHEEL_CELLS,DIATONIC,CHORD,chordDeg,chordAt,chor
 import {PPQ,METERS,SNAPS,snapTicks,barTicksOf,beatTicksOf,SECTION_COLORS,SECTION_PRESETS,PATTERNS,MIN_BPM,MAX_BPM,
   newSong,demoSong,newSection,newChord,cloneSection,timeline,placedChords,placeChord,removeChord,resizeChord,
   setSectionBars,insertBars,stretchChord,insertProgression,setMark,rangeTicks,copyRange,pasteAt,renderSong,buildSmf,safeFileName,
-  songTonic,songFlat,nameOf,tempoAt,voicingOf} from './song.js';
+  songTonic,songFlat,nameOf,tempoAt,voicingOf,patternById} from './song.js';
 import * as player from './player.js';
 
 /* ---------- 状態 ---------- */
@@ -338,7 +338,8 @@ function renderSheet(){
       if(sel&&sel.id===p.c.id)blk.classList.add('sel');
       if(playingId===p.c.id)blk.classList.add('playing');
       blk.append(h('span','n',first?nameOf(song,p.c):w>30?nameOf(song,p.c):''),h('span','d',first?degOfItem(p.c):''));
-      blk.title=`${nameOf(song,p.c)}（${degOfItem(p.c)}）${fmtLen(p.end-p.start,b.meter)}`;
+      blk.title=`${nameOf(song,p.c)}（${degOfItem(p.c)}）${fmtLen(p.end-p.start,b.meter)}　パターン：${patternById(p.pattern).name}${p.c.pattern?'（このコードだけ）':''}`;
+      if(first&&p.c.pattern){const t=h('span','ptag',patternById(p.c.pattern).short);t.title='このコードだけのパターン：'+patternById(p.c.pattern).name;blk.appendChild(t);blk.classList.add('haspat');}
       if(e===p.end)blk.appendChild(h('div','rs'));
       lane.appendChild(blk);
       first=false;
@@ -601,8 +602,15 @@ function renderFooter(){
     minus.disabled=p.end-p.start<=st;plus.disabled=p.end-p.start>=max;
     const dup=h('button','','複製');dup.onclick=duplicateSel;
     const del=h('button','','削除');del.onclick=deleteSel;
+    // このコードだけのパターン（空＝セクション（なければ曲）と同じ）
+    const secPat=song.sections[sel.si].pattern||song.pattern;
+    const pat=h('select','blk-pat'+(c.pattern?' over':''));pat.title='このコードだけの MIDI パターン';
+    pat.appendChild(Object.assign(h('option','',`セクションと同じ（${patternById(secPat).short}）`),{value:''}));
+    for(const x of PATTERNS)pat.appendChild(Object.assign(h('option','',x.name),{value:x.id}));
+    pat.value=c.pattern||'';
+    pat.onchange=()=>edit(cc=>{if(pat.value)cc.pattern=pat.value;else delete cc.pattern;});
     f.append(h('b','who',nameOf(song,c)),h('span','',degOfItem(c)),h('span','sep'),'ルート',root,'種類',q,'ベース',bass,h('span','sep'),
-      '長さ',minus,h('b','',fmtLen(p.end-p.start,b.meter)),plus,h('span','',fmtPos(b.gi,p.start-b.start)),dup,del);
+      '長さ',minus,h('b','',fmtLen(p.end-p.start,b.meter)),plus,h('span','sep'),'パターン',pat,dup,del);
     keys.innerHTML='<kbd>←</kbd><kbd>→</kbd>移動 <kbd>⇧</kbd>+<kbd>←</kbd><kbd>→</kbd>長さ <kbd>↑</kbd><kbd>↓</kbd>半音 <kbd>⌫</kbd>削除 <kbd>Alt</kbd>+ドラッグでコピー';
   }else if(range){
     const n=range.to-range.from;
@@ -636,12 +644,12 @@ function duplicateSel(){
   const p=sel&&placedChords(song,tl).find(x=>x.c.id===sel.id);if(!p)return;
   const b=tl.bars.find(x=>p.end>=x.start&&p.end<x.start+x.ticks);
   if(!b||b.si!==p.si)return;
-  let placed;commit(()=>{placed=placeChord(song,b.si,newChord(b.bar,p.end-b.start,p.end-p.start,p.c.off,p.c.q,p.c.boff));});
+  let placed;commit(()=>{placed=placeChord(song,b.si,{...newChord(b.bar,p.end-b.start,p.end-p.start,p.c.off,p.c.q,p.c.boff),...(p.c.pattern?{pattern:p.c.pattern}:{})});});
   if(placed){sel={si:b.si,id:placed.id};render();}
 }
 function copySel(){
   if(range)clip=copyRange(song,range);
-  else if(sel){const p=placedChords(song,tl).find(x=>x.c.id===sel.id);if(p)clip={len:p.end-p.start,chords:[{at:0,len:p.end-p.start,off:p.c.off,q:p.c.q,boff:p.c.boff}]};}
+  else if(sel){const p=placedChords(song,tl).find(x=>x.c.id===sel.id);if(p)clip={len:p.end-p.start,chords:[{at:0,len:p.end-p.start,off:p.c.off,q:p.c.q,boff:p.c.boff,pattern:p.c.pattern}]};}
   render();
 }
 function pasteSel(){

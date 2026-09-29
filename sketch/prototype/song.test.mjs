@@ -111,5 +111,17 @@ test('定番進行を入れる：上書き・2コードの小節・足りない�
   assert.deepEqual(r,{from:2,to:5});assert.equal(s.sections[0].bars,5);
   assert.deepEqual(placedChords(s).map(x=>[x.start/PPQ,nameOf(s,x.c)]),[[8,'FM7'],[12,'Dm7'],[14,'G7'],[16,'C']]);
 });
+test('コードごとのパターン：コード → セクション → 曲の順',()=>{
+  const s=newSong();s.pattern='whole';s.sections=[newSection('A',1,2)];
+  placeChord(s,0,newChord(0,0,B,0,''));placeChord(s,0,{...newChord(1,0,B,7,''),pattern:'quarter'});
+  assert.deepEqual(placedChords(s).map(x=>x.pattern),['whole','quarter']);
+  s.sections[0].pattern='eighth';
+  assert.deepEqual(placedChords(s).map(x=>x.pattern),['eighth','quarter']);
+  const hitsIn=(a,b)=>new Set(renderSong(s).notes.filter(n=>n.t>=a&&n.t<b).map(n=>n.t)).size;
+  assert.equal(hitsIn(0,B),8);assert.equal(hitsIn(B,B*2),4);
+  // コピー＆貼り付けでもパターンを保つ
+  pasteAt(s,0,copyRange(s,{from:1,to:2}));
+  assert.equal(placedChords(s)[0].pattern,'quarter');
+});
 test('ファイル名',()=>{assert.equal(safeFileName('サビ F♯m7 B♭'),'F#m7_Bb');});
 console.log(`${n} tests passed`);
