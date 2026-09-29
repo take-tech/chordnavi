@@ -20,7 +20,7 @@
 - MIDI 鍵盤（JUCE 版）：C++ が鳴らし（サステインペダル対応）、押している鍵盤（ペダルで伸ばしている音は含めない）を 30Hz の `midiNotes` で送る。コード判別・ステップ入力は JS（ブラウザは Web MIDI）。
 - 曲ファイル（JUCE 版）：`songOpen()` → `{path,name,text}`、`songSaveAs({name,text,path})` → `{path,name}`（どちらもネイティブのダイアログ。拡張子 .chordsketch が無ければ付ける。取り消しは "cancelled"）、`songWrite({path,text})`（上書き保存）。書き込みは一時ファイルに書いてから置き換える。JS の `fileHandle` はブラウザではファイルのハンドル、JUCE 版はパスの文字列。同じパスのファイルを開いたらそのタブに切り替える。
 - 自動保存（JUCE 版）：開いているタブ全部（曲・ファイル名・パス・未保存の印）と画面の設定を `loadSession()`／`saveSession(json)` で `~/Library/Application Support/ChordSketch/session.json`（Windows は AppData の `ChordSketch/session.json`）に。ブラウザは localStorage。session.json が無いときは WebView の localStorage を読む（前の版からの引き継ぎ）。パスを覚えているので、起動し直しても上書き保存できる。
-- JUCE の WebView（macOS）は `alert()`・`confirm()` を出せないので使わない：確認は画面の中のダイアログ（`askDialog`）、知らせはトースト。
+- JUCE の WebView（macOS）は `alert()`・`confirm()`・`print()` を扱わないので使わない（印刷は `printPage`）：確認は画面の中のダイアログ（`askDialog`）、知らせはトースト。
 - ビルド：`cmake --build build --target ChordSketch_Standalone`。`build/ChordSketch_artefacts/<構成>/Standalone/ChordSketch.app`。配布用のスクリプト・CI はまだ ChordNavi だけ。
 
 ## ファイル
@@ -121,7 +121,7 @@ sketch/prototype/
 2. ~~CMake に ChordSketch のターゲットを追加~~（済み・2026-09-29）：Standalone のみ、プロトタイプの UI を埋め込んで表示。ChordNavi のビルド・テストは変わらないことを確認
 3. MIDI の書き出しをネイティブにつなぐ：SMF は JS（song.js の `buildSmf`。テスト済み）で作り、そのバイト列を C++ に渡す。C++ は一時ファイルに書いて外部ドラッグ（`performExternalDragDropOfFiles`）と、保存ダイアログで書くだけ（SMF を作る処理を 2 か所に持たない。当初の「MidiExport をノート列を受ける形に広げる」から変更）。（済み・2026-09-29）Standalone で Finder・DAW へのドラッグと MIDI 保存を確認（ユーザー確認）
 4. ~~試聴~~（済み・2026-09-29）：C++ のシンセに曲全体を予約し、再生位置を C++ の時計で UI へ返す。ドラム音も C++ に。Standalone で再生・ループ・カウントイン・メトロノーム・再生中の変更・試聴・ミュート・出力先・MIDI 鍵盤を確認（ユーザー確認）
-5. MIDI 入力（C++ の `midiNotes`）、状態の保存（曲データの JSON）、Standalone のファイルを開く／保存（ネイティブのダイアログ）。MIDI 入力は済み（2026-09-29、ユーザー確認）。ファイル・自動保存は実装済み・ユーザーの確認待ち
-6. PDF：WebView で `print()` が使えるか確認する。使えなければ C++ 側で PDF を作る（要相談）
+5. ~~MIDI 入力・状態の保存・ファイル~~（済み・2026-09-29）：MIDI 入力（C++ の `midiNotes`）、自動保存（session.json）、Standalone のファイルを開く／保存（ネイティブのダイアログ）。Standalone で確認（ユーザー確認）
+6. ~~PDF~~（済み・2026-09-29）：WKWebView は JS の `print()` を扱わないので、`printPage({title})` で C++ から macOS の印刷画面を出す（`shared/cpp/WebViewPrint.mm`。`@media print` の見た目、余白は上下 14mm・左右 12mm。PDF は印刷画面の「PDF として保存」）。印刷画面・PDF を確認（ユーザー確認）。Windows は 7 で WebView2 の印刷画面を足す
 7. Windows のビルド・配布（CI・インストーラー）と、DAW へのドラッグの確認（DAW によってはドラッグした MIDI のテンポ・拍子を読まない。ノートの位置は tick なのでずれない）。macOS の配布用パッケージ
 8. （PC 版のあと）iPad 版：指で操作しやすい画面、DAW との受け渡し（AUv3 にするか、ファイル・共有メニューか）、App Store での配布
