@@ -18,7 +18,8 @@ public:
 // ChordSketch の画面：sketch/prototype の UI を WebView で表示する。
 // ネイティブ関数（MIDI ドラッグ・保存・試聴など）は JUCE 化の 3 以降で足す
 class SketchEditor : public juce::AudioProcessorEditor,
-                     public juce::DragAndDropContainer
+                     public juce::DragAndDropContainer,
+                     private juce::Timer
 {
 public:
     static constexpr int baseWidth  = 1280;
@@ -48,6 +49,14 @@ private:
                         juce::WebBrowserComponent::NativeFunctionCompletion completion);
 
     std::unique_ptr<juce::FileChooser> fileChooser;
+
+    // 試聴（JS の player.js から）：
+    //   songPlay({ notes:[開始秒, 長さ秒, 音, 強さ0〜1, …], drums:[開始秒, 種類, …], length, leadIn, loop, timbre, session })
+    //   songUpdate({ …同じ（leadIn は使わない）})・songStop()・previewNotes({ notes, dur, timbre })・setMute(bool)・setTimbre(name)
+    // 再生位置は "songPos" { session, seconds, playing }、押している鍵盤は "midiNotes" { notes } で 30Hz で JS に送る
+    void timerCallback() override;
+    SongPlayer::Position lastSentPosition { -2, 0.0, false };
+    std::vector<int> lastSentNotes;
 
     SketchProcessor& processorRef;
     SketchWebView webView;

@@ -26,6 +26,38 @@ namespace
         return out;
     }
 
+    PreviewSynth::Timbre timbreFromName (const juce::String& name)
+    {
+        if (name == "piano")         return PreviewSynth::Timbre::piano;
+        if (name == "electricPiano") return PreviewSynth::Timbre::electricPiano;
+        if (name == "guitar")        return PreviewSynth::Timbre::guitar;
+        if (name == "organ")         return PreviewSynth::Timbre::organ;
+        if (name == "pad")           return PreviewSynth::Timbre::pad;
+        return PreviewSynth::Timbre::triangle;
+    }
+
+    // JS の予定表（数を平らに並べた配列）→ SongPlayer::Song
+    SongPlayer::Song parseSong (const juce::var& o)
+    {
+        SongPlayer::Song song;
+        if (auto* n = o.getProperty ("notes", {}).getArray())
+            for (int i = 0; i + 3 < n->size(); i += 4)
+                song.notes.push_back ({ juce::jmax (0.0, (double) (*n)[i]), juce::jlimit (0.001, 600.0, (double) (*n)[i + 1]),
+                                        juce::jlimit (0, 127, (int) (*n)[i + 2]), juce::jlimit (0.0f, 1.0f, (float) (double) (*n)[i + 3]) });
+        if (auto* d = o.getProperty ("drums", {}).getArray())
+            for (int i = 0; i + 1 < d->size(); i += 2)
+                song.drums.push_back ({ (double) (*d)[i], (SongPlayer::Drum) juce::jlimit (0, 5, (int) (*d)[i + 1]) });
+        const auto byStart = [] (const auto& a, const auto& b) { return a.start < b.start; };
+        std::stable_sort (song.notes.begin(), song.notes.end(), byStart);
+        std::stable_sort (song.drums.begin(), song.drums.end(), byStart);
+        song.length  = juce::jlimit (0.0, 36000.0, (double) o.getProperty ("length", 0.0));
+        song.leadIn  = juce::jlimit (0.0, 30.0, (double) o.getProperty ("leadIn", 0.0));
+        song.loop    = (bool) o.getProperty ("loop", false);
+        song.timbre  = timbreFromName (o.getProperty ("timbre", "piano").toString());
+        song.session = (int) o.getProperty ("session", -1);
+        return song;
+    }
+
     // SMF のヘッダ（MThd）で始まるか
     bool looksLikeMidi (const juce::MemoryBlock& data)
     {
@@ -57,6 +89,43 @@ juce::WebBrowserComponent::Options SketchEditor::makeOptions()
         .withNativeFunction ("saveMidiBytes", [this] (const auto& args, auto completion)
                              {
                                  saveMidiBytes (args, std::move (completion));
+                             })
+        .withNativeFunction ("songPlay", [this] (const auto& args, auto completion)
+                             {
+                                 if (! args.isEmpty()) processorRef.getSongPlayer().play (parseSong (args[0]));
+                                 completion (juce::var (true));
+                             })
+        .withNativeFunction ("songUpdate", [this] (const auto& args, auto completion)
+                             {
+                                 if (! args.isEmpty()) processorRef.getSongPlayer().update (parseSong (args[0]));
+                                 completion (juce::var (true));
+                             })
+        .withNativeFunction ("songStop", [this] (const auto&, auto completion)
+                             {
+                                 processorRef.getSongPlayer().stop();
+                                 completion (juce::var (true));
+                             })
+        .withNativeFunction ("previewNotes", [this] (const auto& args, auto completion)
+                             {
+                                 // パレットのコードのクリックなど：単発で鳴らす（曲の試聴は止めない）
+                                 std::vector<int> notes;
+                                 if (! args.isEmpty())
+                                     if (auto* a = args[0].getProperty ("notes", {}).getArray())
+                                         for (const auto& v : *a) notes.push_back (juce::jlimit (0, 127, (int) v));
+                                 const auto dur = args.isEmpty() ? 1.1 : juce::jlimit (0.05, 10.0, (double) args[0].getProperty ("dur", 1.1));
+                                 const auto timbre = timbreFromName (args.isEmpty() ? juce::String() : args[0].getProperty ("timbre", "piano").toString());
+                                 completion (juce::var (! notes.empty() && processorRef.getSynth().queue (notes, 0.0, dur, timbre, false)));
+                             })
+        .withNativeFunction ("setMute", [this] (const auto& args, auto completion)
+                             {
+                                 processorRef.setMuted (! args.isEmpty() && (bool) args[0]);
+                                 completion (juce::var (true));
+                             })
+        .withNativeFunction ("setTimbre", [this] (const auto& args, auto completion)
+                             {
+                                 // MIDI 鍵盤で弾く音の音色
+                                 if (! args.isEmpty()) processorRef.setLiveTimbre (timbreFromName (args[0].toString()));
+                                 completion (juce::var (true));
                              });
 }
 
@@ -69,6 +138,33 @@ SketchEditor::SketchEditor (SketchProcessor& p)
     setResizeLimits (960, 585, maxWidth, maxHeight);
     setSize (baseWidth, baseHeight);
     webView.goToURL (juce::WebBrowserComponent::getResourceProviderRoot());
+    startTimerHz (30);   // 再生位置と押している鍵盤
+}
+
+void SketchEditor::timerCallback()
+{
+    const auto p = processorRef.getSongPlayer().getPosition();
+    if (p.session != lastSentPosition.session || p.playing != lastSentPosition.playing
+        || std::abs (p.seconds - lastSentPosition.seconds) > 1.0e-4)
+    {
+        lastSentPosition = p;
+        auto* o = new juce::DynamicObject();
+        o->setProperty ("session", p.session);
+        o->setProperty ("seconds", p.seconds);
+        o->setProperty ("playing", p.playing);
+        webView.emitEventIfBrowserIsVisible ("songPos", juce::var (o));
+    }
+
+    const auto notes = processorRef.getHeldNotes();
+    if (notes != lastSentNotes)
+    {
+        lastSentNotes = notes;
+        juce::Array<juce::var> list;
+        for (auto n : notes) list.add (n);
+        auto* o = new juce::DynamicObject();
+        o->setProperty ("notes", list);
+        webView.emitEventIfBrowserIsVisible ("midiNotes", juce::var (o));
+    }
 }
 
 void SketchEditor::resized()

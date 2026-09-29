@@ -7,7 +7,7 @@ import {PPQ,METERS,SNAPS,snapTicks,barTicksOf,beatTicksOf,SECTION_COLORS,SECTION
   setSectionBars,insertBars,appendSectionFrom,stretchChord,stretchChordStart,pruneMarks,mergeSections,splitSection,insertProgression,setMark,rangeTicks,copyRange,pasteAt,renderSong,buildSmf,safeFileName,
   songTonic,songFlat,nameOf,tempoAt,PATTERN_GROUPS,NEW_TITLE,SKETCH_SCALES,keyScale,defaultScale,meterAt,tickToSec,withExtension,keyTonic,sameKey,setKeyMark,keyRegion,transposeBars,voicingOf,patternById,VOICINGS,GUITAR_AREAS} from './song.js';
 import * as player from './player.js';
-import {hasNative,nativeFn} from '../../shared/ui/juce-bridge.js';
+import {hasNative,nativeFn,onNative} from '../../shared/ui/juce-bridge.js';
 
 /* ---------- 状態 ---------- */
 const STORE='chordsketch.v1';
@@ -1367,10 +1367,30 @@ $('prClose').onclick=()=>{$('printWrap').hidden=true;};
 // PDF のファイル名は document.title になる
 $('prGo').onclick=()=>{const t=document.title;document.title=song.title||'ChordSketch';print();document.title=t;};
 
-/* ---------- MIDI 鍵盤（Web MIDI。プラグインでは C++ から midiNotes で届く） ---------- */
+/* ---------- MIDI 鍵盤 ----------
+   JUCE 版：C++ が鳴らし、押している鍵盤が "midiNotes" で届く（機器は「オプション → オーディオ／MIDI の設定」）。
+   ブラウザ：Web MIDI で受けて WebAudio で鳴らす。
+   どちらも押している音からコード名を出し、ステップ入力では全部離したときに一番多く押していた音のコードを入れる */
 const held=new Set();let peak=[];
 function setMidiStatus(s,on){const e=$('midiSt');e.textContent=s;e.classList.toggle('on',!!on);}
-if(navigator.requestMIDIAccess){
+// 押している音が変わったとき（added：押した音、全部離したらステップ入力）
+function heldChanged(){
+  if(held.size>=peak.length)peak=[...held];
+  if(!held.size){
+    if(ui.step&&peak.length>=2){const d=detectChords(peak,1)[0];if(d)insertAtCursor({off:mod12(d.root-tonic()),q:d.q,...(d.bass!=null?{boff:mod12(d.bass-tonic())}:{})});}
+    peak=[];
+  }
+  renderLive();
+}
+if(hasNative){
+  setMidiStatus('オーディオ／MIDI の設定の機器',true);
+  onNative('midiNotes',({notes})=>{
+    const next=new Set(notes||[]);
+    if(next.size===held.size&&[...next].every(n=>held.has(n)))return;
+    held.clear();for(const n of next)held.add(n);
+    heldChanged();
+  });
+}else if(navigator.requestMIDIAccess){
   navigator.requestMIDIAccess().then(acc=>{
     const bind=()=>{
       let n=0;for(const inp of acc.inputs.values()){inp.onmidimessage=onMidi;n++;}
@@ -1381,15 +1401,10 @@ if(navigator.requestMIDIAccess){
 }else setMidiStatus('このブラウザは非対応');
 function onMidi({data:[st,d1,d2]}){
   const t=st&0xf0;
-  if(t===0x90&&d2>0){held.add(d1);player.noteOn(d1,d2,ui.timbre);if(held.size>=peak.length)peak=[...held];}
-  else if(t===0x80||t===0x90){
-    held.delete(d1);player.noteOff(d1);
-    if(!held.size){
-      if(ui.step&&peak.length>=2){const d=detectChords(peak,1)[0];if(d)insertAtCursor({off:mod12(d.root-tonic()),q:d.q,...(d.bass!=null?{boff:mod12(d.bass-tonic())}:{})});}
-      peak=[];
-    }
-  }else return;
-  renderLive();
+  if(t===0x90&&d2>0){held.add(d1);player.noteOn(d1,d2,ui.timbre);}
+  else if(t===0x80||t===0x90){held.delete(d1);player.noteOff(d1);}
+  else return;
+  heldChanged();
 }
 // 開発用：MIDI 機器なしで確認するときにコンソールから MIDI メッセージを流し込む（例：__midi([0x90,60,100])）
 window.__midi=data=>onMidi({data});
@@ -1410,6 +1425,9 @@ function renderLive(){
 const metroMenu=$('metroMenu');
 for(const m of player.METRONOMES.filter(x=>x.id!=='off'))metroMenu.appendChild(Object.assign(h('button','',m.name.replace(/^♪\s*/,'')),{value:m.id,role:'menuitemradio'}));
 for(const t of player.TIMBRES)$('timbre').appendChild(Object.assign(h('option','',t.name),{value:t.id}));
+// 保存してあった音色が今の環境（JUCE 版・ブラウザ）の選択肢に無ければピアノ
+if(!player.TIMBRES.some(t=>t.id===ui.timbre))ui.timbre='piano';
+player.setLiveTimbre(ui.timbre);
 addPatternOptions($('pattern'));
 for(const [v,n] of INS_LENS)$('insLen').appendChild(Object.assign(h('option','',n),{value:v}));
 for(const p of SECTION_PRESETS)$('secNames').appendChild(Object.assign(h('option'),{value:p.name}));
@@ -1429,14 +1447,14 @@ const countMenu=$('countMenu');
 $('countKind').onclick=e=>{e.stopPropagation();fileMenu.hidden=true;metroMenu.hidden=true;$('themeMenu').hidden=true;countMenu.hidden=!countMenu.hidden;};
 countMenu.addEventListener('click',e=>{const v=+e.target.closest('button')?.value;if(!v)return;ui.countIn=true;uiSet('countBars',v);countMenu.hidden=true;});
 addEventListener('click',e=>{if(!e.target.closest('#countMenu'))countMenu.hidden=true;});
-$('timbre').addEventListener('change',e=>{uiSet('timbre',e.target.value);player.refresh();});
+$('timbre').addEventListener('change',e=>{uiSet('timbre',e.target.value);player.setLiveTimbre(ui.timbre);player.refresh();});
 $('insLen').addEventListener('change',e=>uiSet('insLen',e.target.value));
 $('countIn').onclick=()=>uiSet('countIn',!ui.countIn);
 // ミュートは保存しない（開き直すと音が出る状態に戻る）
 let muted=false;
 function toggleMute(){muted=!muted;player.setMuted(muted);$('muteBtn').setAttribute('aria-pressed',muted);}
 $('muteBtn').onclick=toggleMute;
-$('loopBtn').onclick=()=>uiSet('loop',!ui.loop);
+$('loopBtn').onclick=()=>{uiSet('loop',!ui.loop);player.refresh();};   // JUCE 版は再生中の予定表にループの有無が入っている
 $('stepBtn').onclick=()=>{uiSet('step',!ui.step);renderLive();};
 $('keepNames').onclick=()=>uiSet('keepNames',!ui.keepNames);
 $('bassBtn').onclick=()=>commit(()=>{song.bass=!song.bass;});

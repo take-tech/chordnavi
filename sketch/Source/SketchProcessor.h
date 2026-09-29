@@ -1,9 +1,13 @@
 #pragma once
 
 #include <juce_audio_processors/juce_audio_processors.h>
+#include "PreviewSynth.h"
+#include "SongPlayer.h"
+#include <array>
+#include <atomic>
 
-// ChordSketch の本体（Standalone のみ）。今は無音を出すだけ。
-// 試聴（C++ のシンセ）・MIDI 入力の表示は、JUCE 化の 4〜5 で PreviewSynth などとつなぐ
+// ChordSketch の本体（Standalone のみ）。試聴（曲は SongPlayer、単発のコードと MIDI 鍵盤は PreviewSynth）を鳴らす。
+// 選んだオーディオ出力から鳴る（「オプション → オーディオ／MIDI の設定」）
 class SketchProcessor : public juce::AudioProcessor
 {
 public:
@@ -29,6 +33,14 @@ public:
     const juce::String getProgramName (int) override { return {}; }
     void changeProgramName (int, const juce::String&) override {}
 
+    PreviewSynth& getSynth() { return synth; }
+    SongPlayer& getSongPlayer() { return songPlayer; }
+
+    // 押している鍵盤（ペダルで伸ばしている音は含めない。コード判別・ステップ入力用）
+    std::vector<int> getHeldNotes() const;
+    void setMuted (bool m) { muted.store (m); }
+    void setLiveTimbre (PreviewSynth::Timbre t) { liveTimbre.store ((int) t); }
+
     // 画面の状態（JSON）を預かる（ChordNavi と同じ PluginState の形で保存）
     void getStateInformation (juce::MemoryBlock&) override;
     void setStateInformation (const void*, int) override;
@@ -36,6 +48,18 @@ public:
     juce::String getUiState() const;
 
 private:
+    void handleMidi (const juce::MidiMessage&);
+
+    PreviewSynth synth;
+    SongPlayer songPlayer;
+
+    // MIDI 入力の状態（オーディオスレッドだけが書く。heldMask は UI から読む）。ChordNavi の GodokenProcessor と同じ
+    std::array<bool, 128> keyDown {}, sustained {};
+    bool sustainPedal = false;
+    std::array<std::atomic<juce::uint64>, 2> heldMask {};
+    std::atomic<int> liveTimbre { (int) PreviewSynth::Timbre::piano };
+    std::atomic<bool> muted { false };
+
     mutable juce::CriticalSection stateLock;
     juce::String uiState;
 

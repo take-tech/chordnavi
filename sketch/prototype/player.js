@@ -1,10 +1,20 @@
-/* ChordSketch：ブラウザでの試聴（WebAudio）。プラグインでは C++ の PreviewSynth に置き換える
-   先読みスケジューラ：25ms ごとに少し先までの音を予約する。ループは周の終わりで曲データを読み直す（編集がすぐ反映される） */
+/* ChordSketch：試聴。
+   ・JUCE 版：曲全体の「音の予定表」（秒）を C++ の SongPlayer に渡して鳴らす（ループ・差し替え・ドラムも C++）。位置は "songPos" で届く
+   ・ブラウザ：WebAudio。先読みスケジューラで 25ms ごとに少し先までの音を予約する。ループは周の終わりで曲データを読み直す */
 import {tickToSec,secToTick,meterAt,barTicksOf,beatTicksOf,tempoAt} from './song.js';
+import {hasNative,nativeFn,onNative} from '../../shared/ui/juce-bridge.js';
 
-export const TIMBRES=[
+// 音色：JUCE 版は ChordNavi と同じ C++ の 6 種類、ブラウザは WebAudio の 4 種類
+export const TIMBRES=hasNative?[
+  {id:'piano',name:'ピアノ'},{id:'electricPiano',name:'エレピ'},{id:'guitar',name:'ギター'},
+  {id:'organ',name:'オルガン'},{id:'pad',name:'パッド'},{id:'triangle',name:'シンプル（三角波）'}
+]:[
   {id:'piano',name:'ピアノ'},{id:'triangle',name:'シンプル（三角波）'},{id:'organ',name:'オルガン'},{id:'pad',name:'パッド'}
 ];
+const nSongPlay=nativeFn('songPlay'), nSongUpdate=nativeFn('songUpdate'), nSongStop=nativeFn('songStop');
+const nPreview=nativeFn('previewNotes'), nMute=nativeFn('setMute'), nTimbre=nativeFn('setTimbre');
+const DRUM_ID={kick:0,snare:1,hat:2,hatAcc:3,click:4,clickHi:5};   // C++ の SongPlayer::Drum の順
+const nativeErr=err=>console.error(err);
 export const METRONOMES=[
   {id:'off',name:'メトロノームなし'},{id:'click',name:'♪ クリック'},{id:'8beat',name:'♪ 8ビート'},{id:'16beat',name:'♪ 16ビート'},{id:'shuffle',name:'♪ シャッフル'},{id:'four',name:'♪ 4つ打ち（EDM）'}
 ];
@@ -140,12 +150,46 @@ function drumHits(kind,r){
   return out.filter(h=>h.t<r.length);
 }
 
+/* ---------- JUCE 版の再生（C++ の SongPlayer） ---------- */
+let nativeSession=0;
+// 範囲の音（tick）→ C++ に渡す予定表（秒。数を平らに並べる：ノートは [開始, 長さ, 音, 強さ]、ドラムは [開始, 種類]）
+function nativePayload(r,opts){
+  const notes=[], drums=[];
+  for(const n of r.notes){
+    const s=tickToSec(r.tempos,n.t), e=tickToSec(r.tempos,n.t+n.d);
+    notes.push(+s.toFixed(5),+(e-s).toFixed(5),n.n,+(n.v/127).toFixed(3));
+  }
+  for(const h of drumHits(opts.metronome(),r))drums.push(+tickToSec(r.tempos,h.t).toFixed(5),DRUM_ID[h.drum]);
+  return {notes,drums,length:tickToSec(r.tempos,r.length),loop:!!opts.loop(),timbre:opts.timbre(),session:run.session};
+}
+function playNative(opts){
+  const r=opts.render();
+  run={native:true,opts,r,dur:tickToSec(r.tempos,r.length),session:++nativeSession,count:null,lead:0,last:null};
+  const p=nativePayload(r,opts);
+  if(opts.countIn){   // カウントイン：曲の頭より前（負の時刻）のクリック。小節の頭は高い音
+    const bars=opts.countIn===true?1:opts.countIn, m=r.meters[0].meter, beat=60/tempoAt(r.tempos,0)*beatTicksOf(m)/480, n=m[0]*bars;
+    run.lead=beat*n;run.count={beat,n};
+    const pre=[];for(let k=0;k<n;k++)pre.push(+(-run.lead+k*beat).toFixed(5),k%m[0]===0?DRUM_ID.clickHi:DRUM_ID.click);
+    p.drums=[...pre,...p.drums];p.leadIn=run.lead;
+  }
+  run.last={seconds:-run.lead,at:performance.now(),playing:true};
+  nSongPlay(p).catch(nativeErr);
+  run.raf=requestAnimationFrame(pos);
+}
+// C++ から届く再生位置（30Hz）。自分の再生の知らせだけを使う。止まったら終わり
+onNative('songPos',p=>{
+  if(!run||!run.native||p.session!==run.session)return;
+  run.last={seconds:p.seconds,at:performance.now(),playing:p.playing};
+  if(!p.playing){const cb=run.opts.onEnd;stop();cb&&cb();}
+});
+
 /* ---------- 再生 ---------- */
 // opts：render()→{notes,tempos,meters,length}（範囲の頭が 0）、loop、countIn、metronome()、timbre()、onPos(tick|null, countIn?)、onEnd()
 let run=null;
 export const isPlaying=()=>!!run;
 export function play(opts){
   stop();
+  if(hasNative){playNative(opts);return;}
   const a=ctx();a.resume();
   const bus=a.createGain();bus.connect(master);
   const r0=opts.render();
@@ -193,6 +237,11 @@ function startVoice(e,when,end){
    その時点でまだ続くはずの新しい音は horizon から鳴らす（全音符の途中で変えても音が途切れない） */
 export function refresh(){
   if(!run)return;
+  if(run.native){   // JUCE 版：作り直した予定表で差し替える（位置はそのまま、鳴っているはずの音は C++ が鳴らし直す）
+    run.r=run.opts.render();run.dur=tickToSec(run.r.tempos,run.r.length);
+    nSongUpdate(nativePayload(run.r,run.opts)).catch(nativeErr);
+    return;
+  }
   const a=ac, H=Math.max(run.horizon,a.currentTime+.02);
   for(const v of run.voices)if(v.end>H){v.stop(H);run.voices.delete(v);}
   load(run.opts.render());
@@ -203,6 +252,15 @@ export function refresh(){
 }
 function pos(){
   if(!run)return;
+  if(run.native){
+    // 届いた位置のあいだは経過時間で補う（線がなめらかに動くように）
+    const L=run.last;let t=L.seconds+(L.playing?(performance.now()-L.at)/1000:0);
+    if(t>=0)t=Math.min(t,run.dur);
+    const c=run.count, cnt=t<0&&c?{beat:Math.max(0,Math.min(c.n-1,Math.floor((t+run.lead)/c.beat))),n:c.n}:null;
+    run.opts.onPos(t<0?null:secToTick(run.r.tempos,t),t<0,cnt);
+    run.raf=requestAnimationFrame(pos);
+    return;
+  }
   const t=ac.currentTime-run.start;
   // カウントイン中は何拍目か（0 から。鳴る前は -1）と拍の数を渡す
   const c=run.count, cnt=t<0&&c?{beat:Math.min(c.n-1,Math.floor((ac.currentTime-c.start)/c.beat)),n:c.n}:null;
@@ -211,6 +269,7 @@ function pos(){
 }
 export function stop(){
   if(!run)return;
+  if(run.native){cancelAnimationFrame(run.raf);nSongStop().catch(nativeErr);run=null;return;}
   clearInterval(run.timer);cancelAnimationFrame(run.raf);
   const bus=run.bus, t=ac.currentTime;
   bus.gain.setTargetAtTime(0,t,.01);setTimeout(()=>bus.disconnect(),200);
@@ -220,11 +279,13 @@ export function stop(){
 // ミュート：出力をすべて無音にする（試聴・メトロノーム・MIDI 鍵盤。再生と表示は進んだまま）
 export function setMuted(on){
   muted=!!on;
+  if(nMute){nMute(muted).catch(nativeErr);return;}
   if(master)master.gain.setTargetAtTime(muted?0:LEVEL,ac.currentTime,.01);
 }
 
 /* ---------- 単発（コードのクリック、MIDI 鍵盤） ---------- */
 export function playNotes(notes,timbre,dur=1.1){
+  if(nPreview){nPreview({notes,dur,timbre}).catch(nativeErr);return;}
   const a=ctx();a.resume();
   notes.forEach(n=>voice(n,90,a.currentTime+.01,dur,timbre));
 }
@@ -235,3 +296,5 @@ export function noteOn(n,v,timbre){
   live.set(n,voice(n,v,a.currentTime,null,timbre));
 }
 export function noteOff(n){live.get(n)?.(ac.currentTime);live.delete(n);}
+// MIDI 鍵盤で弾く音の音色（JUCE 版：C++ で鳴らす）
+export function setLiveTimbre(timbre){if(nTimbre)nTimbre(timbre).catch(nativeErr);}
