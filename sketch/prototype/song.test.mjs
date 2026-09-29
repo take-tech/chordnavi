@@ -1,7 +1,7 @@
 // song.js の単体テスト：node sketch/prototype/song.test.mjs
 import assert from 'node:assert/strict';
 import {demoSong,newSong,newSection,newChord,timeline,placedChords,renderSong,buildSmf,placeChord,resizeChord,insertBars,
-  setMark,pruneMarks,setKeyMark,stretchChordStart,keyRegion,mergeSections,splitSection,cloneSection,stretchChord,insertProgression,tickToSec,secToTick,copyRange,pasteAt,nameOf,rangeTicks,PPQ,safeFileName,voicingOf,STRUM_TICKS,withExtension,keyScale,sameKey} from './song.js';
+  setMark,pruneMarks,setKeyMark,appendSectionFrom,stretchChordStart,keyRegion,mergeSections,splitSection,cloneSection,stretchChord,insertProgression,tickToSec,secToTick,copyRange,pasteAt,nameOf,rangeTicks,PPQ,safeFileName,voicingOf,STRUM_TICKS,withExtension,keyScale,sameKey} from './song.js';
 import {diatonicOf,conformBars,chordDeg} from '../../ui/theory.js';
 import {barDrums,pulsesOf,backbeat} from './player.js';
 
@@ -276,6 +276,19 @@ test('ドラム：3拍子系（3/4・6/8・9/8）も大きな拍ごとに組み�
   assert.deepEqual(hats('shuffle',[6,8]),[0,2,3,5]);                    // 3連の1つ目と3つ目
   assert.equal(hats('16beat',[3,4]).length,12);
   assert.ok(barDrums('8beat',[7,8]).every(([x])=>x<7));                 // 小節からはみ出さない
+});
+test('別の曲の最後にセクションを付ける：コード名・位置はそのまま（キー・拍子が違えば変更点を付ける）',()=>{
+  const a=demoSong();                                   // C メジャー 4/4
+  const b=newSong();b.key={idx:2,mode:'major'};b.meter=[3,4];b.sections=[newSection('A',1,2)];placeChord(b,0,newChord(0,0,B*3/4,0,''));
+  const names=(s,si)=>placedChords(s).filter(p=>p.si===si).map(p=>nameOf(s,p.c,p.key)+'@'+(p.start-timeline(s).bars[timeline(s).secRanges[si].from].start));
+  const before=names(a,2);
+  const sec=appendSectionFrom(a,2,b);
+  assert.equal(b.sections.length,2);assert.equal(sec.name,'サビ');
+  assert.deepEqual(names(b,1),before);                                                   // コード名も位置も同じ
+  assert.ok(sec.marks.some(m=>m.key&&m.key.idx===0)&&sec.marks.some(m=>m.meter&&m.meter.join()==='4,4'));
+  assert.equal(b.sections[0].chords.length,1);assert.equal(a.sections.length,3);         // 元の曲・付け先の前のセクションは変えない
+  // 同じキー・拍子なら変更点は付けない（元からあるテンポの変更点はそのまま）
+  const c=demoSong();appendSectionFrom(a,1,c);assert.deepEqual(c.sections.at(-1).marks,[]);
 });
 test('ファイル名',()=>{assert.equal(safeFileName('サビ F♯m7 B♭'),'F#m7_Bb');});
 console.log(`${n} tests passed`);

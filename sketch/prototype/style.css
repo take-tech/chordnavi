@@ -349,3 +349,8 @@ body.grabbing,body.grabbing *{cursor:grabbing!important}
 .tab .tclose:hover{color:var(--chord)}
 .tadd{border:0;background:none;font-size:15px;color:var(--muted);padding:0 8px 3px}
 .tadd:hover{color:var(--live)}
+
+.tab.drop-target{background:var(--chord-tint);border-color:var(--chord);color:var(--ink)}   /* セクションをここへ */
+.toast{position:fixed;left:50%;bottom:28px;transform:translate(-50%,10px);background:var(--ink);color:var(--on-ink);padding:8px 16px;border-radius:6px;font-size:13px;
+  box-shadow:0 6px 20px rgba(0,0,0,.25);opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:60}
+.toast.on{opacity:1;transform:translate(-50%,0)}

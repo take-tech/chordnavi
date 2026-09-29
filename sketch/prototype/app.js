@@ -3,7 +3,7 @@ import {MAJ_LABEL,MIN_LABEL,SIG,WHEEL_CELLS,DIATONIC,CHORD,chordDeg,chordAt,chor
   CONFORM_SCALES,conformBars,diatonicOf,scaleById,chordPcs} from '../../ui/theory.js';
 import {PPQ,METERS,SNAPS,snapTicks,barTicksOf,beatTicksOf,SECTION_COLORS,SECTION_PRESETS,PATTERNS,MIN_BPM,MAX_BPM,
   newSong,demoSong,newSection,newChord,cloneSection,timeline,placedChords,placeChord,removeChord,resizeChord,
-  setSectionBars,insertBars,stretchChord,stretchChordStart,pruneMarks,mergeSections,splitSection,insertProgression,setMark,rangeTicks,copyRange,pasteAt,renderSong,buildSmf,safeFileName,
+  setSectionBars,insertBars,appendSectionFrom,stretchChord,stretchChordStart,pruneMarks,mergeSections,splitSection,insertProgression,setMark,rangeTicks,copyRange,pasteAt,renderSong,buildSmf,safeFileName,
   songTonic,songFlat,nameOf,tempoAt,SKETCH_SCALES,keyScale,defaultScale,meterAt,tickToSec,withExtension,keyTonic,sameKey,setKeyMark,keyRegion,transposeBars,voicingOf,patternById,VOICINGS,GUITAR_AREAS} from './song.js';
 import * as player from './player.js';
 
@@ -602,19 +602,31 @@ function startSectionDrag(e,si){
     line.style.top=top/k+'px';
     line.hidden=target===si||target===si+1;   // 今の位置と同じなら線を出さない
   };
+  let tabTarget=-1, tabX=0;
   const tick=()=>{
+    // 別の曲のタブの上：そのタブを光らせ、シートの線は隠す（放すとその曲の最後へ）
+    const over=document.elementFromPoint(tabX,y)?.closest?.('#tabs .tab');
+    const ti=over?[...document.querySelectorAll('#tabs .tab')].indexOf(over):-1;
+    tabTarget=ti>=0&&ti!==active?ti:-1;
+    document.querySelectorAll('#tabs .tab').forEach((t,i)=>t.classList.toggle('drop-target',i===tabTarget));
+    if(tabTarget>=0){line.hidden=true;ghost.textContent=`「${s.name}」を「${docs[tabTarget].song.title}」の最後へ${copyKey?'コピー':'移動'}`;raf=requestAnimationFrame(tick);return;}
+    ghost.textContent=`「${s.name}」を移動`;
     const sr=sheet.getBoundingClientRect(), edge=40*sr.height/sheet.clientHeight;
     if(y<sr.top+edge)sheet.scrollTop-=12;else if(y>sr.bottom-edge)sheet.scrollTop+=12;
     place();raf=requestAnimationFrame(tick);
   };
-  const move=ev=>{y=ev.clientY;ghost.style.left=ev.clientX+10+'px';ghost.style.top=ev.clientY+8+'px';place();};
+  let copyKey=false;
+  const move=ev=>{y=ev.clientY;tabX=ev.clientX;copyKey=ev.altKey;ghost.style.left=ev.clientX+10+'px';ghost.style.top=ev.clientY+8+'px';place();};
   const end=()=>{
     cancelAnimationFrame(raf);removeEventListener('pointermove',move);removeEventListener('pointerup',up);removeEventListener('keydown',key,true);
     line.remove();me.classList.remove('dragging');document.body.classList.remove('grabbing');ghost.hidden=true;
   };
   const up=ev=>{
     if(ev&&ev.clientY!=null&&!cancelled){y=ev.clientY;place();}   // 素早く放したときも放した位置で決める
+    const toTab=cancelled?-1:tabTarget;
     end();
+    document.querySelectorAll('#tabs .tab.drop-target').forEach(t=>t.classList.remove('drop-target'));
+    if(toTab>=0){moveSectionToTab(si,toTab,copyKey||!!ev?.altKey);return;}
     if(cancelled||target===si||target===si+1)return;
     const to=target>si?target-1:target;
     commit(()=>{const [x]=song.sections.splice(si,1);song.sections.splice(to,0,x);});
@@ -624,6 +636,20 @@ function startSectionDrag(e,si){
   move(e);
   addEventListener('pointermove',move);addEventListener('pointerup',up);addEventListener('keydown',key,true);
   raf=requestAnimationFrame(tick);
+}
+
+// 別の曲（タブ）の最後へセクションを移動（copy ならコピー）。移動先・移動元のどちらでも元に戻せる
+function moveSectionToTab(si,ti,copy){
+  const d=docs[ti], name=song.sections[si].name;
+  d.undo=d.undo||[];d.undo.push(JSON.stringify(d.song));d.redo=[];
+  appendSectionFrom(song,si,d.song);d.dirty=true;
+  if(copy)renderTabs();else{commit(()=>song.sections.splice(si,1));sel=null;range=null;}
+  persist();
+  toast(`「${name}」を「${d.song.title}」の最後に${copy?'コピー':'移動'}しました`);
+}
+function toast(msg){
+  let t=$('toast');if(!t){t=h('div','toast');t.id='toast';document.body.appendChild(t);}
+  t.textContent=msg;t.classList.add('on');clearTimeout(t._timer);t._timer=setTimeout(()=>t.classList.remove('on'),2600);
 }
 
 // ブロック：クリックで選択＋試聴、ドラッグで移動（Alt でコピー）、右端で長さ

@@ -229,6 +229,21 @@ export function splitSection(song,si,bar){
   song.sections.splice(si+1,0,b);
   return true;
 }
+// 別の曲（dst）の最後にセクションを付ける（タブの間の移動・コピー）。コード名と小節の中の位置が変わらないよう、
+// 付け先の最後のキー・拍子と違えば、セクションの頭にキー・拍子の変更点を付ける（テンポは付け先に合わせる）
+export function appendSectionFrom(src,si,dst){
+  const tlS=timeline(src), from=tlS.secRanges[si].from, b=tlS.bars[from];
+  const sec=cloneSection(src.sections[si]);
+  const tlD=timeline(dst), last=tlD.bars.at(-1);
+  const dKey=last?last.key:dst.key, dMeter=last?last.meter:dst.meter;
+  if(b){
+    if(!sec.marks.some(m=>m.bar===0&&m.key)&&!sameKey(b.key,dKey))sec.marks.push({bar:0,pos:0,key:{...b.key}});
+    if(!sec.marks.some(m=>m.bar===0&&m.meter)&&b.meter.join('/')!==dMeter.join('/'))sec.marks.push({bar:0,pos:0,meter:[...b.meter]});
+  }
+  dst.sections.push(sec);
+  pruneMarks(dst,dst.sections.length-1);
+  return sec;
+}
 // bar の前に count 小節を入れる（負なら bar から削除）
 export function insertBars(song,si,bar,count){
   const sec=song.sections[si];
