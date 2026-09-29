@@ -9,7 +9,7 @@ import * as player from './player.js';
 
 /* ---------- 状態 ---------- */
 const STORE='chordsketch.v1';
-const UI_DEFAULT={snap:'beat',perRow:4,insLen:'bar',dia:'7',timbre:'piano',metro:'click',metroOn:true,countIn:false,loop:false,keepNames:false,step:false,theme:'light',prog:{major:0,minor:13},progVar:0};
+const UI_DEFAULT={snap:'beat',perRow:4,insLen:'bar',dia:'7',timbre:'piano',metro:'click',metroOn:true,countIn:false,countBars:1,loop:false,keepNames:false,step:false,theme:'light',prog:{major:0,minor:13},progVar:0};
 let song, ui={...UI_DEFAULT};
 let tl;                     // timeline(song) のキャッシュ（changed() で更新）
 let sel=null;               // 選択中のコード {si,id}
@@ -928,7 +928,7 @@ function startPlay(){
   playFrom=rangeTicks(tl,r).from;
   player.play({
     render:()=>renderSong(song,rangeTicks(tl,r)),
-    loop:()=>ui.loop, countIn:ui.countIn, metronome:()=>ui.metroOn?ui.metro:'off', timbre:()=>ui.timbre,
+    loop:()=>ui.loop, countIn:ui.countIn?ui.countBars:0, metronome:()=>ui.metroOn?ui.metro:'off', timbre:()=>ui.timbre,
     onPos:(t,counting,cnt)=>onPos(t==null?null:playFrom+t,counting,cnt),
     onEnd:()=>{playTick=null;playingId=null;render();}
   });
@@ -941,13 +941,13 @@ function onPos(abs,counting,cnt){
   // カウントイン：拍の数だけ「・」を並べ、鳴った拍まで赤くする
   if(abs==null){
     const n=cnt?.n??4, k=cnt?.beat??-1, key='count:'+n+':'+k;
-    if(lastPos!==key){disp.innerHTML='';for(let i=0;i<n;i++)disp.appendChild(h('span','cdot'+(i<=k?' on':''),'•'));lastPos=key;}
+    if(lastPos!==key){disp.innerHTML='';disp.classList.toggle('many',n>4);for(let i=0;i<n;i++)disp.appendChild(h('span','cdot'+(i<=k?' on':''),'•'));lastPos=key;}
     return;
   }
   playTick=abs;
   const b=tl.bars.find(x=>abs>=x.start&&abs<x.start+x.ticks)||tl.bars.at(-1);
   const s=fmtPos(b.gi,Math.floor((abs-b.start)/SIXTEENTH)*SIXTEENTH);
-  if(s!==lastPos){disp.textContent=s;lastPos=s;scrollToBar(b.gi);}
+  if(s!==lastPos){disp.textContent=s;disp.classList.remove('many');lastPos=s;scrollToBar(b.gi);}
   renderLcd(abs);
   const p=placedChords(song,tl).find(x=>abs>=x.start&&abs<x.end);
   const id=p?.c.id??null;
@@ -1239,12 +1239,17 @@ $('title').addEventListener('keydown',e=>{if(e.key==='Enter')e.target.blur();});
 $('pattern').addEventListener('change',e=>commit(()=>{song.pattern=e.target.value;}));
 const uiSet=(k,v)=>{ui[k]=v;render();persist();};
 $('metroBtn').onclick=()=>{uiSet('metroOn',!ui.metroOn);player.refresh();};
-$('metroKind').onclick=e=>{e.stopPropagation();fileMenu.hidden=true;$('themeMenu').hidden=true;metroMenu.hidden=!metroMenu.hidden;};
+$('metroKind').onclick=e=>{e.stopPropagation();fileMenu.hidden=true;$('themeMenu').hidden=true;$('countMenu').hidden=true;metroMenu.hidden=!metroMenu.hidden;};
 metroMenu.addEventListener('click',e=>{
   const v=e.target.closest('button')?.value;if(!v)return;
   ui.metroOn=true;uiSet('metro',v);player.refresh();metroMenu.hidden=true;   // 種類を選んだらオンにする
 });
 addEventListener('click',e=>{if(!e.target.closest('#metroMenu'))metroMenu.hidden=true;});
+// カウントインの小節数（1小節／2小節）。選んだらオンにする
+const countMenu=$('countMenu');
+$('countKind').onclick=e=>{e.stopPropagation();fileMenu.hidden=true;metroMenu.hidden=true;$('themeMenu').hidden=true;countMenu.hidden=!countMenu.hidden;};
+countMenu.addEventListener('click',e=>{const v=+e.target.closest('button')?.value;if(!v)return;ui.countIn=true;uiSet('countBars',v);countMenu.hidden=true;});
+addEventListener('click',e=>{if(!e.target.closest('#countMenu'))countMenu.hidden=true;});
 $('timbre').addEventListener('change',e=>{uiSet('timbre',e.target.value);player.refresh();});
 $('insLen').addEventListener('change',e=>uiSet('insLen',e.target.value));
 $('countIn').onclick=()=>uiSet('countIn',!ui.countIn);
@@ -1301,6 +1306,8 @@ function render(){
   const mk=player.METRONOMES.find(x=>x.id===ui.metro);
   $('metroBtn').title=`メトロノーム（試聴のみ）：${ui.metroOn?'オン':'オフ'}・${mk?mk.name.replace(/^♪\s*/,''):''}（押してオン／オフ、種類は ▾）`;
   metroMenu.querySelectorAll('button').forEach(b=>b.setAttribute('aria-checked',b.value===ui.metro));
+  countMenu.querySelectorAll('button').forEach(b=>b.setAttribute('aria-checked',+b.value===ui.countBars));
+  $('countIn').title=`カウントイン：${ui.countIn?'オン':'オフ'}・${ui.countBars}小節（押してオン／オフ、小節数は ▾）`;
   $('timbre').value=ui.timbre;$('pattern').value=song.pattern;$('insLen').value=ui.insLen;
   pressed('countIn',ui.countIn);pressed('loopBtn',ui.loop);pressed('stepBtn',ui.step);pressed('keepNames',ui.keepNames);pressed('bassBtn',song.bass);
   document.querySelectorAll('#snapSeg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.v===ui.snap));

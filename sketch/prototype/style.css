@@ -50,7 +50,8 @@ h1{font-size:17px;font-weight:900;letter-spacing:.02em;margin:0 6px 0 0;white-sp
 .title{width:170px;font-size:14px;font-weight:700}
 .transport{display:flex;align-items:center;gap:4px;margin:0 4px}
 .play{min-width:40px;font-size:14px;font-weight:700;background:var(--pressed-bg);color:var(--pressed-fg);border-color:var(--pressed-bg)}
-#muteBtn{min-width:30px;font-weight:900}
+#muteBtn{min-width:30px;font-weight:900;color:#C4456A;border-color:#C4456A}   /* ミュートは赤で目立たせる */
+#muteBtn:hover{background:rgba(196,69,106,.1)}
 #muteBtn[aria-pressed=true]{background:#C4456A;border-color:#C4456A;color:#fff}
 .play.on{background:var(--chord);border-color:var(--chord)}
 /* 位置の表示（DAW のトランスポート風の暗い枠。テーマによらず同じ色）：
@@ -71,6 +72,8 @@ h1{font-size:17px;font-weight:900;letter-spacing:.02em;margin:0 6px 0 0;white-sp
 .lcd .l1::before{content:'♩';font-size:12px;color:var(--lcd-dim);margin-right:auto}
 .lcd .l2::before{content:'';margin-right:auto}
 .lcd .pos.count{gap:5px}
+.lcd .pos.count.many{gap:1px}
+.lcd .pos.many .cdot{font-size:12px}
 .lcd .cdot{color:var(--lcd-dim);font-size:16px;line-height:1;transition:color .05s}
 .lcd .cdot.on{color:#FF5C7A}   /* カウントイン：鳴った拍 */
 .loop svg{display:block}
@@ -318,7 +321,6 @@ body.grabbing,body.grabbing *{cursor:grabbing!important}
 .clickgrp .ic2{display:flex;align-items:center;justify-content:center;padding:0;height:20px;width:100%}
 .clickgrp .menu{display:flex}
 .clickgrp .kind{font-size:10px;color:var(--muted);border-color:var(--line)}
-.clickgrp .wide{grid-column:1/-1}
 .metro-pop{left:0;right:auto;min-width:130px;top:24px}
 .metro-pop button[aria-checked=true]{font-weight:700;color:var(--live)}
 .metro-pop button[aria-checked=true]::after{content:' ✓'}

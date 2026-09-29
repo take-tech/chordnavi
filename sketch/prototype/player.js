@@ -82,17 +82,38 @@ function drum(kind,when,dest=master){
   src.connect(f).connect(g);src.start(when,Math.random()*.5);src.stop(when+.2);
 }
 
-// 1小節のドラム：[拍の位置（拍単位）, 種類]。拍は拍子の分母の音符（6/8 なら8分）
-function barDrums(kind,beats){
-  const out=[];
-  for(let k=0;k<beats;k++){
-    if(kind==='click'){out.push([k,k===0?'clickHi':'click']);continue;}
-    const kick=k===0||(k===2&&beats>=4), snare=k%2===1;
-    if(kick)out.push([k,'kick']);
-    if(snare)out.push([k,'snare']);
-    if(kind==='8beat'){out.push([k,'hatAcc'],[k+.5,'hat']);if(k===2&&beats>=4)out.push([k+.5,'kick']);}
-    if(kind==='16beat'){[0,.25,.5,.75].forEach(x=>out.push([k+x,x===0?'hatAcc':'hat']));if(k===1)out.push([k+.75,'kick']);if(k===2&&beats>=4)out.push([k+.5,'kick']);}
-    if(kind==='shuffle'){out.push([k,'hatAcc'],[k+2/3,'hat']);}
+// 拍子の大きな拍（パルス）：6/8・9/8・12/8 は付点4分（8分×3）ずつ、ほかは拍（分母の音符）ずつ
+export function pulsesOf([n,d]){
+  const compound=d===8&&n%3===0&&n>3, size=compound?3:1;
+  return {P:n/size,size,compound};
+}
+// キック（K）とスネア（S）の並び：2つずつ K S、奇数なら最後を3つ K S S（3/4 は K S S のワルツ、5/4 は K S K S S）
+export function backbeat(P){
+  if(P<=1)return ['K'];
+  const out=[];let left=P;
+  while(left>0){if(left===3){out.push('K','S','S');left-=3;}else{out.push('K','S');left-=2;}}
+  return out;
+}
+// 1小節のドラム：[拍の位置（拍子の分母の音符が1）, 種類]。3拍子系（3/4・6/8・9/8…）も大きな拍ごとに組み立てる
+export function barDrums(kind,meter){
+  const out=[], {P,size,compound}=pulsesOf(meter);
+  if(kind==='click'){for(let k=0;k<meter[0];k++)out.push([k,k===0?'clickHi':'click']);return out;}
+  const bb=backbeat(P);
+  for(let p=0;p<P;p++){
+    const at=p*size;
+    out.push([at,bb[p]==='K'?'kick':'snare']);
+    if(kind==='shuffle'){
+      // 4分系は3連でハネる。6/8 などはもともと3連なので、1つ目と3つ目で刻む
+      if(compound)out.push([at,'hatAcc'],[at+2,'hat']);else out.push([at,'hatAcc'],[at+2/3,'hat']);
+      continue;
+    }
+    const sub=kind==='16beat'?(compound?6:4):(compound?3:2);   // 大きな拍を何分割して刻むか
+    for(let i=0;i<sub;i++)out.push([at+i*size/sub,i===0?'hatAcc':'hat']);
+  }
+  // 4拍子の8ビート・16ビートは、今までどおりキックを足す
+  if(!compound&&P===4){
+    if(kind==='8beat')out.push([2.5,'kick']);
+    if(kind==='16beat')out.push([1.75,'kick'],[2.5,'kick']);
   }
   return out;
 }
@@ -102,7 +123,7 @@ function drumHits(kind,r){
   const out=[];
   for(let t=0;t<r.length;){
     const m=meterAt(r.meters,t), bt=beatTicksOf(m);
-    for(const [x,k] of barDrums(kind,m[0]))out.push({t:t+x*bt,drum:k});
+    for(const [x,k] of barDrums(kind,m))out.push({t:t+x*bt,drum:k});
     t+=barTicksOf(m);
   }
   return out.filter(h=>h.t<r.length);
@@ -118,11 +139,11 @@ export function play(opts){
   const bus=a.createGain();bus.connect(master);
   const r0=opts.render();
   let lead=0, count=null;
-  if(opts.countIn){   // カウントイン：1小節のクリック（範囲の頭のテンポ・拍子）
-    const m=r0.meters[0].meter, bpm=tempoAt(r0.tempos,0), beat=60/bpm*beatTicksOf(m)/480;
-    lead=beat*m[0];
-    for(let k=0;k<m[0];k++)drum(k===0?'clickHi':'click',a.currentTime+.08+k*beat,bus);
-    count={start:a.currentTime+.08,beat,n:m[0]};
+  if(opts.countIn){   // カウントイン：countIn 小節（1 か 2）のクリック（範囲の頭のテンポ・拍子）。小節の頭は高い音
+    const bars=opts.countIn===true?1:opts.countIn, m=r0.meters[0].meter, bpm=tempoAt(r0.tempos,0), beat=60/bpm*beatTicksOf(m)/480;
+    const n=m[0]*bars;lead=beat*n;
+    for(let k=0;k<n;k++)drum(k%m[0]===0?'clickHi':'click',a.currentTime+.08+k*beat,bus);
+    count={start:a.currentTime+.08,beat,n};
   }
   run={opts,bus,start:a.currentTime+.08+lead,data:null,idx:0,voices:new Set(),horizon:0,count};
   load(r0);

@@ -15,6 +15,7 @@
       <button id="toStart" title="先頭へ（Home）">⏮</button>
       <button id="playBtn" class="play" title="再生／停止（Space キー）" aria-label="再生">▶</button>
       <button id="loopBtn" class="tg loop" aria-pressed="false" aria-label="ループ" title="ループ：選択範囲（なければ曲全体）を繰り返す"><svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><path d="M5 7h8.5a3 3 0 0 1 0 6H12M15 13H6.5a3 3 0 0 1 0-6H8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M11 4.5 13.8 7 11 9.5M9 10.5 6.2 13 9 15.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <button id="muteBtn" class="tg mute" aria-pressed="false" title="ミュート：ChordSketch の音をすべて消す（表示は動いたまま。M キー）" aria-label="ミュート">M</button>
     </div>
     <!-- 位置の表示（DAW のトランスポートと同じ並び）：今の位置のテンポ／拍子・キー、位置／経過時間。数字を押すとその値を変える -->
     <div class="lcd" id="lcd">
@@ -30,9 +31,14 @@
         <button id="metroKind" class="ic2 kind" aria-haspopup="true" title="メトロノームの種類">▾</button>
         <div class="menu-pop metro-pop" id="metroMenu" hidden></div>
       </div>
-      <button id="countIn" class="tg ic2 wide" aria-pressed="false" aria-label="カウントイン" title="カウントイン：再生の前に1小節クリック"><svg viewBox="0 0 28 10" width="26" height="9" aria-hidden="true"><circle cx="4" cy="5" r="2.2" fill="currentColor"/><circle cx="10.7" cy="5" r="2.2" fill="currentColor"/><circle cx="17.3" cy="5" r="2.2" fill="currentColor"/><circle cx="24" cy="5" r="2.2" fill="currentColor"/></svg></button>
+      <button id="countIn" class="tg ic2" aria-pressed="false" aria-label="カウントイン" title="カウントイン：再生の前にクリック（押してオン／オフ、小節数は ▾）"><svg viewBox="0 0 28 10" width="26" height="9" aria-hidden="true"><circle cx="4" cy="5" r="2.2" fill="currentColor"/><circle cx="10.7" cy="5" r="2.2" fill="currentColor"/><circle cx="17.3" cy="5" r="2.2" fill="currentColor"/><circle cx="24" cy="5" r="2.2" fill="currentColor"/></svg></button>
+      <div class="menu">
+        <button id="countKind" class="ic2 kind" aria-haspopup="true" title="カウントインの小節数">▾</button>
+        <div class="menu-pop metro-pop" id="countMenu" hidden>
+          <button value="1" role="menuitemradio">1小節</button><button value="2" role="menuitemradio">2小節</button>
+        </div>
+      </div>
     </div>
-    <button id="muteBtn" class="tg" aria-pressed="false" title="ミュート：ChordSketch の音をすべて消す（表示は動いたまま。M キー）" aria-label="ミュート">M</button>
     <span class="spacer"></span>
     <button id="undo" class="ic" title="元に戻す（⌘Z）">↶</button><button id="redo" class="ic" title="やり直し（⇧⌘Z）">↷</button>
     <div class="menu">

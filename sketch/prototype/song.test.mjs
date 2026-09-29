@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {demoSong,newSong,newSection,newChord,timeline,placedChords,renderSong,buildSmf,placeChord,resizeChord,insertBars,
   setMark,pruneMarks,setKeyMark,stretchChordStart,keyRegion,mergeSections,splitSection,cloneSection,stretchChord,insertProgression,tickToSec,secToTick,copyRange,pasteAt,nameOf,rangeTicks,PPQ,safeFileName,voicingOf,STRUM_TICKS,withExtension,keyScale,sameKey} from './song.js';
 import {diatonicOf,conformBars,chordDeg} from '../../ui/theory.js';
+import {barDrums,pulsesOf,backbeat} from './player.js';
 
 const B=PPQ*4;
 let n=0;const test=(name,f)=>{f();n++;console.log('ok',name);};
@@ -260,6 +261,21 @@ test('スケール：既定はモードのスケール、度数番号でロク�
   const bars=conformBars([[5,'M7'],[7,'7']],'major','dorian');
   assert.deepEqual(bars.map(b=>b[1]),['7','m7']);
   insertProgression(s,0,bars);assert.ok(s.sections[0].chords.every(c=>c.deg!=null));
+});
+test('ドラム：3拍子系（3/4・6/8・9/8）も大きな拍ごとに組み立てる',()=>{
+  const ks=(kind,m)=>barDrums(kind,m).filter(([,k])=>k==='kick'||k==='snare').sort((a,b)=>a[0]-b[0]).map(([x,k])=>x+(k==='kick'?'K':'S')).join(' ');
+  assert.equal(ks('8beat',[4,4]),'0K 1S 2K 2.5K 3S');                  // 4/4 は今までどおり
+  assert.equal(ks('8beat',[3,4]),'0K 1S 2S');                           // ワルツ
+  assert.equal(ks('8beat',[6,8]),'0K 3S');                              // 付点4分が2つ
+  assert.equal(ks('8beat',[9,8]),'0K 3S 6S');
+  assert.equal(ks('8beat',[12,8]),'0K 3S 6K 9S');
+  assert.equal(ks('8beat',[5,4]),'0K 1S 2K 3S 4S');
+  assert.deepEqual(pulsesOf([6,8]),{P:2,size:3,compound:true});assert.deepEqual(backbeat(7),['K','S','K','S','K','S','S']);
+  const hats=(kind,m)=>barDrums(kind,m).filter(([,k])=>k.startsWith('hat')).map(([x])=>x).sort((a,b)=>a-b);
+  assert.deepEqual(hats('8beat',[6,8]),[0,1,2,3,4,5]);                  // 6/8 は8分で刻む
+  assert.deepEqual(hats('shuffle',[6,8]),[0,2,3,5]);                    // 3連の1つ目と3つ目
+  assert.equal(hats('16beat',[3,4]).length,12);
+  assert.ok(barDrums('8beat',[7,8]).every(([x])=>x<7));                 // 小節からはみ出さない
 });
 test('ファイル名',()=>{assert.equal(safeFileName('サビ F♯m7 B♭'),'F#m7_Bb');});
 console.log(`${n} tests passed`);
