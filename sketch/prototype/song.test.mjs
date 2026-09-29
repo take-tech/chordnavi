@@ -1,7 +1,7 @@
 // song.js の単体テスト：node sketch/prototype/song.test.mjs
 import assert from 'node:assert/strict';
 import {demoSong,newSong,newSection,newChord,timeline,placedChords,renderSong,buildSmf,placeChord,resizeChord,insertBars,
-  setMark,pruneMarks,setKeyMark,keyRegion,mergeSections,splitSection,cloneSection,stretchChord,insertProgression,tickToSec,secToTick,copyRange,pasteAt,nameOf,rangeTicks,PPQ,safeFileName,voicingOf,STRUM_TICKS} from './song.js';
+  setMark,pruneMarks,setKeyMark,stretchChordStart,keyRegion,mergeSections,splitSection,cloneSection,stretchChord,insertProgression,tickToSec,secToTick,copyRange,pasteAt,nameOf,rangeTicks,PPQ,safeFileName,voicingOf,STRUM_TICKS} from './song.js';
 
 const B=PPQ*4;
 let n=0;const test=(name,f)=>{f();n++;console.log('ok',name);};
@@ -50,6 +50,18 @@ test('伸ばす：次のコードを上書きし、上限（2小節）で止ま�
   const a=placeChord(s,0,newChord(0,0,B,0,''));placeChord(s,0,newChord(1,0,B,7,''));placeChord(s,0,newChord(2,0,B,9,'m'));
   stretchChord(s,0,a.id,B*5,PPQ/2,B*2);
   assert.deepEqual(placedChords(s).map(x=>[x.start,x.end,nameOf(s,x.c)]),[[0,B*2,'C'],[B*2,B*3,'Am']]);
+});
+test('頭を伸ばす：前のコードを上書き、終わりはそのまま、上限とセクションの頭で止まる',()=>{
+  const s=newSong();s.sections=[newSection('A',1,4)];
+  placeChord(s,0,newChord(0,0,B,0,''));const g=placeChord(s,0,newChord(1,0,B,7,''));
+  stretchChordStart(s,0,g.id,B-PPQ/2,PPQ/2,B*2);                     // 半拍前へ（食い）
+  assert.deepEqual(placedChords(s).map(x=>[x.start,x.end,nameOf(s,x.c)]),[[0,B-PPQ/2,'C'],[B-PPQ/2,B*2,'G']]);
+  stretchChordStart(s,0,g.id,-B,PPQ/2,B*2);                          // セクションの頭より前へは伸ばさない
+  assert.deepEqual(placedChords(s).map(x=>[x.start,x.end]),[[0,B*2]]);
+  stretchChordStart(s,0,g.id,B*2,PPQ/2,B*2);                         // 後ろへずらすと短くなる（最短 minLen）
+  assert.deepEqual(placedChords(s).map(x=>[x.start,x.end]),[[B*2-PPQ/2,B*2]]);
+  const h=placeChord(s,0,newChord(3,0,B,5,''));stretchChordStart(s,0,h.id,0,PPQ/2,B*2);   // 上限は2小節
+  assert.deepEqual(placedChords(s).at(-1).start,B*2);
 });
 test('小節の挿入と削除',()=>{
   const s=newSong();placeChord(s,0,newChord(3,0,B,7,''));

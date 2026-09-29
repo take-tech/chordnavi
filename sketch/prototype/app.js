@@ -2,7 +2,7 @@ import {MAJ_LABEL,MIN_LABEL,SIG,WHEEL_CELLS,DIATONIC,CHORD,chordDeg,chordAt,chor
   noteName,tonicOf,isFlatKey,keyName as keyNameOf,detectChords,mod12,PROGRESSIONS,variantsOf,progressionDegrees} from '../../ui/theory.js';
 import {PPQ,METERS,SNAPS,snapTicks,barTicksOf,beatTicksOf,SECTION_COLORS,SECTION_PRESETS,PATTERNS,MIN_BPM,MAX_BPM,
   newSong,demoSong,newSection,newChord,cloneSection,timeline,placedChords,placeChord,removeChord,resizeChord,
-  setSectionBars,insertBars,stretchChord,pruneMarks,mergeSections,splitSection,insertProgression,setMark,rangeTicks,copyRange,pasteAt,renderSong,buildSmf,safeFileName,
+  setSectionBars,insertBars,stretchChord,stretchChordStart,pruneMarks,mergeSections,splitSection,insertProgression,setMark,rangeTicks,copyRange,pasteAt,renderSong,buildSmf,safeFileName,
   songTonic,songFlat,nameOf,tempoAt,keyTonic,sameKey,setKeyMark,keyRegion,transposeBars,voicingOf,patternById,VOICINGS,GUITAR_AREAS} from './song.js';
 import * as player from './player.js';
 
@@ -379,7 +379,8 @@ function renderSheet(){
       blk.append(h('span','n',first||w>30?nameOf(song,p.c,p.key):''),h('span','d',first?degOfItem(p.c):''));
       blk.title=`${nameOf(song,p.c,p.key)}（${degOfItem(p.c)}）${fmtLen(p.end-p.start,b.meter)}　パターン：${patternById(p.pattern).name}${p.c.pattern?'（このコードだけ）':''}`;
       if(first&&p.c.pattern){const t=h('span','ptag',patternById(p.c.pattern).short);t.title='このコードだけのパターン：'+patternById(p.c.pattern).name;blk.appendChild(t);blk.classList.add('haspat');}
-      if(e===p.end)blk.appendChild(h('div','rs'));
+      if(first)blk.appendChild(Object.assign(h('div','rs rsl'),{title:'ドラッグで頭の位置を変える（前に伸ばすと前のコードを上書き）'}));
+      if(e===p.end)blk.appendChild(Object.assign(h('div','rs'),{title:'ドラッグで長さを変える'}));
       lane.appendChild(blk);
       first=false;
     }
@@ -582,7 +583,7 @@ function startSectionDrag(e,si){
 function startBlockDrag(e,blkEl){
   const si=+blkEl.dataset.si, id=blkEl.dataset.id, c=song.sections[si].chords.find(x=>x.id===id);if(!c)return;
   const p=placedChords(song,tl).find(x=>x.c.id===id);if(!p)return;
-  const resizing=e.target.classList.contains('rs');
+  const resizing=e.target.classList.contains('rs'), fromLeft=e.target.classList.contains('rsl');   // 右端＝長さ、左端＝頭の位置
   const hit0=hitBar(e.clientX,e.clientY), grab=hit0?hit0.b.start+hit0.tick-p.start:0;
   const x0=e.clientX,y0=e.clientY;let moved=false,target=null;
   // 選ぶと同時に、クリックした位置（スナップ）にカーソルを置く
@@ -598,8 +599,16 @@ function startBlockDrag(e,blkEl){
     const hit=hitBar(ev.clientX,ev.clientY);
     if(resizing){
       if(!hit)return;
-      const st=snapOf(hit.b.meter), end=hit.b.start+Math.max(st,Math.round(hit.tick/st)*st);
-      song=JSON.parse(base);stretchChord(song,si,id,end-p.start,st,maxLen);
+      const st=snapOf(hit.b.meter);
+      song=JSON.parse(base);
+      if(fromLeft){
+        // 頭：セクションの頭からの tick（ほかのセクションの上なら、その端で止まる）
+        const secStart=tl.bars[tl.secRanges[si].from].start, at=hit.b.start+Math.round(hit.tick/st)*st;
+        stretchChordStart(song,si,id,at-secStart,st,maxLen);
+      }else{
+        const end=hit.b.start+Math.max(st,Math.round(hit.tick/st)*st);
+        stretchChord(song,si,id,end-p.start,st,maxLen);
+      }
       tl=timeline(song);render();
       return;
     }
@@ -734,7 +743,7 @@ function renderFooter(){
     pat.onchange=()=>edit(cc=>{if(pat.value)cc.pattern=pat.value;else delete cc.pattern;});
     f.append(h('b','who',nameOf(song,c,p.key)),h('span','',degOfItem(c)),h('span','sep'),'ルート',root,'種類',q,'ベース',bass,h('span','sep'),
       '長さ',minus,h('b','',fmtLen(p.end-p.start,b.meter)),plus,h('span','sep'),'パターン',pat,dup,del);
-    keys.innerHTML='<kbd>←</kbd><kbd>→</kbd>移動 <kbd>⇧</kbd>+<kbd>←</kbd><kbd>→</kbd>長さ <kbd>↑</kbd><kbd>↓</kbd>半音 <kbd>⌫</kbd>削除 <kbd>Alt</kbd>+ドラッグでコピー';
+    keys.innerHTML='<kbd>←</kbd><kbd>→</kbd>移動 <kbd>⇧</kbd>+<kbd>←</kbd><kbd>→</kbd>長さ <kbd>⌥⇧</kbd>+<kbd>←</kbd><kbd>→</kbd>頭 <kbd>↑</kbd><kbd>↓</kbd>半音 <kbd>⌫</kbd>削除 <kbd>Alt</kbd>+ドラッグでコピー';
   }else if(range){
     const n=range.to-range.from;
     const loop=h('button','','この範囲をループ再生');loop.onclick=()=>{ui.loop=true;render();startPlay();};
@@ -828,18 +837,20 @@ addEventListener('keydown',e=>{
   if(e.key==='Home'){cursor={gi:0,pos:0};sel=null;range=null;render();scrollToBar(0);return;}
   if(e.key==='Delete'||e.key==='Backspace'){e.preventDefault();deleteSel();return;}
   if(/^[1-7]$/.test(e.key)){e.preventDefault();sel=null;range=null;insertAtCursor(diaItems()[+e.key-1]);return;}
-  if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.preventDefault();arrow(e.key==='ArrowRight'?1:-1,e.shiftKey);return;}
+  if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.preventDefault();arrow(e.key==='ArrowRight'?1:-1,e.shiftKey,e.altKey);return;}
   if((e.key==='ArrowUp'||e.key==='ArrowDown')&&sel){
     e.preventDefault();const d=e.key==='ArrowUp'?1:-1;
     commit(()=>{const c=song.sections[sel.si].chords.find(x=>x.id===sel.id);c.off=mod12(c.off+d);if(c.boff!=null)c.boff=mod12(c.boff+d);});
     previewSel();
   }
 });
-function arrow(dir,shift){
+function arrow(dir,shift,alt){
   const b=tl.bars[cursor.gi];if(!b)return;
   const st=snapOf(b.meter);
   if(sel){
     const p=placedChords(song,tl).find(x=>x.c.id===sel.id);if(!p)return;
+    // ⌥⇧＋←→：頭の位置（終わりはそのまま）、⇧＋←→：長さ
+    if(shift&&alt){const secStart=tl.bars[tl.secRanges[sel.si].from].start;commit(()=>stretchChordStart(song,sel.si,sel.id,p.start-secStart+dir*st,st,maxLenAt(p.start)));return;}
     if(shift){commit(()=>stretchChord(song,sel.si,sel.id,p.end-p.start+dir*st,st,maxLenAt(p.start)));return;}
     const abs=p.start+dir*st, nb=tl.bars.find(x=>abs>=x.start&&abs<x.start+x.ticks);
     if(!nb)return;

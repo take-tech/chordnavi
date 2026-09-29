@@ -169,6 +169,16 @@ export function stretchChord(song,si,id,len,minLen,maxLen){
   if(!c)return null;
   return placeChord(song,si,{...c,len:Math.max(minLen,Math.min(maxLen,len))});
 }
+// 頭の位置の変更（終わりはそのまま）。start はセクションの頭からの tick。前に伸ばした先のコードは上書き。
+// 長さは minLen〜maxLen、セクションの頭より前には伸ばさない
+export function stretchChordStart(song,si,id,start,minLen,maxLen){
+  const c=song.sections[si].chords.find(x=>x.id===id);
+  if(!c)return null;
+  const g=secGeom(timeline(song),si), a=g.toLocal(c.bar,c.pos), e=a+c.len;
+  let s0=Math.max(0,Math.min(start,e-minLen));
+  if(e-s0>maxLen)s0=e-maxLen;
+  return placeChord(song,si,{...c,...g.fromLocal(s0),len:e-s0});
+}
 // セクションの小節数を変える。はみ出したコード・マークは消す（長さは切る）
 export function setSectionBars(song,si,n){
   const sec=song.sections[si];n=Math.max(1,Math.min(128,n));

@@ -169,6 +169,8 @@ body.grabbing,body.grabbing *{cursor:grabbing!important}
 .blk.playing{background:var(--chord-tint);border-color:var(--chord)}
 .blk.anti::before{content:'';position:absolute;left:0;top:0;border-top:7px solid var(--root);border-right:7px solid transparent}
 .blk .rs{position:absolute;right:0;top:0;bottom:0;width:7px;cursor:ew-resize}
+.blk .rs.rsl{right:auto;left:0}
+.blk.narrow .rs{width:5px}
 .blk .rs:hover{background:rgba(196,69,106,.25)}
 .lane::after{content:'';position:absolute;left:0;right:0;bottom:0;height:11px;background:var(--grid2);border-top:1px dashed var(--grid);pointer-events:none}   /* カーソル帯：いつでもクリックでカーソル・ドラッグで範囲 */
 .lane:hover::after{background:rgba(47,111,214,.10)}
