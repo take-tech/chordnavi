@@ -160,10 +160,9 @@ for(const m of ['major','minor'])for(let i=0;i<12;i++){
 keySel.addEventListener('change',()=>{const [i,m]=keySel.value.split(':');setKey(+i,m);});
 
 /* ---------- パレット（ダイアトニック・コードを作る） ---------- */
-function paletteChip(item,key){
+function paletteChip(item){
   const b=h('button','pchip');
   b.append(h('span','n',nameOfItem(item)),h('span','d',degOfItem(item)));
-  if(key)b.append(h('span','k',key));
   b.title='クリックで試聴、ダブルクリックでカーソル位置に入力、シートへドラッグで配置';
   b.addEventListener('pointerdown',e=>startPaletteDrag(e,item));
   b.addEventListener('dblclick',()=>insertAtCursor(item));
@@ -171,24 +170,27 @@ function paletteChip(item,key){
 }
 const diaItems=()=>DIATONIC[ui.dia][song.key.mode].map(([off,q])=>({off,q}));
 function customItem(){
-  const off=+$('bRoot').value, q=$('bQ').value, bv=$('bBass').value;
-  return {off,q,...(bv!==''&&+bv!==off?{boff:+bv}:{})};
+  const off=+$('bRoot').value, q=$('bQ').value, bv=+$('bBass').value;
+  return {off,q,...(bv!==off?{boff:bv}:{})};
 }
+let lastRoot='0';   // 直前のルート（ベースがこれと同じなら、ルートを変えたときに一緒に動かす）
 function renderPalette(){
   const dia=$('dia');dia.innerHTML='';
-  diaItems().forEach((it,i)=>dia.appendChild(paletteChip(it,String(i+1))));
+  diaItems().forEach(it=>dia.appendChild(paletteChip(it)));
   // コードを作る：ルート・ベースの選択肢は今のキーの音名で
   for(const id of ['bRoot','bBass']){
     const s=$(id), v=s.value;s.innerHTML='';
-    if(id==='bBass')s.appendChild(Object.assign(h('option','','/ベース'),{value:''}));
     for(let off=0;off<12;off++)s.appendChild(Object.assign(h('option','',(id==='bBass'?'/':'')+noteName(mod12(tonic()+off),flat())),{value:off}));
-    s.value=v||(id==='bRoot'?'0':'');
+    s.value=v||$('bRoot').value||'0';   // ベースの既定はルートと同じ音（分数コードにしない）
   }
+  lastRoot=$('bRoot').value;
   const c=$('custom');c.innerHTML='';c.appendChild(paletteChip(customItem()));
   document.querySelectorAll('.left .pchip .n').forEach(n=>fitText(n,9));
   document.querySelectorAll('#diaSeg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.v===ui.dia));
 }
 for(const q of QUALITIES)$('bQ').appendChild(Object.assign(h('option','',q===''?'maj':CHORD[q].s),{value:q}));
+// ルートを変えたとき、ベースがルートと同じ（分数コードでない）なら一緒に動かす
+$('bRoot').addEventListener('change',()=>{if($('bBass').value===lastRoot)$('bBass').value=$('bRoot').value;lastRoot=$('bRoot').value;});
 for(const id of ['bRoot','bQ','bBass'])$(id).addEventListener('change',()=>{renderPalette();previewItem(customItem());});
 document.querySelectorAll('#diaSeg button').forEach(b=>b.addEventListener('click',()=>{ui.dia=b.dataset.v;renderPalette();persist();}));
 
@@ -242,7 +244,10 @@ function renderProg(){
   names.innerHTML='';
   for(const bar of bars){
     const cell=h('span','pb');
-    for(const [off,q,boff] of Array.isArray(bar[0])?bar:[bar])cell.appendChild(h('span','pc',nameOfItem({off,q,boff})));
+    (Array.isArray(bar[0])?bar:[bar]).forEach(([off,q,boff],k)=>{
+      if(k)cell.appendChild(h('span','dash','-'));
+      cell.appendChild(h('span','pc',nameOfItem({off,q,boff})));
+    });
     cell.title=cell.textContent;names.appendChild(cell);
   }
   names.querySelectorAll('.pb').forEach(cell=>fitText(cell,7.5));
