@@ -136,6 +136,7 @@ auval -v aumu Gdkn Rnze
 
 - 配布用 `.pkg`：`./scripts/package_macos.sh`（`build-release/packages/ChordNavi-<ver>-macOS.pkg`。AU・VST3・Standalone を形式ごとの部品 pkg にして `productbuild` でまとめ、インストール時の「カスタマイズ」でどれを入れるか選べる（既定はすべて）。バージョンは CMake の `project(... VERSION)`、または環境変数 `CHORDNAVI_VERSION`）。署名・公証は環境変数（`MACOS_APP_SIGN_IDENTITY` など）があるときだけ。
 - ビルドは Intel／Apple Silicon のユニバーサル（`CMAKE_OSX_ARCHITECTURES`、macOS 11 以降）。
+- ChordSketch は別のタグ `sketch-v*` と `.github/workflows/sketch-release.yml`（sketch/CLAUDE.md）。
 - タグ `v*` を push すると `.github/workflows/release.yml` が `.pkg`（macOS）と `Setup.exe`（Windows）をビルドして GitHub Release に添付する。手動実行（workflow_dispatch）では成果物だけ作る。
 - **Windows**：GitHub Actions（windows-2022）でビルド。WebView2 SDK を NuGet で取得し `-DJUCE_WEBVIEW2_PACKAGE_LOCATION` で渡す。WebView2 は静的リンク（`JUCE_USE_WIN_WEBVIEW2_WITH_STATIC_LINKING`）、エディタは WebView2 バックエンド＋データフォルダを AppData に。MSVC は `/utf-8`。インストーラーは Inno Setup（`installer/windows/ChordNavi.iss`、VST3 と Standalone をコンポーネントとして選べる、WebView2 ランタイムが無ければ案内）。Standalone の「オプション」はウィンドウ内のメニューバー。
 

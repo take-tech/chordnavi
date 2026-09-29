@@ -21,7 +21,10 @@
 - 曲ファイル（JUCE 版）：`songOpen()` → `{path,name,text}`、`songSaveAs({name,text,path})` → `{path,name}`（どちらもネイティブのダイアログ。拡張子 .chordsketch が無ければ付ける。取り消しは "cancelled"）、`songWrite({path,text})`（上書き保存）。書き込みは一時ファイルに書いてから置き換える。JS の `fileHandle` はブラウザではファイルのハンドル、JUCE 版はパスの文字列。同じパスのファイルを開いたらそのタブに切り替える。
 - 自動保存（JUCE 版）：開いているタブ全部（曲・ファイル名・パス・未保存の印）と画面の設定を `loadSession()`／`saveSession(json)` で `~/Library/Application Support/ChordSketch/session.json`（Windows は AppData の `ChordSketch/session.json`）に。ブラウザは localStorage。session.json が無いときは WebView の localStorage を読む（前の版からの引き継ぎ）。パスを覚えているので、起動し直しても上書き保存できる。
 - JUCE の WebView（macOS）は `alert()`・`confirm()`・`print()` を扱わないので使わない（印刷は `printPage`）：確認は画面の中のダイアログ（`askDialog`）、知らせはトースト。
-- ビルド：`cmake --build build --target ChordSketch_Standalone`。`build/ChordSketch_artefacts/<構成>/Standalone/ChordSketch.app`。配布用のスクリプト・CI はまだ ChordNavi だけ。
+- ビルド：`cmake --build build --target ChordSketch_Standalone`。`build/ChordSketch_artefacts/<構成>/Standalone/ChordSketch.app`。
+- 曲ファイルの関連付け：macOS は `DOCUMENT_EXTENSIONS chordsketch`（Info.plist）、Windows はインストーラーのレジストリ。ダブルクリックで開いたファイルは `SketchStandaloneApp`（起動時のコマンドライン・`anotherInstanceStarted`）→ `SketchProcessor::queueOpenFiles` → エディタが JS に渡す（JS が起動時に `takeOpenFiles()` を呼んだあとは 30Hz のタイマーで `openFiles` イベント）。起動中なら新しいタブ、もう開いていればそのタブへ。
+- 印刷：macOS は `printPage`（上）。Windows の WebView2 は JS の `print()` で印刷画面が出るので、`printPage` が false を返したら `print()`。
+- 配布：macOS は `./scripts/package_sketch_macos.sh`（`build-release/packages/ChordSketch-<ver>-macOS.pkg`。/Applications に入れる。署名・公証の環境変数は ChordNavi と同じ）。Windows は Inno Setup の `installer/windows/ChordSketch.iss`（Program Files、スタートメニュー、.chordsketch の関連付け、WebView2 ランタイムが無ければ案内）。タグ `sketch-v*` を push すると `.github/workflows/sketch-release.yml` が両方を作って GitHub Release に添付する（ChordNavi の `v*` とは別。手動実行では成果物だけ）。
 
 ## ファイル
 
@@ -123,5 +126,5 @@ sketch/prototype/
 4. ~~試聴~~（済み・2026-09-29）：C++ のシンセに曲全体を予約し、再生位置を C++ の時計で UI へ返す。ドラム音も C++ に。Standalone で再生・ループ・カウントイン・メトロノーム・再生中の変更・試聴・ミュート・出力先・MIDI 鍵盤を確認（ユーザー確認）
 5. ~~MIDI 入力・状態の保存・ファイル~~（済み・2026-09-29）：MIDI 入力（C++ の `midiNotes`）、自動保存（session.json）、Standalone のファイルを開く／保存（ネイティブのダイアログ）。Standalone で確認（ユーザー確認）
 6. ~~PDF~~（済み・2026-09-29）：WKWebView は JS の `print()` を扱わないので、`printPage({title})` で C++ から macOS の印刷画面を出す（`shared/cpp/WebViewPrint.mm`。`@media print` の見た目、余白は上下 14mm・左右 12mm。PDF は印刷画面の「PDF として保存」）。印刷画面・PDF を確認（ユーザー確認）。Windows は 7 で WebView2 の印刷画面を足す
-7. Windows のビルド・配布（CI・インストーラー）と、DAW へのドラッグの確認（DAW によってはドラッグした MIDI のテンポ・拍子を読まない。ノートの位置は tick なのでずれない）。macOS の配布用パッケージ
+7. Windows のビルド・配布（CI・インストーラー）と、DAW へのドラッグの確認（macOS の .pkg・Windows の .iss・ワークフロー・関連付けは作成済み。Windows の実機確認はまだ）（DAW によってはドラッグした MIDI のテンポ・拍子を読まない。ノートの位置は tick なのでずれない）。macOS の配布用パッケージ
 8. （PC 版のあと）iPad 版：指で操作しやすい画面、DAW との受け渡し（AUv3 にするか、ファイル・共有メニューか）、App Store での配布
