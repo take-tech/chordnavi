@@ -1328,7 +1328,7 @@ function layoutPrint(){
 }
 let usedSync=false, usedAnti=false;
 function buildPrint(){
-  const pr=$('print');pr.innerHTML='';usedSync=false;usedAnti=false;
+  const pr=$('print');pr.innerHTML='';pr.classList.toggle('with-deg',$('prDeg').checked);usedSync=false;usedAnti=false;
   pr.appendChild(h('h2','',song.title));
   pr.appendChild(h('div','meta',`Key: ${songKeyLabel()}（${song.key.mode==='major'?'メジャー':'マイナー'}）　♩=${song.bpm}　${song.meter.join('/')}`));
   const pcs=placedChords(song,tl);

@@ -280,6 +280,7 @@ body.grabbing,body.grabbing *{cursor:grabbing!important}
 .print .plabel{display:inline-block;font-weight:900;font-size:11pt;border:1.5px solid #000;border-radius:3px;padding:0 6px;margin-bottom:1.5mm;border-left:6px solid var(--c)}
 .print .prow{display:grid;grid-template-columns:repeat(4,1fr);margin-bottom:3mm;print-color-adjust:exact;-webkit-print-color-adjust:exact}
 .print .pbar{position:relative;height:13mm;border-left:1.2px solid #000}
+.print.with-deg .pbar{height:16mm}   /* 度数の行のぶん高くして、左下の小節番号と重ねない */
 .print .pbar.end{border-right:1.2px solid #000}
 .print .pbar.final{border-right:3.5px double #000}
 .print .pch{position:absolute;top:4mm;font-size:13pt;padding-left:1.5mm;white-space:nowrap;line-height:1.1}
