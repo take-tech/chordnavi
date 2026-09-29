@@ -1244,9 +1244,7 @@ async function openFile(){
   if(hasNative){
     const r=await nativeFile.open().catch(e=>{console.error(e);return null;});
     if(typeof r?.text!=='string'){if(r!=='cancelled'){console.error(r);toast('ファイルを開けませんでした');}return;}
-    const open=docs.findIndex((d,i)=>(i===active?fileHandle:d.handle)===r.path);   // もう開いているならそのタブへ
-    if(open>=0){switchTab(open);toast('このファイルはもう開いています');return;}
-    loadSongText(r.text,r.name,r.path);
+    openNativeFile(r);
     return;
   }
   if('showOpenFilePicker' in window){
@@ -1255,6 +1253,18 @@ async function openFile(){
     return;
   }
   $('fileInput').click();
+}
+// JUCE 版で読んだファイル { path, name, text }。もう開いているならそのタブへ
+function openNativeFile(r){
+  const open=docs.findIndex((d,i)=>(i===active?fileHandle:d.handle)===r.path);
+  if(open>=0){switchTab(open);toast('このファイルはもう開いています');return;}
+  loadSongText(r.text,r.name,r.path);
+}
+// Finder・エクスプローラーでダブルクリックした曲ファイル（起動前に開いたものは takeOpenFiles でまとめて受け取る）
+if(hasNative){
+  const openList=list=>{for(const r of Array.isArray(list)?list:[])if(typeof r?.text==='string')openNativeFile(r);};
+  nativeFn('takeOpenFiles')().then(openList).catch(e=>console.error(e));
+  onNative('openFiles',openList);
 }
 function loadSongText(text,name,handle){
   try{const s=validSong(JSON.parse(text).song);if(!s)throw 0;openInTab(s,name,handle);}
@@ -1419,10 +1429,11 @@ $('printBtn').onclick=()=>{buildPrint();$('printWrap').hidden=false;layoutPrint(
 $('prDeg').onchange=()=>{buildPrint();layoutPrint();};
 $('prClose').onclick=()=>{$('printWrap').hidden=true;};
 // PDF のファイル名は document.title になる
-// 印刷。JUCE 版の WebView は print() を扱わないので、C++ から OS の印刷画面を出す（PDF もそこから保存）
+// 印刷。JUCE 版の macOS の WebView は print() を扱わないので、C++ から OS の印刷画面を出す（PDF もそこから保存）
 const nativePrint=nativeFn('printPage');
 $('prGo').onclick=async()=>{
-  if(nativePrint){if(!await nativePrint({title:song.title||'ChordSketch'}).catch(()=>false))toast('印刷画面を出せませんでした');return;}
+  // macOS は C++ が印刷画面を出す。Windows（WebView2）は JS の print() で印刷画面が出るので、false が返ったら print() を使う
+  if(nativePrint&&await nativePrint({title:song.title||'ChordSketch'}).catch(()=>false))return;
   const t=document.title;document.title=song.title||'ChordSketch';print();document.title=t;
 };
 

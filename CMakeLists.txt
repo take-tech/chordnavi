@@ -159,6 +159,7 @@ juce_add_plugin(ChordSketch
     IS_MIDI_EFFECT              FALSE
     EDITOR_WANTS_KEYBOARD_FOCUS TRUE
     NEEDS_WEBVIEW2              TRUE
+    DOCUMENT_EXTENSIONS         chordsketch   # Finder でダブルクリックしたら開く（Windows はインストーラーで登録）
 )
 
 target_sources(ChordSketch PRIVATE

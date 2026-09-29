@@ -14,6 +14,20 @@ namespace
 {
 using namespace juce;
 
+// コマンドライン（Windows のダブルクリック・macOS の「開く」。空白を含むパスは "" で囲まれる）から曲ファイルを取り出す
+StringArray songFilesIn (const String& commandLine)
+{
+    StringArray out;
+    for (auto token : StringArray::fromTokens (commandLine, true))
+    {
+        token = token.unquoted();
+        if (File::isAbsolutePath (token))
+            if (const File f (token); f.existsAsFile() && (f.hasFileExtension ("chordsketch") || f.hasFileExtension ("json")))
+                out.add (f.getFullPathName());
+    }
+    return out;
+}
+
 //==============================================================================
 // 縦横比・最小サイズを「中身（タイトルバーを除く）」に対してかける。
 // ネイティブのタイトルバーでは checkBounds にタイトルバー込みの大きさが渡されるため
@@ -130,13 +144,33 @@ public:
     const String getApplicationName() override           { return CharPointer_UTF8 (JucePlugin_Name); }
     const String getApplicationVersion() override        { return JucePlugin_VersionString; }
     bool moreThanOneInstanceAllowed() override           { return false; }
-    void anotherInstanceStarted (const String&) override {}
 
-    void initialise (const String&) override
+    // Finder でダブルクリック（macOS）、起動中にもう一度起動（Windows）：曲ファイルを新しいタブで開く
+    void anotherInstanceStarted (const String& commandLine) override
+    {
+        openSongFiles (songFilesIn (commandLine));
+        if (window != nullptr)
+            window->toFront (true);
+    }
+
+    void openSongFiles (const StringArray& paths)
+    {
+        if (paths.isEmpty())
+            return;
+        if (auto* processor = holder != nullptr ? dynamic_cast<SketchProcessor*> (holder->processor.get()) : nullptr)
+            processor->queueOpenFiles (paths);
+        else
+            pendingFiles.addArray (paths);   // まだ起動の途中
+    }
+
+    void initialise (const String& commandLine) override
     {
         // MIDI キーボードをつないだらすぐ使えるよう、MIDI 入力は自動で開く
         holder = std::make_unique<StandalonePluginHolder> (appProperties.getUserSettings(), false, String{}, nullptr,
                                                            Array<StandalonePluginHolder::PluginInOuts>{}, true);
+
+        pendingFiles.addArray (songFilesIn (commandLine));   // Windows：ダブルクリックで起動したときのファイル
+        openSongFiles (std::exchange (pendingFiles, {}));
 
         window = std::make_unique<MainWindow> (getApplicationName(), *holder);
         window->setVisible (true);
@@ -195,6 +229,7 @@ private:
     std::unique_ptr<StandalonePluginHolder> holder;
     std::unique_ptr<MainWindow> window;
     OptionsMenu menu;
+    StringArray pendingFiles;
 };
 }
 

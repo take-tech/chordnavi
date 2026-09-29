@@ -63,6 +63,9 @@ private:
     // 再生位置は "songPos" { session, seconds, playing }、押している鍵盤は "midiNotes" { notes } で 30Hz で JS に送る
     void timerCallback() override;
     SongPlayer::Position lastSentPosition { -2, 0.0, false };
+    // JS が takeOpenFiles() を呼んだら true（それより前に開いたファイルは、そのときにまとめて返す）。
+    // その後に届いたファイルは "openFiles" [{ path, name, text }] で送る
+    bool pageReady = false;
     std::vector<int> lastSentNotes;
 
     SketchProcessor& processorRef;

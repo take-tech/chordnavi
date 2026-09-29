@@ -47,6 +47,11 @@ public:
     void setUiState (const juce::String& json);
     juce::String getUiState() const;
 
+    // Finder・エクスプローラーから開いた曲ファイル（メッセージスレッドだけで使う）。
+    // アプリが受け取って入れ、画面の準備ができたらエディタが取り出して JS に渡す
+    void queueOpenFiles (const juce::StringArray& paths) { pendingOpenFiles.addArray (paths); }
+    juce::StringArray takeOpenFiles() { auto out = pendingOpenFiles; pendingOpenFiles.clear(); return out; }
+
 private:
     void handleMidi (const juce::MidiMessage&);
 
@@ -62,6 +67,7 @@ private:
 
     mutable juce::CriticalSection stateLock;
     juce::String uiState;
+    juce::StringArray pendingOpenFiles;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (SketchProcessor)
 };

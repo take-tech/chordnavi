@@ -98,6 +98,19 @@ namespace
         return juce::var (o);
     }
 
+    // 開くファイルの一覧 → [{ path, name, text }]（読めないファイルは飛ばす）
+    juce::var openFileList (const juce::StringArray& paths)
+    {
+        juce::Array<juce::var> list;
+        for (const auto& p : paths)
+        {
+            const juce::File file (p);
+            if (const auto text = readTextFile (file); text.isNotEmpty())
+                list.add (fileResult (file, text));
+        }
+        return list;
+    }
+
     // SMF のヘッダ（MThd）で始まるか
     bool looksLikeMidi (const juce::MemoryBlock& data)
     {
@@ -144,6 +157,11 @@ juce::WebBrowserComponent::Options SketchEditor::makeOptions()
                                  const auto text = args.isEmpty() ? juce::String() : args[0].getProperty ("text", "").toString();
                                  completion (juce::var (juce::File::isAbsolutePath (path) && text.isNotEmpty()
                                                         && writeTextSafely (juce::File (path), text)));
+                             })
+        .withNativeFunction ("takeOpenFiles", [this] (const auto&, auto completion)
+                             {
+                                 pageReady = true;
+                                 completion (openFileList (processorRef.takeOpenFiles()));
                              })
         .withNativeFunction ("loadSession", [] (const auto&, auto completion)
                              {
@@ -224,6 +242,10 @@ void SketchEditor::timerCallback()
         o->setProperty ("playing", p.playing);
         webView.emitEventIfBrowserIsVisible ("songPos", juce::var (o));
     }
+
+    if (pageReady)
+        if (const auto paths = processorRef.takeOpenFiles(); ! paths.isEmpty())
+            webView.emitEventIfBrowserIsVisible ("openFiles", openFileList (paths));
 
     const auto notes = processorRef.getHeldNotes();
     if (notes != lastSentNotes)
