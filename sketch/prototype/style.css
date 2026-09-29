@@ -194,8 +194,6 @@ body.grabbing,body.grabbing *{cursor:grabbing!important}
 .footer b.pos{font-variant-numeric:tabular-nums;min-width:52px}
 .footer .who{color:var(--chord)}
 .footer select{font-size:12px;padding:1px 3px}
-.footer .keys{margin-left:auto;font-size:10.5px;color:var(--faint);overflow:hidden;text-overflow:ellipsis}
-kbd{font:inherit;font-size:10px;border:1px solid var(--line);border-bottom-width:2px;border-radius:3px;padding:0 3px;background:var(--card);color:var(--ink2)}
 
 /* ポップアップ（テンポ・拍子の変更） */
 .pop{position:fixed;z-index:30;background:var(--card);border:1px solid var(--ink2);border-radius:6px;padding:10px 12px;box-shadow:0 8px 24px rgba(30,39,66,.25);

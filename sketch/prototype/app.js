@@ -714,7 +714,6 @@ addEventListener('pointerdown',e=>{if(!pop.hidden&&!pop.contains(e.target)&&!e.t
 /* ---------- 下のバー ---------- */
 function renderFooter(){
   const f=$('footer');f.innerHTML='';
-  const keys=h('span','keys');
   const p=sel&&placedChords(song,tl).find(x=>x.c.id===sel.id);
   if(p){
     const c=p.c, b=tl.bars.find(x=>p.start>=x.start&&p.start<x.start+x.ticks), kt=keyTonic(p.key), kf=isFlatKey(p.key.idx);
@@ -743,7 +742,6 @@ function renderFooter(){
     pat.onchange=()=>edit(cc=>{if(pat.value)cc.pattern=pat.value;else delete cc.pattern;});
     f.append(h('b','who',nameOf(song,c,p.key)),h('span','',degOfItem(c)),h('span','sep'),'ルート',root,'種類',q,'ベース',bass,h('span','sep'),
       '長さ',minus,h('b','',fmtLen(p.end-p.start,b.meter)),plus,h('span','sep'),'パターン',pat,dup,del);
-    keys.innerHTML='<kbd>←</kbd><kbd>→</kbd>移動 <kbd>⇧</kbd>+<kbd>←</kbd><kbd>→</kbd>長さ <kbd>⌥⇧</kbd>+<kbd>←</kbd><kbd>→</kbd>頭 <kbd>↑</kbd><kbd>↓</kbd>半音 <kbd>⌫</kbd>削除 <kbd>Alt</kbd>+ドラッグでコピー';
   }else if(range){
     const n=range.to-range.from;
     const loop=h('button','','この範囲をループ再生');loop.onclick=()=>{ui.loop=true;render();startPlay();};
@@ -752,7 +750,6 @@ function renderFooter(){
     const ins=h('button','','挿入');ins.onclick=()=>insertBarsAtCursor(n);ins.title=`選択範囲の前に${n}小節を入れる`;
     const rm=h('button','','削除');rm.onclick=()=>deleteRangeBars();rm.title='選択範囲の小節を消す';
     f.append(h('b','',rangeLabel(range)),h('span','',`（${n}小節）を選択`),loop,copy,clear,h('span','sep'),'小節',ins,rm);
-    keys.innerHTML='<kbd>⌘C</kbd>コピー <kbd>⌘V</kbd>貼り付け <kbd>⌫</kbd>コードを消す <kbd>Esc</kbd>解除';
   }else{
     const b=tl.bars[cursor.gi];
     const markBtn=h('button','','テンポ・拍子・キー…');markBtn.onclick=()=>openMarkPop(cursor.gi,cursor.pos,markBtn);
@@ -762,9 +759,7 @@ function renderFooter(){
     const split=h('button','','セクション分割');split.disabled=!b||b.bar===0;split.onclick=splitAtCursor;
     split.title='カーソルのある小節の頭でセクションを2つに分ける';
     f.append('カーソル',h('b','pos',b?fmtPos(cursor.gi,cursor.pos):'—'),markBtn,h('span','sep'),'小節',ins,rm,h('span','sep'),split,paste);
-    keys.innerHTML='<kbd>1</kbd>〜<kbd>7</kbd>ダイアトニックを入力 <kbd>←</kbd><kbd>→</kbd>カーソル <kbd>Space</kbd>再生 <kbd>⌘A</kbd>全選択';
   }
-  f.appendChild(keys);
 }
 function splitAtCursor(){
   const b=tl.bars[cursor.gi];if(!b||b.bar===0)return;
