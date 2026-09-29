@@ -53,17 +53,24 @@ h1{font-size:17px;font-weight:900;letter-spacing:.02em;margin:0 6px 0 0;white-sp
 #muteBtn{min-width:30px;font-weight:900}
 #muteBtn[aria-pressed=true]{background:#C4456A;border-color:#C4456A;color:#fff}
 .play.on{background:var(--chord);border-color:var(--chord)}
-/* 位置の表示：2行×2列（テンポ｜位置 / 拍子・キー｜経過時間）。画面の色になじませる */
-.lcd{display:grid;grid-template-columns:auto auto;column-gap:14px;align-items:center;border:1px solid var(--line);background:var(--card);border-radius:5px;padding:1px 10px;line-height:1.2;font-variant-numeric:tabular-nums}
-.lcd button{border:0;background:none;padding:0;border-radius:2px;color:inherit;font:inherit;cursor:pointer}
-.lcd button:hover{color:var(--live)}
-.lcd-v{white-space:nowrap}
-#lcdTempo{font-size:14px;color:var(--ink2);text-align:left}
-#lcdTempo b{font-size:15px;color:var(--ink)}
-.lcd .pos{font-size:15px;font-weight:700;color:var(--ink);text-align:right;min-width:62px}
-.lcd .pos.count{color:var(--chord)}
-.lcd .sub{font-size:11px;color:var(--muted);display:flex;gap:8px}
-.lcd .time{justify-content:flex-end;text-align:right}
+/* 位置の表示（DAW のトランスポート風の暗い枠。テーマによらず同じ色）：
+   2列の幅を固定し、数字は右そろえ（等幅）。左＝テンポ／拍子・キー、右＝位置／経過時間 */
+.lcd{--lcd-bg:#12151C;--lcd-hi:#7CC4FF;--lcd-lo:#5E9ED6;--lcd-dim:#4B5670;--lcd-line:#262C3A;
+  display:grid;grid-template-columns:86px 84px;grid-template-rows:17px 14px;background:var(--lcd-bg);border:1px solid #07090D;border-radius:4px;
+  padding:3px 0;font-variant-numeric:tabular-nums;font-family:"SF Mono",Menlo,Consolas,"Hiragino Sans",monospace;letter-spacing:.02em}
+.lcd-c{display:flex;align-items:center;justify-content:flex-end;gap:7px;padding:0 9px;white-space:nowrap;min-width:0}
+.lcd .r1,.lcd .r2{border-left:1px solid var(--lcd-line)}
+.lcd button{border:0;background:none;padding:0;border-radius:2px;color:inherit;font:inherit;cursor:pointer;letter-spacing:inherit}
+.lcd button:hover{color:#fff}
+.lcd .l1,.lcd .r1{font-size:15px;color:var(--lcd-hi)}
+.lcd .l1 b{font-weight:600}
+.lcd .r1{font-weight:600}
+.lcd .l2,.lcd .r2{font-size:11.5px;color:var(--lcd-lo)}
+.lcd #lcdKey{color:var(--lcd-dim)}
+.lcd #lcdKey:hover{color:#fff}
+.lcd .l1::before{content:'♩';font-size:12px;color:var(--lcd-dim);margin-right:auto}
+.lcd .l2::before{content:'';margin-right:auto}
+.lcd .pos.count{color:#FF8FA8}
 .loop svg{display:block}
 .ic{padding:2px 8px;font-size:14px}
 .menu{position:relative}

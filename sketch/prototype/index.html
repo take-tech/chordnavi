@@ -18,10 +18,10 @@
     </div>
     <!-- 位置の表示（DAW のトランスポートと同じ並び）：今の位置のテンポ／拍子・キー、位置／経過時間。数字を押すとその値を変える -->
     <div class="lcd" id="lcd">
-      <button class="lcd-v" id="lcdTempo" title="テンポ（押すと変更）">♩ <b id="lcdBpm">120.0</b></button>
-      <span class="lcd-v pos" id="posDisp" title="位置（小節.拍.16分）">1.1.1</span>
-      <span class="lcd-v sub"><button id="lcdMeter" title="拍子（押すと変更）">4/4</button><button id="lcdKey" title="キー">Key C</button></span>
-      <span class="lcd-v sub time" id="lcdTime" title="経過時間（分:秒）">0:00.0</span>
+      <button class="lcd-c l1" id="lcdTempo" title="テンポ（押すと変更）"><b id="lcdBpm">120.0</b></button>
+      <span class="lcd-c r1 pos" id="posDisp" title="位置（小節.拍.16分）">1.1.1</span>
+      <span class="lcd-c l2"><button id="lcdMeter" title="拍子（押すと変更）">4/4</button><button id="lcdKey" title="キー">C</button></span>
+      <span class="lcd-c r2 time" id="lcdTime" title="経過時間（分:秒）">0:00.0</span>
     </div>
     <select id="metro" title="メトロノーム（試聴のみ）"></select>
     <button id="countIn" class="tg" aria-pressed="false" title="再生の前に1小節クリック">カウント</button>
