@@ -1483,9 +1483,13 @@ function render(){
 }
 
 /* ---------- 画面の拡大縮小（スクロールなし、ChordNavi と同じ） ---------- */
+// 画面（1280×780）をウィンドウに合わせて拡大縮小する。文字がにじまないよう、
+// 拡大率が 1 にほぼ等しいときはちょうど 1 にし、位置は整数のピクセルにそろえる（WKWebView では半端な値でぼやける）
 function fit(){
-  const s=Math.min(innerWidth/1280,innerHeight/780);
-  $('stage').style.transform=`translate(-50%,-50%) scale(${s})`;
+  let s=Math.min(innerWidth/1280,innerHeight/780);
+  if(Math.abs(s-1)<.015)s=1;
+  const x=Math.round((innerWidth-1280*s)/2), y=Math.round((innerHeight-780*s)/2);
+  $('stage').style.transform=`translate(${x}px,${y}px) scale(${s})`;
 }
 addEventListener('resize',()=>{fit();renderSheet();});
 fit();applyTheme();rotateTo(curKey().idx,true);render();renderLive();renderFileState();
