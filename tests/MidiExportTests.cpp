@@ -147,6 +147,29 @@ public:
             expectEquals (MidiExport::safeFileName ("../etc/passwd"), juce::String ("___etc_passwd"));
             expectEquals (MidiExport::safeFileName (juce::String::fromUTF8 ("I–V–VIm–IV")), juce::String ("I_V_VIm_IV"));
         }
+
+        beginTest ("Temp file from prebuilt SMF bytes (ChordSketch)");
+        {
+            const char smf[] = { 'M', 'T', 'h', 'd', 0, 0, 0, 6, 0, 0, 0, 1, 1, (char) 0xe0 };
+            juce::MemoryBlock data (smf, sizeof (smf));
+            const auto file = MidiExport::writeTempBytes (data, juce::String::fromUTF8 ("C_サビ F♯m.mid"), "ChordSketchTests");
+            expect (file.existsAsFile());
+            expectEquals (file.getFileName(), juce::String ("C____F#m.mid"));   // safeFileName は1文字ずつ _ にする（ChordNavi と同じ）
+            expectEquals (file.getParentDirectory().getFileName(), juce::String ("ChordSketchTests"));
+            juce::MemoryBlock back;
+            expect (file.loadFileAsData (back));
+            expect (back == data);
+            file.deleteFile();
+            expect (! MidiExport::writeTempBytes ({}, "empty", "ChordSketchTests").exists());
+        }
+
+        beginTest ("Extension is added only when missing");
+        {
+            const auto dir = juce::File::getSpecialLocation (juce::File::tempDirectory);
+            expectEquals (MidiExport::withExtensionIfMissing (dir.getChildFile ("take2"), "mid").getFileName(), juce::String ("take2.mid"));
+            expectEquals (MidiExport::withExtensionIfMissing (dir.getChildFile ("take2.MID"), "mid").getFileName(), juce::String ("take2.MID"));
+            expectEquals (MidiExport::withExtensionIfMissing (dir.getChildFile ("song.v2"), "mid").getFileName(), juce::String ("song.v2.mid"));
+        }
     }
 };
 

@@ -15,6 +15,7 @@
 - UI は `sketch/prototype/` の html・js・css をそのまま埋め込む（`ChordSketchUIData`。共通の `shared/ui/` と JUCE の JS も）。プロトタイプを正とするのでコピーしない。
 - C++ は `sketch/Source/`：`SketchProcessor`（今は無音。画面の状態 JSON を `PluginState` で預かる）、`SketchEditor`（WebView。`WebResources` で配信）、`SketchStandaloneApp`（ChordNavi と同じネイティブのタイトルバー、メニュー「オプション → オーディオ／MIDI の設定…」）。
 - 拡大縮小：macOS では WKWebView のページのズーム（`shared/cpp/WebViewZoom.mm`）をウィンドウの大きさ÷1280×780 にして、画面側からはいつも基準の大きさに見せる（CSS の拡大縮小は倍率 1 のままなので文字がにじまない。座標の計算も変わらない）。Windows は画面側の CSS の拡大縮小（`fit()`：倍率が 1 にほぼ等しければ 1、位置は整数ピクセル）。
+- ネイティブ関数（`SketchEditor`）：`startMidiDragBytes({name,data})`（data は JS の `buildSmf` の SMF を base64。一時フォルダの `ChordSketch/` に書いて OS のファイルドラッグ）、`saveMidiBytes({name,data})`（保存ダイアログ。拡張子 .mid が無ければ付ける）。JS は `shared/ui/juce-bridge.js` があるとき（JUCE 版）だけ使い、MIDI のドラッグは押して 4px 動かしたら始める（WebView では HTML のドラッグを使わない）。ブラウザでは Chrome の `DownloadURL` とダウンロード。
 - ビルド：`cmake --build build --target ChordSketch_Standalone`。`build/ChordSketch_artefacts/<構成>/Standalone/ChordSketch.app`。配布用のスクリプト・CI はまだ ChordNavi だけ。
 
 ## ファイル
@@ -113,8 +114,9 @@ sketch/prototype/
 
 1. ~~共通部品の切り出し~~（済み・2026-09-29）：`shared/ui/`（theory・guitar・wheel・juce-bridge）と `shared/cpp/`（MidiExport・PreviewSynth・PluginState・WebResources。INTERFACE ライブラリ RanzeShared）。ChordNavi は画面（五度圏の SVG・文字）が切り出し前と一致、テスト 39 件（配信のテスト4件を追加）、Standalone・VST3・AU のビルドを確認。Debug ビルドの Standalone を起動して、表示・五度圏・試聴が動くことを確認（ユーザー確認）。MIDI ドラッグの JS・テーマは製品ごとに違うので、2〜3 で ChordSketch 用を作るときに共通化を見直す
 2. ~~CMake に ChordSketch のターゲットを追加~~（済み・2026-09-29）：Standalone のみ、プロトタイプの UI を埋め込んで表示。ChordNavi のビルド・テストは変わらないことを確認
-3. `MidiExport` をノート列＋テンポ・拍子のメタイベントを受ける形に広げる（パターン・食いの計算は JS の song.js が正、C++ は SMF を書くだけ）と単体テスト
+3. MIDI の書き出しをネイティブにつなぐ：SMF は JS（song.js の `buildSmf`。テスト済み）で作り、そのバイト列を C++ に渡す。C++ は一時ファイルに書いて外部ドラッグ（`performExternalDragDropOfFiles`）と、保存ダイアログで書くだけ（SMF を作る処理を 2 か所に持たない。当初の「MidiExport をノート列を受ける形に広げる」から変更）
 4. 試聴：C++ のシンセに曲全体を予約し、再生位置を C++ の時計で UI へ返す。ドラム音も C++ に
 5. MIDI 入力（C++ の `midiNotes`）、状態の保存（曲データの JSON）、Standalone のファイルを開く／保存（ネイティブのダイアログ）
 6. PDF：WebView で `print()` が使えるか確認する。使えなければ C++ 側で PDF を作る（要相談）
-7. VST3／AU、DAW 上での確認（DAW によってはドラッグした MIDI のテンポ・拍子を読まない。ノートの位置は tick なのでずれない）
+7. Windows のビルド・配布（CI・インストーラー）と、DAW へのドラッグの確認（DAW によってはドラッグした MIDI のテンポ・拍子を読まない。ノートの位置は tick なのでずれない）。macOS の配布用パッケージ
+8. （PC 版のあと）iPad 版：指で操作しやすい画面、DAW との受け渡し（AUv3 にするか、ファイル・共有メニューか）、App Store での配布

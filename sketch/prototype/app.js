@@ -7,6 +7,7 @@ import {PPQ,METERS,SNAPS,snapTicks,barTicksOf,beatTicksOf,SECTION_COLORS,SECTION
   setSectionBars,insertBars,appendSectionFrom,stretchChord,stretchChordStart,pruneMarks,mergeSections,splitSection,insertProgression,setMark,rangeTicks,copyRange,pasteAt,renderSong,buildSmf,safeFileName,
   songTonic,songFlat,nameOf,tempoAt,PATTERN_GROUPS,NEW_TITLE,SKETCH_SCALES,keyScale,defaultScale,meterAt,tickToSec,withExtension,keyTonic,sameKey,setKeyMark,keyRegion,transposeBars,voicingOf,patternById,VOICINGS,GUITAR_AREAS} from './song.js';
 import * as player from './player.js';
+import {hasNative,nativeFn} from '../../shared/ui/juce-bridge.js';
 
 /* ---------- 状態 ---------- */
 const STORE='chordsketch.v1';
@@ -1085,24 +1086,49 @@ function currentExport(){
 }
 function smfFor(r,label){return buildSmf(renderSong(song,rangeTicks(tl,r)),`${song.title} ${label}`);}
 const b64=bytes=>{let s='';for(const x of bytes)s+=String.fromCharCode(x);return btoa(s);};
-// ブラウザ確認用：Chrome の DownloadURL でデスクトップ・DAW へドラッグ（プラグインでは C++ の外部ドラッグに置き換える）
-function midiHandle(getRange,getLabel){
-  const b=h('button','handle');b.draggable=true;
-  b.addEventListener('dragstart',e=>{
-    const label=getLabel(), name=fileName(label);
-    e.dataTransfer.setData('DownloadURL',`audio/midi:${name}:data:audio/midi;base64,${b64(smfFor(getRange(),label))}`);
-    e.dataTransfer.effectAllowed='copy';
+// MIDI を DAW・デスクトップへドラッグする。SMF はここ（song.js）で作る。
+// JUCE 版：押して少し動かしたら C++ の startMidiDragBytes（一時ファイルに書いて OS のファイルドラッグ）。WebView では HTML のドラッグは使えない
+// ブラウザ：Chrome の DownloadURL
+const nativeDrag=nativeFn('startMidiDragBytes'), nativeSaveMidi=nativeFn('saveMidiBytes');
+function attachMidiDrag(el,getPayload){   // getPayload() → {name, bytes}
+  if(!hasNative){
+    el.draggable=true;
+    el.addEventListener('dragstart',e=>{
+      const {name,bytes}=getPayload();
+      e.dataTransfer.setData('DownloadURL',`audio/midi:${name}:data:audio/midi;base64,${b64(bytes)}`);
+      e.dataTransfer.effectAllowed='copy';
+    });
+    return;
+  }
+  el.draggable=false;
+  el.addEventListener('mousedown',e=>{
+    if(e.button!==0)return;
+    e.preventDefault();
+    const x0=e.clientX,y0=e.clientY;
+    const cleanup=()=>{removeEventListener('mousemove',move);removeEventListener('mouseup',cleanup);};
+    const move=ev=>{
+      if(Math.hypot(ev.clientX-x0,ev.clientY-y0)<4)return;
+      cleanup();
+      const {name,bytes}=getPayload();
+      nativeDrag({name,data:b64(bytes)}).then(r=>{if(String(r).startsWith('error'))toast('MIDI のドラッグを始められませんでした');}).catch(err=>console.error(err));
+    };
+    addEventListener('mousemove',move);addEventListener('mouseup',cleanup);
   });
+}
+function midiHandle(getRange,getLabel){
+  const b=h('button','handle');
+  attachMidiDrag(b,()=>{const label=getLabel();return {name:fileName(label),bytes:smfFor(getRange(),label)};});
   return b;
 }
 const dragSel=$('dragSel');
-dragSel.addEventListener('dragstart',e=>{
-  const {r,label}=currentExport(), name=fileName(label);
-  e.dataTransfer.setData('DownloadURL',`audio/midi:${name}:data:audio/midi;base64,${b64(smfFor(r,label))}`);
-  e.dataTransfer.effectAllowed='copy';
-});
+attachMidiDrag(dragSel,()=>{const {r,label}=currentExport();return {name:fileName(label),bytes:smfFor(r,label)};});
 $('saveMidi').onclick=async()=>{
   const {r,label}=currentExport();
+  if(nativeSaveMidi){   // JUCE 版：ネイティブの保存ダイアログ（拡張子が無ければ C++ で付ける）
+    const res=String(await nativeSaveMidi({name:fileName(label),data:b64(smfFor(r,label))}).catch(()=>'error'));
+    if(res.startsWith('saved:'))toast('MIDI を保存しました');else if(res.startsWith('error'))toast('MIDI を保存できませんでした');
+    return;
+  }
   const name=await askFileName(fileName(label),'.mid',$('saveMidi'));
   if(name)download(new Blob([smfFor(r,label)],{type:'audio/midi'}),name);
 };

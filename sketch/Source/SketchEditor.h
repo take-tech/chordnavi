@@ -36,6 +36,19 @@ private:
     // WebView のページのズームをウィンドウの大きさに合わせる（macOS。文字がにじまないように）
     void updateZoom();
 
+    juce::WebBrowserComponent::Options makeOptions();
+
+    // JS: startMidiDragBytes({ name, data }) — data は SMF の base64（JS の song.js が作る）。
+    // 一時ファイルに書いて、マウスボタンが押されたままのこのタイミングで OS のファイルドラッグを始める
+    void startMidiDragBytes (const juce::Array<juce::var>& args,
+                             juce::WebBrowserComponent::NativeFunctionCompletion completion);
+
+    // JS: saveMidiBytes({ name, data }) — 保存ダイアログで .mid を保存（拡張子が無ければ付ける）
+    void saveMidiBytes (const juce::Array<juce::var>& args,
+                        juce::WebBrowserComponent::NativeFunctionCompletion completion);
+
+    std::unique_ptr<juce::FileChooser> fileChooser;
+
     SketchProcessor& processorRef;
     SketchWebView webView;
 
