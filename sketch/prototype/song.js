@@ -194,6 +194,23 @@ export function setMark(song,si,bar,pos,{bpm,meter}){
   if(meter)sec.marks.push({bar,pos:0,meter});
 }
 
+// 直前に効いている値と同じテンポ・拍子の変更点を消す（曲の頭から順に見るので、消した結果いらなくなった後ろの変更点も消える）。
+// テンポ・拍子を変えたときに呼ぶ（セクションの並べ替えでは呼ばない：戻したときに変更点が消えないように）
+export function pruneMarks(song){
+  let bpm=song.bpm, meter=song.meter.join('/');
+  for(const s of song.sections){
+    const keep=[];
+    const sorted=[...s.marks].sort((a,b)=>a.bar-b.bar||(b.meter?1:0)-(a.meter?1:0)||(a.pos||0)-(b.pos||0));
+    for(const m of sorted){
+      if(m.bar>=s.bars)continue;
+      if(m.meter){const k=m.meter.join('/');if(k===meter)continue;meter=k;}
+      if(m.bpm){if(m.bpm===bpm)continue;bpm=m.bpm;}
+      keep.push(m);
+    }
+    s.marks=keep;
+  }
+}
+
 /* ---------- 範囲（小節番号は曲全体の通し番号） ---------- */
 export const rangeTicks=(tl,{from,to})=>({from:tl.bars[from]?.start??0,to:to>=tl.bars.length?tl.total:tl.bars[to].start});
 

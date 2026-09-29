@@ -1,7 +1,7 @@
 // song.js の単体テスト：node sketch/prototype/song.test.mjs
 import assert from 'node:assert/strict';
 import {demoSong,newSong,newSection,newChord,timeline,placedChords,renderSong,buildSmf,placeChord,resizeChord,insertBars,
-  setMark,stretchChord,insertProgression,tickToSec,secToTick,copyRange,pasteAt,nameOf,rangeTicks,PPQ,safeFileName} from './song.js';
+  setMark,pruneMarks,stretchChord,insertProgression,tickToSec,secToTick,copyRange,pasteAt,nameOf,rangeTicks,PPQ,safeFileName} from './song.js';
 
 const B=PPQ*4;
 let n=0;const test=(name,f)=>{f();n++;console.log('ok',name);};
@@ -14,6 +14,17 @@ test('タイムライン：拍子とテンポの変更',()=>{
   assert.equal(tl.total,B*2+B*3/2);
   assert.deepEqual(tl.tempos,[{tick:0,bpm:120},{tick:B*2+B*3/4+PPQ,bpm:90}]);
   assert.equal(tl.meters.length,2);
+});
+test('直前と同じテンポ・拍子の変更点は消す（前に変更があれば残す）',()=>{
+  const s=newSong();s.sections=[newSection('A',1,4),newSection('B',2,4)];
+  setMark(s,0,2,0,{bpm:120});setMark(s,0,3,0,{meter:[4,4]});pruneMarks(s);
+  assert.equal(s.sections[0].marks.length,0);                       // 曲全体と同じ → 消える
+  setMark(s,0,1,0,{bpm:140});setMark(s,1,0,0,{bpm:120});setMark(s,1,2,0,{bpm:120});pruneMarks(s);
+  assert.deepEqual(s.sections.map(x=>x.marks.map(m=>m.bpm)),[[140],[120]]);   // 140 から 120 に戻すのは残す、続く 120 は消える
+  setMark(s,0,1,0,{bpm:null});pruneMarks(s);
+  assert.deepEqual(s.sections.map(x=>x.marks.length),[0,0]);        // 140 を外すと 120 に戻す変更点もいらなくなる
+  s.bpm=100;setMark(s,1,1,0,{bpm:120});s.bpm=120;pruneMarks(s);
+  assert.equal(s.sections[1].marks.length,0);                       // 曲全体のテンポを変えて同じになったら消える
 });
 test('tick ⇔ 秒',()=>{
   const tempos=[{tick:0,bpm:120},{tick:B,bpm:60}];

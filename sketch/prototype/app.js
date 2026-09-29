@@ -2,7 +2,7 @@ import {MAJ_LABEL,MIN_LABEL,SIG,WHEEL_CELLS,DIATONIC,CHORD,chordDeg,chordAt,chor
   noteName,tonicOf,isFlatKey,keyName as keyNameOf,detectChords,mod12,PROGRESSIONS,variantsOf,progressionDegrees} from '../../ui/theory.js';
 import {PPQ,METERS,SNAPS,snapTicks,barTicksOf,beatTicksOf,SECTION_COLORS,SECTION_PRESETS,PATTERNS,MIN_BPM,MAX_BPM,
   newSong,demoSong,newSection,newChord,cloneSection,timeline,placedChords,placeChord,removeChord,resizeChord,
-  setSectionBars,insertBars,stretchChord,insertProgression,setMark,rangeTicks,copyRange,pasteAt,renderSong,buildSmf,safeFileName,
+  setSectionBars,insertBars,stretchChord,pruneMarks,insertProgression,setMark,rangeTicks,copyRange,pasteAt,renderSong,buildSmf,safeFileName,
   songTonic,songFlat,nameOf,tempoAt,voicingOf,patternById} from './song.js';
 import * as player from './player.js';
 
@@ -536,16 +536,17 @@ function openMarkPop(gi,pos,anchor){
   for(const m of METERS)met.appendChild(Object.assign(h('option','',m.join('/')),{value:m.join('/')}));
   met.value=atStart?song.meter.join('/'):mm?mm.meter.join('/'):'';
   pop.append(h('span','lbl','テンポ ♩='),bpm,h('span','lbl','位置'),posSel,h('span','lbl','拍子（小節の頭）'),met);
-  pop.appendChild(h('p','note','テンポは半拍単位の位置で、拍子は小節の頭で変えられます。空欄・「変更なし」にすると外します。'));
+  pop.appendChild(h('p','note','テンポは半拍単位の位置で、拍子は小節の頭で変えられます。空欄・「変更なし」にすると外します。直前と同じ値にしたときもタグは消えます。'));
   const btns=h('div','btns');
   const ok=h('button','tg','適用');ok.setAttribute('aria-pressed','true');
   const cancel=h('button','','閉じる');
   ok.onclick=()=>{
     const v=Math.round(+bpm.value), m=met.value?met.value.split('/').map(Number):null, p=+posSel.value;
     commit(()=>{
-      if(atStart){if(v)song.bpm=Math.min(MAX_BPM,Math.max(MIN_BPM,v));if(m)song.meter=m;return;}
+      if(atStart){if(v)song.bpm=Math.min(MAX_BPM,Math.max(MIN_BPM,v));if(m)song.meter=m;pruneMarks(song);return;}
       if(tm&&(tm.pos||0)!==p)setMark(song,b.si,b.bar,tm.pos||0,{bpm:null,meter:mm?.meter});
       setMark(song,b.si,b.bar,p,{bpm:v||null,meter:m});
+      pruneMarks(song);   // 直前と同じ値になった変更点はタグごと消す
     });
     closePop();
   };
@@ -915,8 +916,8 @@ for(const [v,n] of INS_LENS)$('insLen').appendChild(Object.assign(h('option','',
 for(const p of SECTION_PRESETS)$('secNames').appendChild(Object.assign(h('option'),{value:p.name}));
 $('title').addEventListener('change',e=>commit(()=>{song.title=e.target.value.trim()||'無題';}));
 $('title').addEventListener('keydown',e=>{if(e.key==='Enter')e.target.blur();});
-$('bpm').addEventListener('change',e=>commit(()=>{song.bpm=Math.min(MAX_BPM,Math.max(MIN_BPM,Math.round(+e.target.value)||120));}));
-$('meter').addEventListener('change',e=>commit(()=>{song.meter=e.target.value.split('/').map(Number);}));
+$('bpm').addEventListener('change',e=>commit(()=>{song.bpm=Math.min(MAX_BPM,Math.max(MIN_BPM,Math.round(+e.target.value)||120));pruneMarks(song);}));
+$('meter').addEventListener('change',e=>commit(()=>{song.meter=e.target.value.split('/').map(Number);pruneMarks(song);}));
 $('pattern').addEventListener('change',e=>commit(()=>{song.pattern=e.target.value;}));
 const uiSet=(k,v)=>{ui[k]=v;render();persist();};
 $('metro').addEventListener('change',e=>{uiSet('metro',e.target.value);player.refresh();});
