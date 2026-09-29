@@ -195,13 +195,30 @@ body.grabbing,body.grabbing *{cursor:grabbing!important}
 .add-presets button{font-size:11px;border-style:dashed;padding:0 8px}
 .empty{padding:40px;text-align:center;color:var(--muted)}
 
-/* 下のバー（選択中のコード・範囲・カーソル） */
-.footer{border-top:1px solid var(--line);padding:6px 12px;display:flex;align-items:center;gap:6px;min-height:40px;font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden}
-.footer b{color:var(--ink);font-size:14px}
+/* 下のバー（カーソル・範囲の小節とセクションの操作） */
+.footer{border-top:1px solid var(--line);padding:6px 10px;display:flex;align-items:center;gap:0;min-height:42px;font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden}
+.footer .fgroup{display:flex;align-items:center;gap:5px;padding:0 12px;border-left:1px solid var(--line)}
+.footer .fgroup:first-child{border-left:0;padding-left:2px}
+.footer .flbl{font-size:11px;color:var(--muted)}
+.footer .fsub{font-size:12px}
+.footer b{color:var(--ink);font-size:15px}
 .footer b.pos{font-variant-numeric:tabular-nums;min-width:52px}
-.footer .who{color:var(--chord)}
-.footer select{font-size:12px;padding:1px 3px}
+.footer button{font-size:12.5px;padding:3px 10px}
+.footer .fhint{margin-left:auto;font-size:11px;color:var(--faint);overflow:hidden;text-overflow:ellipsis}
 
+/* 選んだコードの編集パネル（ブロックのすぐ下） */
+.chip-edit{position:absolute;z-index:8;background:var(--card);border:1px solid var(--chord);border-radius:8px;padding:8px 10px;
+  box-shadow:0 8px 24px rgba(30,39,66,.22);display:flex;flex-direction:column;gap:6px;width:548px;font-size:12px}
+.chip-edit .ce-row{display:flex;align-items:center;gap:5px}
+.chip-edit .ce-name{font-size:18px;color:var(--chord);font-weight:900}
+.chip-edit .ce-deg{font-size:12px;color:var(--muted)}
+.chip-edit .ce-len{min-width:48px;text-align:center;color:var(--ink);font-size:13px}
+.chip-edit select{font-size:12.5px;padding:2px 4px}
+.chip-edit .blk-pat{max-width:200px}
+.chip-edit .ce-gap{margin-left:8px}
+.chip-edit .blk-pat.over{border-color:var(--tone);color:var(--tone);font-weight:700}
+.chip-edit .x{border:0;background:none;font-size:16px;color:var(--muted);padding:0 4px}
+.chip-edit .del{color:var(--chord)}
 /* ポップアップ（テンポ・拍子の変更） */
 .pop{position:fixed;z-index:30;background:var(--card);border:1px solid var(--ink2);border-radius:6px;padding:10px 12px;box-shadow:0 8px 24px rgba(30,39,66,.25);
   display:grid;grid-template-columns:auto auto;gap:6px 10px;align-items:center;font-size:12px}
@@ -271,8 +288,6 @@ body.grabbing,body.grabbing *{cursor:grabbing!important}
 .blk.haspat .n{padding-right:30px}
 .blk.narrow .ptag{right:2px;padding:0 2px;font-size:8px}
 .blk.narrow.haspat .n{padding-right:0}
-.footer .blk-pat{max-width:170px}
-.footer .blk-pat.over{border-color:var(--tone);color:var(--tone);font-weight:700}
 
 /* 名前を付けて保存 */
 .pop .save-row{grid-column:1/-1;display:flex;align-items:center;gap:4px}

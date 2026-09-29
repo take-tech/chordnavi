@@ -212,6 +212,7 @@ function previewItem(it,key=curKey()){
 function insertAtCursor(it){
   const b=tl.bars[cursor.gi];if(!b)return;
   const len=insLenTicks(b.meter);let placed;
+  editOpen=false;
   commit(()=>{placed=placeChord(song,b.si,newChord(b.bar,cursor.pos,len,it.off,it.q,it.boff));if(placed)sel={si:b.si,id:placed.id};});
   if(placed){advanceCursor(b.start+cursor.pos+placed.len);previewItem(it);render();}
 }
@@ -417,9 +418,12 @@ function renderSheet(){
   }
   add.appendChild(presets);
   sheet.appendChild(add);
+  placeChordEditorLater=true;
   if(!song.sections.length)sheet.prepend(h('div','empty','セクションがありません。下の欄に名前を入れて追加してください。'));
   sheet.scrollTop=scroll;
+  if(placeChordEditorLater){placeChordEditorLater=false;placeChordEditor();}
 }
+let placeChordEditorLater=false;
 function barCell(b,rowEnd,songEnd){
   const bar=h('div','bar'+(rowEnd?' last':'')+(songEnd?' sec-end':''));bar.dataset.gi=b.gi;
   if(range&&b.gi>=range.from&&b.gi<range.to)bar.classList.add('insel');
@@ -488,7 +492,7 @@ function sectionHead(s,si){
 /* ---------- シートの操作 ---------- */
 sheet.addEventListener('pointerdown',e=>{
   if(e.button===0&&e.target.closest('.sec-grip')){e.preventDefault();startSectionDrag(e,+e.target.closest('.sec').dataset.si);return;}
-  if(e.button!==0||e.target.closest('.sec-head,.add-sec'))return;
+  if(e.button!==0||e.target.closest('.sec-head,.add-sec,.chip-edit'))return;
   const mark=e.target.closest('.mark'), blk=e.target.closest('.blk'), no=e.target.closest('.bar-no'), lane=e.target.closest('.lane');
   const bar=e.target.closest('.bar');
   if(mark&&bar){e.preventDefault();const gi=+bar.dataset.gi;openMarkPop(gi,mark.classList.contains('tempo')?+(mark.dataset.pos||0):0,mark);return;}
@@ -587,7 +591,7 @@ function startBlockDrag(e,blkEl){
   const hit0=hitBar(e.clientX,e.clientY), grab=hit0?hit0.b.start+hit0.tick-p.start:0;
   const x0=e.clientX,y0=e.clientY;let moved=false,target=null;
   // 選ぶと同時に、クリックした位置（スナップ）にカーソルを置く
-  sel={si,id};range=null;
+  sel={si,id};range=null;editOpen=false;
   if(hit0){const st=snapOf(hit0.b.meter);cursor={gi:hit0.b.gi,pos:Math.min(hit0.b.ticks-st,Math.round(hit0.tick/st)*st)};}
   render();
   // 長さの変更：伸ばした先のコードは上書きするので、動かすたびにドラッグ前の状態からやり直す（縮め直すと戻る）
@@ -625,7 +629,7 @@ function startBlockDrag(e,blkEl){
     removeEventListener('pointermove',move);removeEventListener('pointerup',up);
     ghost.hidden=true;showDrop(null);
     if(resizing){if(moved){changed();previewSel();}else undoStack.pop();return;}
-    if(!moved){previewItem(c,p.key);return;}
+    if(!moved){previewItem(c,p.key);editOpen=true;render();return;}
     if(!target)return;
     const b=tl.bars[target.gi];
     commit(()=>{
@@ -712,54 +716,74 @@ function closePop(){pop.hidden=true;sheet.focus({preventScroll:true});}
 addEventListener('pointerdown',e=>{if(!pop.hidden&&!pop.contains(e.target)&&!e.target.closest('.bar-no,.sec-sw'))pop.hidden=true;},true);
 
 /* ---------- 下のバー ---------- */
+// 選んだコードの編集パネル：ブロックのすぐ下（下に入らなければ上）に出す。
+// ブロックをクリックしたとき（ドラッグでない）に開き、Esc・ほかの場所のクリック・× で閉じる。Enter で開き直す
+let editOpen=false;
+function chordEditor(p){
+  const c=p.c, b=tl.bars.find(x=>p.start>=x.start&&p.start<x.start+x.ticks), kt=keyTonic(p.key), kf=isFlatKey(p.key.idx);
+  const edit=mut=>commit(()=>{const cc=song.sections[sel.si].chords.find(x=>x.id===sel.id);mut(cc);});
+  const box=h('div','chip-edit');box.setAttribute('role','dialog');box.setAttribute('aria-label','コードの編集');
+  const opt=(s,text,value)=>s.appendChild(Object.assign(h('option','',text),{value}));
+  const root=h('select','');for(let off=0;off<12;off++)opt(root,noteName(mod12(kt+off),kf),off);
+  root.value=c.off;root.title='ルート';
+  root.onchange=()=>{const d=+root.value-c.off;edit(cc=>{cc.off=+root.value;if(cc.boff!=null)cc.boff=mod12(cc.boff+d);});previewSel();};
+  const q=h('select','');for(const k of QUALITIES)opt(q,k===''?'maj':CHORD[k].s,k);
+  q.value=c.q;q.title='種類';q.onchange=()=>{edit(cc=>{cc.q=q.value;});previewSel();};
+  // ベース：コード作成と同じく「/音名」、ルートと同じ音なら分数コードにしない
+  const bass=h('select','');for(let off=0;off<12;off++)opt(bass,'/'+noteName(mod12(kt+off),kf),off);
+  bass.value=c.boff??c.off;bass.title='ベース（ルートと同じなら分数コードにしない）';
+  bass.onchange=()=>{edit(cc=>{if(+bass.value===cc.off)delete cc.boff;else cc.boff=+bass.value;});previewSel();};
+  const close=h('button','x','×');close.title='閉じる（Esc）';close.onclick=()=>{editOpen=false;render();};
+  const head=h('div','ce-row');
+  head.append(h('b','ce-name',nameOf(song,c,p.key)),h('span','ce-deg',degOfItem(c)),h('span','spacer'),root,q,bass,close);
+  const st=snapOf(b.meter), max=maxLenAt(p.start);
+  const minus=h('button','','−'),plus=h('button','','＋');minus.title=plus.title='長さ（スナップ単位）';
+  minus.onclick=()=>commit(()=>stretchChord(song,sel.si,sel.id,p.end-p.start-st,st,max));
+  plus.onclick=()=>commit(()=>stretchChord(song,sel.si,sel.id,p.end-p.start+st,st,max));
+  minus.disabled=p.end-p.start<=st;plus.disabled=p.end-p.start>=max;
+  const secPat=song.sections[sel.si].pattern||song.pattern;
+  const pat=h('select','blk-pat'+(c.pattern?' over':''));pat.title='このコードだけの MIDI パターン';
+  opt(pat,`セクションと同じ（${patternById(secPat).short}）`,'');
+  for(const x of PATTERNS)opt(pat,x.name,x.id);
+  pat.value=c.pattern||'';
+  pat.onchange=()=>edit(cc=>{if(pat.value)cc.pattern=pat.value;else delete cc.pattern;});
+  const dup=h('button','','複製');dup.title='すぐ後ろに同じコードを置く（⌘D）';dup.onclick=duplicateSel;
+  const del=h('button','del','削除');del.title='このコードを消す（⌫）';del.onclick=deleteSel;
+  const tail=h('div','ce-row');
+  tail.append(h('span','lbl','長さ'),minus,h('b','ce-len',fmtLen(p.end-p.start,b.meter)),plus,h('span','lbl ce-gap','パターン'),pat,h('span','spacer'),dup,del);
+  box.append(head,tail);
+  return box;
+}
+function placeChordEditor(){
+  if(!sel||!editOpen||player.isPlaying())return;
+  const p=placedChords(song,tl).find(x=>x.c.id===sel.id), blk=sheet.querySelector(`.blk[data-id="${sel.id}"]:not(.cont)`);
+  if(!p||!blk){editOpen=false;return;}
+  const box=chordEditor(p);sheet.appendChild(box);
+  const sr=sheet.getBoundingClientRect(), k=sr.width/sheet.offsetWidth, br=blk.getBoundingClientRect();
+  const top=(br.bottom-sr.top)/k+sheet.scrollTop+4, above=(br.top-sr.top)/k+sheet.scrollTop-box.offsetHeight-4;
+  const fitsBelow=top+box.offsetHeight<=sheet.scrollTop+sheet.clientHeight;
+  box.style.top=(fitsBelow||above<sheet.scrollTop?top:above)+'px';
+  box.style.left=Math.max(4,Math.min(sheet.clientWidth-box.offsetWidth-4,(br.left-sr.left)/k))+'px';
+  if(!fitsBelow&&above<sheet.scrollTop)box.scrollIntoView({block:'nearest'});
+}
+// 下のバー：カーソル・範囲に対する小節とセクションの操作（使えないボタンは出さない）
 function renderFooter(){
   const f=$('footer');f.innerHTML='';
-  const p=sel&&placedChords(song,tl).find(x=>x.c.id===sel.id);
-  if(p){
-    const c=p.c, b=tl.bars.find(x=>p.start>=x.start&&p.start<x.start+x.ticks), kt=keyTonic(p.key), kf=isFlatKey(p.key.idx);
-    const edit=mut=>commit(()=>{const cc=song.sections[sel.si].chords.find(x=>x.id===sel.id);mut(cc);});
-    const root=h('select','');for(let off=0;off<12;off++)root.appendChild(Object.assign(h('option','',noteName(mod12(kt+off),kf)),{value:off}));
-    root.value=c.off;root.onchange=()=>{const d=+root.value-c.off;edit(cc=>{cc.off=+root.value;if(cc.boff!=null)cc.boff=mod12(cc.boff+d);});previewSel();};
-    const q=h('select','');for(const k of QUALITIES)q.appendChild(Object.assign(h('option','',k===''?'（メジャー）':CHORD[k].s),{value:k}));
-    q.value=c.q;q.onchange=()=>{edit(cc=>{cc.q=q.value;});previewSel();};
-    const bass=h('select','');bass.appendChild(Object.assign(h('option','','なし'),{value:''}));
-    for(let off=0;off<12;off++)bass.appendChild(Object.assign(h('option','',noteName(mod12(kt+off),kf)),{value:off}));
-    bass.value=c.boff??'';bass.onchange=()=>{edit(cc=>{if(bass.value===''||+bass.value===cc.off)delete cc.boff;else cc.boff=+bass.value;});previewSel();};
-    const st=snapOf(b.meter);
-    const minus=h('button','','−'),plus=h('button','','＋');
-    const max=maxLenAt(p.start);
-    minus.onclick=()=>commit(()=>stretchChord(song,sel.si,sel.id,p.end-p.start-st,st,max));
-    plus.onclick=()=>commit(()=>stretchChord(song,sel.si,sel.id,p.end-p.start+st,st,max));
-    minus.disabled=p.end-p.start<=st;plus.disabled=p.end-p.start>=max;
-    const dup=h('button','','複製');dup.onclick=duplicateSel;
-    const del=h('button','','削除');del.onclick=deleteSel;
-    // このコードだけのパターン（空＝セクション（なければ曲）と同じ）
-    const secPat=song.sections[sel.si].pattern||song.pattern;
-    const pat=h('select','blk-pat'+(c.pattern?' over':''));pat.title='このコードだけの MIDI パターン';
-    pat.appendChild(Object.assign(h('option','',`セクションと同じ（${patternById(secPat).short}）`),{value:''}));
-    for(const x of PATTERNS)pat.appendChild(Object.assign(h('option','',x.name),{value:x.id}));
-    pat.value=c.pattern||'';
-    pat.onchange=()=>edit(cc=>{if(pat.value)cc.pattern=pat.value;else delete cc.pattern;});
-    f.append(h('b','who',nameOf(song,c,p.key)),h('span','',degOfItem(c)),h('span','sep'),'ルート',root,'種類',q,'ベース',bass,h('span','sep'),
-      '長さ',minus,h('b','',fmtLen(p.end-p.start,b.meter)),plus,h('span','sep'),'パターン',pat,dup,del);
-  }else if(range){
+  const group=(label,...items)=>{const g=h('div','fgroup');if(label)g.appendChild(h('span','flbl',label));g.append(...items);return g;};
+  const btn=(text,title,fn)=>{const b=h('button','',text);b.title=title;b.onclick=fn;return b;};
+  if(range){
     const n=range.to-range.from;
-    const loop=h('button','','この範囲をループ再生');loop.onclick=()=>{ui.loop=true;render();startPlay();};
-    const copy=h('button','','コピー');copy.onclick=copySel;
-    const clear=h('button','','コードを消す');clear.onclick=deleteSel;
-    const ins=h('button','','挿入');ins.onclick=()=>insertBarsAtCursor(n);ins.title=`選択範囲の前に${n}小節を入れる`;
-    const rm=h('button','','削除');rm.onclick=()=>deleteRangeBars();rm.title='選択範囲の小節を消す';
-    f.append(h('b','',rangeLabel(range)),h('span','',`（${n}小節）を選択`),loop,copy,clear,h('span','sep'),'小節',ins,rm);
+    f.append(group(null,h('b','',rangeLabel(range)),h('span','fsub',`${n}小節を選択`)),
+      group('範囲',btn('▶ ループ再生','この範囲を繰り返し再生',()=>{ui.loop=true;render();startPlay();}),btn('コピー','コードをコピー（⌘C）',copySel),btn('コードを消す','範囲のコードを消す（⌫）',deleteSel)),
+      group('小節',btn('＋ 挿入',`選択範囲の前に${n}小節を入れる`,()=>insertBarsAtCursor(n)),btn('− 削除','選択範囲の小節を消す',()=>deleteRangeBars())));
   }else{
     const b=tl.bars[cursor.gi];
-    const markBtn=h('button','','テンポ・拍子・キー…');markBtn.onclick=()=>openMarkPop(cursor.gi,cursor.pos,markBtn);
-    const ins=h('button','','挿入');ins.onclick=()=>insertBarsAtCursor(1);ins.title='カーソルのある小節の前に1小節入れる';
-    const rm=h('button','','削除');rm.onclick=()=>{range={from:cursor.gi,to:cursor.gi+1};deleteRangeBars();};rm.title='カーソルのある小節を消す';
-    const paste=h('button','','貼り付け');paste.disabled=!clip;paste.onclick=pasteSel;
-    const split=h('button','','セクション分割');split.disabled=!b||b.bar===0;split.onclick=splitAtCursor;
-    split.title='カーソルのある小節の頭でセクションを2つに分ける';
-    f.append('カーソル',h('b','pos',b?fmtPos(cursor.gi,cursor.pos):'—'),markBtn,h('span','sep'),'小節',ins,rm,h('span','sep'),split,paste);
+    f.append(group(null,h('span','flbl','カーソル'),h('b','pos',b?fmtPos(cursor.gi,cursor.pos):'—')),
+      group('小節',btn('＋ 挿入','カーソルのある小節の前に1小節入れる',()=>insertBarsAtCursor(1)),btn('− 削除','カーソルのある小節を消す',()=>{range={from:cursor.gi,to:cursor.gi+1};deleteRangeBars();})));
+    if(b&&b.bar>0)f.append(group('セクション',btn('✂ ここで分割','カーソルのある小節の頭でセクションを2つに分ける',splitAtCursor)));
   }
+  if(clip)f.append(group(null,btn('貼り付け','コピーしたコードをカーソル（範囲の頭）から貼り付ける（⌘V）',pasteSel)));
+  f.appendChild(h('span','fhint','テンポ・拍子・キーは小節番号をダブルクリック'));
 }
 function splitAtCursor(){
   const b=tl.bars[cursor.gi];if(!b||b.bar===0)return;
@@ -828,6 +852,8 @@ addEventListener('keydown',e=>{
   if(k==='m'){e.preventDefault();toggleMute();return;}
   if(e.key==='Escape'&&!$('printWrap').hidden){$('printWrap').hidden=true;return;}
   if(!$('printWrap').hidden)return;
+  if(e.key==='Escape'&&editOpen){editOpen=false;render();return;}
+  if(e.key==='Enter'&&sel){e.preventDefault();editOpen=true;render();return;}
   if(e.key==='Escape'){sel=null;range=null;pop.hidden=true;render();return;}
   if(e.key==='Home'){cursor={gi:0,pos:0};sel=null;range=null;render();scrollToBar(0);return;}
   if(e.key==='Delete'||e.key==='Backspace'){e.preventDefault();deleteSel();return;}
