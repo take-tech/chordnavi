@@ -1407,7 +1407,7 @@ function heldChanged(){
   renderLive();
 }
 if(hasNative){
-  setMidiStatus('オーディオ／MIDI の設定の機器',true);
+  setMidiStatus('設定の機器',true);$('midiSt').title='「オプション → オーディオ／MIDI の設定」で選んだ MIDI 機器';
   onNative('midiNotes',({notes})=>{
     const next=new Set(notes||[]);
     if(next.size===held.size&&[...next].every(n=>held.has(n)))return;
