@@ -140,3 +140,8 @@ auval -v aumu Gdkn Rnze
 - MIDI生成ロジックには単体テストを書く（ヘッダ、デルタタイム、ノートオン／オフの対応）。試聴シンセにもテストあり（`tests/`、ターゲット `MidiExportTests`）。
 - 大きな設計変更や方式の切り替えは、実装前に提案して確認を取る。
 - コミットはマイルストーン単位を目安に、日本語のメッセージで。
+
+## 派生アプリ ChordSketch
+
+- 1曲単位でコード譜と MIDI を作る派生アプリ。`sketch/` にあり、仕様は `sketch/CLAUDE.md`。
+- `ui/theory.js` は ChordSketch からも読み込むので、変更するときは `node sketch/prototype/song.test.mjs` も通すこと。
