@@ -4,6 +4,7 @@
 
 - ChordNavi と同じリポジトリで作る別製品。音楽理論（`ui/theory.js`）は ChordNavi と共有し、コピーしない。
 - 今はブラウザで動くプロトタイプ（`sketch/prototype/`）の段階。**UI・挙動はこのプロトタイプを正とする**（ChordNavi の `reference/prototype.html` と同じ扱い）。
+- **プロトタイプの仕様は 2026-09-29 に確定**（タグ `chordsketch-prototype-1`）。JUCE 化はこの状態を正として進める。仕様を変えるときは、先にプロトタイプとこのファイルを直してから JUCE 側に反映する。
 - 確認：リポジトリのルートを HTTP で配信して `http://localhost:8765/sketch/prototype/` を開く（`python3 -m http.server 8765`）。`../../ui/theory.js` を読むのでルートから配信すること。
 - テスト：`node sketch/prototype/song.test.mjs`（曲データ・パターン・食い・範囲・SMF）。
 - `app.js` を変えたら文法を確かめる（書き間違いがあると画面全体が動かなくなる）：`cp sketch/prototype/app.js /tmp/app.mjs && node --check /tmp/app.mjs`
