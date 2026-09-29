@@ -122,6 +122,73 @@ target_link_libraries(ChordNavi
 )
 
 # ──────────────────────────────────────────────────────
+# ChordSketch（1曲単位のコード譜と MIDI を作る派生アプリ。Standalone のみ。仕様は sketch/CLAUDE.md）
+# UI は sketch/prototype をそのまま埋め込む（テスト用の .mjs は入れない）
+# ──────────────────────────────────────────────────────
+file(GLOB SKETCH_UI_FILES CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/sketch/prototype/*.html"
+    "${CMAKE_CURRENT_SOURCE_DIR}/sketch/prototype/*.js"
+    "${CMAKE_CURRENT_SOURCE_DIR}/sketch/prototype/*.css")
+set(CHORDSKETCH_UI_FILES
+    ${SKETCH_UI_FILES}
+    ${SHARED_UI_FILES}
+    "${JUCE_JS_DIR}/index.js"
+    "${JUCE_JS_DIR}/check_native_interop.js"
+)
+ranze_check_unique_names(${CHORDSKETCH_UI_FILES})
+
+juce_add_binary_data(ChordSketchUIData
+    HEADER_NAME ChordSketchUIData.h
+    NAMESPACE ChordSketchUIData
+    SOURCES ${CHORDSKETCH_UI_FILES}
+)
+
+juce_add_plugin(ChordSketch
+    VERSION                     0.1.0
+    COMPANY_NAME                Ranze
+    PLUGIN_MANUFACTURER_CODE    Rnze
+    PLUGIN_CODE                 Cdsk
+    FORMATS                     Standalone
+    PRODUCT_NAME                "ChordSketch"
+    BUNDLE_ID                   com.ranze.chordsketch
+    IS_SYNTH                    TRUE
+    NEEDS_MIDI_INPUT            TRUE
+    NEEDS_MIDI_OUTPUT           FALSE
+    IS_MIDI_EFFECT              FALSE
+    EDITOR_WANTS_KEYBOARD_FOCUS TRUE
+    NEEDS_WEBVIEW2              TRUE
+)
+
+target_sources(ChordSketch PRIVATE
+    sketch/Source/SketchProcessor.cpp
+    sketch/Source/SketchEditor.cpp
+    sketch/Source/SketchStandaloneApp.cpp
+)
+
+if(WIN32)
+    target_compile_definitions(ChordSketch PUBLIC JUCE_USE_WIN_WEBVIEW2_WITH_STATIC_LINKING=1)
+endif()
+
+target_compile_definitions(ChordSketch PUBLIC
+    JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP=1   # sketch/Source/SketchStandaloneApp.cpp（ネイティブのタイトルバーとメニューバー）
+    JUCE_WEB_BROWSER=1
+    JUCE_USE_CURL=0
+    JUCE_VST3_CAN_REPLACE_VST2=0
+)
+
+target_link_libraries(ChordSketch
+    PRIVATE
+        RanzeShared
+        ChordSketchUIData
+        juce::juce_audio_utils
+        juce::juce_gui_extra
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+# ──────────────────────────────────────────────────────
 # MIDI 生成の単体テスト
 # ──────────────────────────────────────────────────────
 enable_testing()

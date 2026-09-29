@@ -9,9 +9,17 @@
 - テスト：`node sketch/prototype/song.test.mjs`（曲データ・パターン・食い・範囲・SMF）。
 - `app.js` を変えたら文法を確かめる（書き間違いがあると画面全体が動かなくなる）：`cp sketch/prototype/app.js /tmp/app.mjs && node --check /tmp/app.mjs`
 
+## JUCE 版（Standalone のみ）
+
+- CMake のターゲット `ChordSketch`（`ChordSketch_Standalone`）。プラグインのコード `Cdsk`（メーカー `Rnze`）、表示名「ChordSketch」、バンドル ID `com.ranze.chordsketch`、バージョン 0.1.0。設定ファイルは `~/Library/Application Support/ChordSketch.settings`、Windows の WebView2 のデータは AppData の `ChordSketch/WebView2`。
+- UI は `sketch/prototype/` の html・js・css をそのまま埋め込む（`ChordSketchUIData`。共通の `shared/ui/` と JUCE の JS も）。プロトタイプを正とするのでコピーしない。
+- C++ は `sketch/Source/`：`SketchProcessor`（今は無音。画面の状態 JSON を `PluginState` で預かる）、`SketchEditor`（WebView。`WebResources` で配信）、`SketchStandaloneApp`（ChordNavi と同じネイティブのタイトルバー、メニュー「オプション → オーディオ／MIDI の設定…」）。
+- ビルド：`cmake --build build --target ChordSketch_Standalone`。`build/ChordSketch_artefacts/<構成>/Standalone/ChordSketch.app`。配布用のスクリプト・CI はまだ ChordNavi だけ。
+
 ## ファイル
 
 ```
+sketch/Source/                … JUCE 版の C++（上）
 sketch/prototype/
   index.html / style.css   … 画面。色の変数は ChordNavi と同じ名前（値はダークの文字色だけ ChordSketch で落としている：
                              文字が多いので本文 --ink を #C9CEDA・--ink2 を #A4ADC5 に。押されているボタンは --pressed-bg/-fg で、ダークでは白くしない）
@@ -98,7 +106,7 @@ sketch/prototype/
 ## この先（JUCE 化）
 
 1. ~~共通部品の切り出し~~（済み・2026-09-29）：`shared/ui/`（theory・guitar・wheel・juce-bridge）と `shared/cpp/`（MidiExport・PreviewSynth・PluginState・WebResources。INTERFACE ライブラリ RanzeShared）。ChordNavi は画面（五度圏の SVG・文字）が切り出し前と一致、テスト 39 件（配信のテスト4件を追加）、Standalone・VST3・AU のビルドを確認。Debug ビルドの Standalone を起動して、表示・五度圏・試聴が動くことを確認（ユーザー確認）。MIDI ドラッグの JS・テーマは製品ごとに違うので、2〜3 で ChordSketch 用を作るときに共通化を見直す
-2. CMake に ChordSketch のターゲットを追加（プラグインコードは ChordNavi と別）。空の画面が出るところまで
+2. ~~CMake に ChordSketch のターゲットを追加~~（済み・2026-09-29）：Standalone のみ、プロトタイプの UI を埋め込んで表示。ChordNavi のビルド・テストは変わらないことを確認
 3. `MidiExport` をノート列＋テンポ・拍子のメタイベントを受ける形に広げる（パターン・食いの計算は JS の song.js が正、C++ は SMF を書くだけ）と単体テスト
 4. 試聴：C++ のシンセに曲全体を予約し、再生位置を C++ の時計で UI へ返す。ドラム音も C++ に
 5. MIDI 入力（C++ の `midiNotes`）、状態の保存（曲データの JSON）、Standalone のファイルを開く／保存（ネイティブのダイアログ）
