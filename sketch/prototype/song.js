@@ -1,7 +1,7 @@
 /* ChordSketch：曲データと MIDI 生成の純粋関数（UI コードは置かない）
-   音楽理論（コード・表記・判別）は ChordNavi の ui/theory.js を共有する */
-import {CHORD,chordAt,chordName as chordNameOf,tonicOf,isFlatKey,mod12,SCALES,scaleById} from '../../ui/theory.js';
-import {nearestVoicing,TAB_AREAS} from '../../ui/guitar.js';
+   音楽理論（コード・表記・判別）は ChordNavi と共通の shared/ui/theory.js を使う */
+import {CHORD,chordAt,chordName as chordNameOf,tonicOf,isFlatKey,mod12,SCALES,scaleById} from '../../shared/ui/theory.js';
+import {nearestVoicing,TAB_AREAS} from '../../shared/ui/guitar.js';
 
 export const PPQ=480, WHOLE=PPQ*4;
 export const barTicksOf=([n,d])=>n*WHOLE/d;

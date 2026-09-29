@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import {demoSong,newSong,newSection,newChord,timeline,placedChords,renderSong,buildSmf,placeChord,resizeChord,insertBars,
   setMark,pruneMarks,setKeyMark,appendSectionFrom,stretchChordStart,keyRegion,mergeSections,splitSection,cloneSection,stretchChord,insertProgression,tickToSec,secToTick,copyRange,pasteAt,nameOf,rangeTicks,PPQ,safeFileName,voicingOf,STRUM_TICKS,withExtension,keyScale,sameKey} from './song.js';
-import {diatonicOf,conformBars,chordDeg} from '../../ui/theory.js';
+import {diatonicOf,conformBars,chordDeg} from '../../shared/ui/theory.js';
 import {barDrums,pulsesOf,backbeat} from './player.js';
 
 const B=PPQ*4;

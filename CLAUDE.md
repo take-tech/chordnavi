@@ -21,17 +21,25 @@
 ```
 CMakeLists.txt
 reference/prototype.html      … 参照用。編集しない
-Source/
+Source/                       … ChordNavi 専用の C++
   PluginProcessor.h/.cpp
   PluginEditor.h/.cpp         … WebBrowserComponent を載せる
-  MidiExport.h/.cpp           … コード列 → .mid ファイル生成、外部ドラッグ
-  PreviewSynth.h/.cpp         … 試聴用の簡易シンセ（三角波＋エンベロープ、ロックフリーのキュー）
-  PluginState.h/.cpp          … 保存データ（UI 状態の JSON を ValueTree で包む）
   StandaloneApp.cpp           … Standalone 版のアプリ本体（macOS 標準のタイトルバー、上部メニューバーの「オプション」）
+shared/                       … ChordNavi・ChordSketch で共通（変えたら両方のビルド・テストを通す）
+  cpp/                        … CMake の INTERFACE ライブラリ RanzeShared（使う側でコンパイル）
+    MidiExport.h/.cpp         … コード列 → .mid ファイル生成、外部ドラッグ
+    PreviewSynth.h/.cpp       … 試聴用の簡易シンセ（三角波＋エンベロープ、ロックフリーのキュー）
+    PluginState.h/.cpp        … 保存データ（UI 状態の JSON を ValueTree で包む）
+    WebResources.h/.cpp       … 埋め込み UI の配信（URL のファイル名で引く・MIME）
+  ui/
+    theory.js / guitar.js     … 音楽理論・ギターのフォーム探索
+    wheel.js                  … 五度圏（createWheel）
+    juce-bridge.js            … JUCE の JS の読み込み・ネイティブ関数・イベント
 assets/icon/                  … アプリアイコンの案（SVG と 1024px PNG）
-ui/
+ui/                           … ChordNavi 専用の UI（共通部品は ../shared/ui/ から読む）
   index.html                  … プロトタイプを分割・整理したもの
-  app.js / theory.js / midi.js / audio.js / staff.js / guitar.js / host.js / persist.js / style.css
+  app.js / midi.js / audio.js / staff.js / host.js / persist.js / style.css
+sketch/                       … ChordSketch（sketch/CLAUDE.md）
 ```
 
 ## 機能仕様
@@ -43,7 +51,7 @@ ui/
    - 五線譜の綴りは度数・音程から決める（例：F♯メジャーの7度は E♯、ダブルシャープ／フラットあり）。鍵盤・指板の表記はプロトタイプのまま。
 3. **ギター指板**：レギュラーチューニング、0〜15フレット、上が1弦。表示ルールは鍵盤と同じ。押すとその音（1弦開放＝E4〜6弦開放＝E2）を試聴。
    - 「指板｜コード図｜TAB」切替。コード図は横向き（上が1弦、ローポジションはナット、それ以外は開始フレット番号を左下に、セーハは太い棒、○開放・×ミュート、ベースはオレンジ）。コード図と TAB はコードを選んでいるとその3ポジション（6弦・5弦・4弦ルートの一番良い形）、選んでいない／試聴中は進行を「ロー／ミドル／ハイ」のエリアで表示（前のコードから手の移動が少ない形）。列を押すとその形を試聴。
-   - フォームは `ui/guitar.js` で探索（最低音＝ルート／分数コードのベース、3フレット以内・指4本以内（セーハは1本）、4弦以上、途中ミュート1本まで、5度は省略可、開放弦はローポジションのみ・セーハの上では不可）。
+   - フォームは `shared/ui/guitar.js` で探索（最低音＝ルート／分数コードのベース、3フレット以内・指4本以内（セーハは1本）、4弦以上、途中ミュート1本まで、5度は省略可、開放弦はローポジションのみ・セーハの上では不可）。
 4. **スケール**：プロトタイプの14種類＋オーギュメント（対称）。加えて「コードトーン」グループ（M7・m7・7・m7♭5・dim7。五度圏で選んだキーの主音をルートに構成音だけを表示）。いずれも `SCALES`（コードトーンは `group:'chord'`）。キーのモードを切り替えたときのみ既定スケール（メジャー／ナチュラル・マイナー）に戻す。
 5. **ダイアトニックコード**：7つ。「4和音／3和音」切替（既定は4和音）。切替時は選択中のコードも対応する和音に置き換える（3和音へは7thを落とす、4和音へはダイアトニックの度数に一致する場合のみ）し、その和音を試聴する。クリックで試聴＋構成音表示、ドラッグでMIDI。
 6. **コード進行**：メジャー8種・マイナー5種（`PROGRESSIONS`。プロトタイプの12小節ブルース2種は削除）。進行名ボタンで1つ選び、コード名とディグリーをチップ表示。単体コード・進行全体をドラッグでMIDI。「MIDI保存」でファイル保存も可能。
@@ -132,11 +140,12 @@ auval -v aumu Gdkn Rnze
 - **Windows**：GitHub Actions（windows-2022）でビルド。WebView2 SDK を NuGet で取得し `-DJUCE_WEBVIEW2_PACKAGE_LOCATION` で渡す。WebView2 は静的リンク（`JUCE_USE_WIN_WEBVIEW2_WITH_STATIC_LINKING`）、エディタは WebView2 バックエンド＋データフォルダを AppData に。MSVC は `/utf-8`。インストーラーは Inno Setup（`installer/windows/ChordNavi.iss`、VST3 と Standalone をコンポーネントとして選べる、WebView2 ランタイムが無ければ案内）。Standalone の「オプション」はウィンドウ内のメニューバー。
 
 - 音源（aumu）なので MIDI 入力を受ける設定にしている（`NEEDS_MIDI_INPUT TRUE`。auval の MIDI テストに必要）。受けた MIDI は今は使わない。
-- UI をブラウザで確認するときは `ui/` を HTTP で配信して開く（JUCE ブリッジが無いときは WebAudio・DAW同期なしで動く）。
+- UI をブラウザで確認するときは**リポジトリのルート**を HTTP で配信して `/ui/index.html` を開く（`ui/` は `../shared/ui/` を読むので、`ui/` だけを配信すると動かない。JUCE ブリッジが無いときは WebAudio・DAW同期なしで動く）。
 
 ## ルール
 
-- 音楽理論のデータ（スケール・コード・進行）は `theory.js` に集約し、UIコードと混ぜない。
+- 音楽理論のデータ（スケール・コード・進行）は `shared/ui/theory.js` に集約し、UIコードと混ぜない。
+- 埋め込む UI は WebView にファイル名で配信するので、ChordNavi の `ui/`・`shared/ui/`・JUCE の JS に同じ名前のファイルを置かない（CMake の `ranze_check_unique_names` でビルドが止まる）。JS は `../shared/ui/…` のように相対で読む（ブラウザでもプラグインでも `/shared/ui/…` を指す）。
 - MIDI生成ロジックには単体テストを書く（ヘッダ、デルタタイム、ノートオン／オフの対応）。試聴シンセにもテストあり（`tests/`、ターゲット `MidiExportTests`）。
 - 大きな設計変更や方式の切り替えは、実装前に提案して確認を取る。
 - コミットはマイルストーン単位を目安に、日本語のメッセージで。
@@ -144,4 +153,4 @@ auval -v aumu Gdkn Rnze
 ## 派生アプリ ChordSketch
 
 - 1曲単位でコード譜と MIDI を作る派生アプリ。`sketch/` にあり、仕様は `sketch/CLAUDE.md`。
-- `ui/theory.js` は ChordSketch からも読み込むので、変更するときは `node sketch/prototype/song.test.mjs` も通すこと。
+- `shared/` は ChordSketch と共通なので、変更するときは ChordNavi のビルド・テストに加えて `node sketch/prototype/song.test.mjs` も通し、両方の画面をブラウザで確かめること。

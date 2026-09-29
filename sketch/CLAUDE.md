@@ -2,10 +2,10 @@
 
 ## このフォルダについて
 
-- ChordNavi と同じリポジトリで作る別製品。音楽理論（`ui/theory.js`）は ChordNavi と共有し、コピーしない。
+- ChordNavi と同じリポジトリで作る別製品。音楽理論（`shared/ui/theory.js`）・五度圏（`shared/ui/wheel.js`）などは ChordNavi と共有し（`shared/`、ルートの CLAUDE.md）、コピーしない。
 - 今はブラウザで動くプロトタイプ（`sketch/prototype/`）の段階。**UI・挙動はこのプロトタイプを正とする**（ChordNavi の `reference/prototype.html` と同じ扱い）。
 - **プロトタイプの仕様は 2026-09-29 に確定**（タグ `chordsketch-prototype-1`）。JUCE 化はこの状態を正として進める。仕様を変えるときは、先にプロトタイプとこのファイルを直してから JUCE 側に反映する。
-- 確認：リポジトリのルートを HTTP で配信して `http://localhost:8765/sketch/prototype/` を開く（`python3 -m http.server 8765`）。`../../ui/theory.js` を読むのでルートから配信すること。
+- 確認：リポジトリのルートを HTTP で配信して `http://localhost:8765/sketch/prototype/` を開く（`python3 -m http.server 8765`）。`../../shared/ui/` を読むのでルートから配信すること。
 - テスト：`node sketch/prototype/song.test.mjs`（曲データ・パターン・食い・範囲・SMF）。
 - `app.js` を変えたら文法を確かめる（書き間違いがあると画面全体が動かなくなる）：`cp sketch/prototype/app.js /tmp/app.mjs && node --check /tmp/app.mjs`
 
@@ -97,7 +97,7 @@ sketch/prototype/
 
 ## この先（JUCE 化）
 
-1. 共通部品の切り出し：`ui/theory.js`、五度圏の描画、MIDI ドラッグ（JS・C++）、`PreviewSynth`、テーマ、ホスト連携を両製品で使う形にする（ChordNavi のビルド・テストが変わらないことを確認）
+1. ~~共通部品の切り出し~~（済み・2026-09-29）：`shared/ui/`（theory・guitar・wheel・juce-bridge）と `shared/cpp/`（MidiExport・PreviewSynth・PluginState・WebResources。INTERFACE ライブラリ RanzeShared）。ChordNavi は画面（五度圏の SVG・文字）が切り出し前と一致、テスト 39 件（配信のテスト4件を追加）、Standalone・VST3・AU のビルドを確認。MIDI ドラッグの JS・テーマは製品ごとに違うので、2〜3 で ChordSketch 用を作るときに共通化を見直す
 2. CMake に ChordSketch のターゲットを追加（プラグインコードは ChordNavi と別）。空の画面が出るところまで
 3. `MidiExport` をノート列＋テンポ・拍子のメタイベントを受ける形に広げる（パターン・食いの計算は JS の song.js が正、C++ は SMF を書くだけ）と単体テスト
 4. 試聴：C++ のシンセに曲全体を予約し、再生位置を C++ の時計で UI へ返す。ドラム音も C++ に

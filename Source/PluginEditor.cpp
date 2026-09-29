@@ -1,30 +1,13 @@
 #include "PluginEditor.h"
 #include "MidiExport.h"
+#include "WebResources.h"
 #include "GodokenUIData.h"
 
 namespace
 {
-    juce::String mimeTypeFor (const juce::String& fileName)
-    {
-        const auto ext = fileName.fromLastOccurrenceOf (".", false, true);
-        if (ext == "html") return "text/html";
-        if (ext == "js")   return "text/javascript";
-        if (ext == "css")  return "text/css";
-        if (ext == "json") return "application/json";
-        if (ext == "svg")  return "image/svg+xml";
-        return "application/octet-stream";
-    }
-
-    // URL のファイル名（basename）で埋め込みリソースを引く
-    const char* findResource (const juce::String& fileName, int& size)
-    {
-        for (int i = 0; i < GodokenUIData::namedResourceListSize; ++i)
-            if (fileName == GodokenUIData::originalFilenames[i])
-                return GodokenUIData::getNamedResource (GodokenUIData::namedResourceList[i], size);
-
-        size = 0;
-        return nullptr;
-    }
+    // ChordNavi の埋め込み UI（ui/ と shared/ui/ と JUCE の JS）
+    const WebResources::Table uiResources { GodokenUIData::namedResourceListSize, GodokenUIData::namedResourceList,
+                                            GodokenUIData::originalFilenames, &GodokenUIData::getNamedResource };
 
     std::vector<MidiExport::Chord> parseChords (const juce::var& list)
     {
@@ -235,19 +218,8 @@ void GodokenEditor::resized()
 
 std::optional<juce::WebBrowserComponent::Resource> GodokenEditor::serveResource (const juce::String& urlPath)
 {
-    auto path = urlPath.upToFirstOccurrenceOf ("?", false, false).trimCharactersAtStart ("/");
-    if (path.isEmpty())
-        path = "index.html";
-
-    const auto fileName = path.fromLastOccurrenceOf ("/", false, false);
-
-    int size = 0;
-    if (auto* data = findResource (fileName, size); data != nullptr && size > 0)
-    {
-        std::vector<std::byte> bytes ((size_t) size);
-        std::memcpy (bytes.data(), data, (size_t) size);
-        return juce::WebBrowserComponent::Resource { std::move (bytes), mimeTypeFor (fileName) };
-    }
+    if (auto file = WebResources::serve (uiResources, urlPath))
+        return juce::WebBrowserComponent::Resource { std::move (file->bytes), file->mimeType };
 
     return std::nullopt;
 }

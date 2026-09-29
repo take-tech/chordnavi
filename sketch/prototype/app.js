@@ -1,6 +1,7 @@
-import {MAJ_LABEL,MIN_LABEL,SIG,WHEEL_CELLS,DIATONIC,CHORD,chordDeg,chordAt,chordName as chordNameOf,
+import {MAJ_LABEL,MIN_LABEL,SIG,DIATONIC,CHORD,chordDeg,chordAt,chordName as chordNameOf,
   noteName,tonicOf,isFlatKey,keyName as keyNameOf,detectChords,mod12,PROGRESSIONS,variantsOf,progressionDegrees,
-  CONFORM_SCALES,conformBars,diatonicOf,scaleById,chordPcs} from '../../ui/theory.js';
+  CONFORM_SCALES,conformBars,diatonicOf,scaleById,chordPcs} from '../../shared/ui/theory.js';
+import {createWheel} from '../../shared/ui/wheel.js';
 import {PPQ,METERS,SNAPS,snapTicks,barTicksOf,beatTicksOf,SECTION_COLORS,SECTION_PRESETS,PATTERNS,MIN_BPM,MAX_BPM,
   newSong,demoSong,newSection,newChord,cloneSection,timeline,placedChords,placeChord,removeChord,resizeChord,
   setSectionBars,insertBars,appendSectionFrom,stretchChord,stretchChordStart,pruneMarks,mergeSections,splitSection,insertProgression,setMark,rangeTicks,copyRange,pasteAt,renderSong,buildSmf,safeFileName,
@@ -114,61 +115,13 @@ const QUALITIES=['','m','7','M7','m7','m7b5','dim','dim7','aug','sus4','7sus4','
 for(const q of Object.keys(CHORD))if(!QUALITIES.includes(q))QUALITIES.push(q);
 const INS_LENS=[['2bar','2小節'],['bar','1小節'],['2beat','2拍'],['beat','1拍'],['half','半拍']];
 
-/* ---------- SVG ---------- */
-const NS='http://www.w3.org/2000/svg';
-function el(tag,attrs={},parent){const e=document.createElementNS(NS,tag);for(const k in attrs){const v=attrs[k];if(typeof v==='string'&&v.startsWith('var('))e.style.setProperty(k,v);else e.setAttribute(k,v);}if(parent)parent.appendChild(e);return e;}
-function txt(parent,x,y,s,attrs={}){const t=el('text',{x,y,'text-anchor':'middle','dominant-baseline':'central',...attrs},parent);t.textContent=s;return t;}
 function h(tag,cls,text){const e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;}
 
-/* ---------- 五度圏（ChordNavi と同じ見た目・操作） ---------- */
-const wheel=$('wheel');
-const P=(r,a)=>[r*Math.sin(a*Math.PI/180),-r*Math.cos(a*Math.PI/180)];
-function arc(r0,r1,a0,a1){
-  const [x0,y0]=P(r1,a0),[x1,y1]=P(r1,a1),[x2,y2]=P(r0,a1),[x3,y3]=P(r0,a0);
-  return `M${x0},${y0}A${r1},${r1} 0 0 1 ${x1},${y1}L${x2},${y2}A${r0},${r0} 0 0 0 ${x3},${y3}Z`;
-}
-const R={c:66,i0:68,i1:118,o0:120,o1:192};
-const gWedges=el('g',{},wheel), gOverlay=el('g',{'pointer-events':'none'},wheel), gLabels=el('g',{'pointer-events':'none'},wheel), gStatic=el('g',{'pointer-events':'none'},wheel);
-const labelNodes=[];
-for(let i=0;i<12;i++){
-  const a0=i*30-15,a1=i*30+15;
-  const o=el('path',{d:arc(R.o0,R.o1,a0,a1),fill:'var(--wheel-outer)',stroke:'var(--bg)','stroke-width':2,class:'wedge',tabindex:0,role:'button','aria-label':MAJ_LABEL[i]+' メジャー'},gWedges);
-  const n=el('path',{d:arc(R.i0,R.i1,a0,a1),fill:'var(--wheel-inner)',stroke:'var(--bg)','stroke-width':2,class:'wedge',tabindex:0,role:'button','aria-label':MIN_LABEL[i]+' マイナー'},gWedges);
-  for(const [node,m] of [[o,'major'],[n,'minor']]){
-    node.addEventListener('click',()=>setKey(i,m));
-    node.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();e.stopPropagation();setKey(i,m);}});
-  }
-  const long=i===6, [ox,oy]=P(163,i*30), [ix,iy]=P(100,i*30);
-  labelNodes.push({t:txt(gLabels,ox,oy,MAJ_LABEL[i],{fill:'#fff','font-size':long?13:22,'font-weight':700}),x:ox,y:oy});
-  labelNodes.push({t:txt(gLabels,ix,iy,MIN_LABEL[i],{fill:'#fff','font-size':long?9:14,'font-weight':500}),x:ix,y:iy});
-}
-el('circle',{r:R.c,fill:'var(--panel)',stroke:'var(--line)'},wheel);
-const cKey=txt(wheel,0,-12,'',{fill:'var(--ink)','font-size':26,'font-weight':900});
-const cSig=txt(wheel,0,16,'',{fill:'var(--muted)','font-size':11});
-const cMode=txt(wheel,0,32,'',{fill:'var(--muted)','font-size':11});
-el('path',{d:'M-9,-212 L9,-212 L0,-197 Z',fill:'#E3A21A'},wheel);
-function drawOverlay(){
-  gOverlay.innerHTML='';gStatic.innerHTML='';
-  for(const [rel,outer,deg,isT] of WHEEL_CELLS[curKey().mode]){
-    const a=rel*30, r0=outer?R.o0:R.i0, r1=outer?R.o1:R.i1;
-    el('path',{d:arc(r0,r1,a-15,a+15),fill:isT?'#E3A21A':'#2E8C80','fill-opacity':isT?.9:(rel===2?.35:.6)},gOverlay);
-    const [x,y]=P(outer?134:80,a);
-    txt(gStatic,x,y,deg,{fill:'#fff','font-size':outer?11:9,'font-weight':700,opacity:.95});
-  }
-}
-let rot=0,anim=null,rotKey=null;   // rotKey：回している先のキー（元に戻す・ファイルを開くでも回すため）
-function applyRot(r){
-  const tr=`rotate(${r})`;gWedges.setAttribute('transform',tr);gLabels.setAttribute('transform',tr);
-  for(const n of labelNodes)n.t.setAttribute('transform',`rotate(${-r},${n.x},${n.y})`);
-}
-function rotateTo(idx,instant){
-  rotKey=idx;
-  const target=-idx*30, d=((target-rot)%360+540)%360-180, from=rot, to=rot+d;
-  const dur=instant||matchMedia('(prefers-reduced-motion: reduce)').matches?0:750, t0=performance.now();
-  cancelAnimationFrame(anim);
-  const step=now=>{const p=dur?Math.min(1,(now-t0)/dur):1, e=1-Math.pow(1-p,3);rot=from+(to-from)*e;applyRot(rot);if(p<1)anim=requestAnimationFrame(step);else rot=to;};
-  anim=requestAnimationFrame(step);
-}
+/* ---------- 五度圏（shared/ui/wheel.js。ChordNavi と共通） ---------- */
+const wheel=createWheel($('wheel'),{onSelect:(i,m)=>setKey(i,m)});
+const {key:cKey,sig:cSig,mode:cMode}=wheel.center;
+const drawOverlay=()=>wheel.setOverlay(curKey().mode);
+const rotateTo=(idx,instant)=>wheel.rotateTo(idx,instant);
 // キーの変更：カーソルのある範囲（曲の頭または途中のキーの変更点〜次の変更点）のキーを変える。
 // 既定は度数を保って移調。「コード固定」なら、その範囲のコードの度数を付け替えてコード名（鳴る音）を変えない
 function setKey(idx,mode){
@@ -1522,7 +1475,7 @@ function render(){
   const scName=keyScale(ck)!==defaultScale(ck.mode)?scaleById(keyScale(ck)).name.split('（')[0]:(ck.mode==='major'?'メジャー':'マイナー');
   cMode.textContent=scName+(kr.from>0?`・${kr.from+1}小節〜`:'');
   drawOverlay();
-  if(rotKey!==ck.idx)rotateTo(ck.idx);
+  if(wheel.target!==ck.idx)rotateTo(ck.idx);   // 元に戻す・ファイルを開く・タブの切り替えでキーが変わったときも回す
   renderOctUp();renderOctBass();
   const ex=currentExport();
   $('dragLabel').textContent=!range?'曲全体':ex.si>=0?`「${song.sections[ex.si].name}」`:rangeLabel(range);

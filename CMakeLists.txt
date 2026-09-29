@@ -26,25 +26,55 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(JUCE)
 
 # ──────────────────────────────────────────────────────
-# UI（ui/ 配下 + JUCE 付属の JS ブリッジ）をバイナリに埋め込む
+# ChordNavi・ChordSketch で共通の C++（shared/cpp）。
+# JUCE の部品を 2 回リンクしないよう、ソースを使う側（プラグイン・テスト）でコンパイルする INTERFACE ライブラリにする
+# ──────────────────────────────────────────────────────
+add_library(RanzeShared INTERFACE)
+target_sources(RanzeShared INTERFACE
+    ${CMAKE_CURRENT_SOURCE_DIR}/shared/cpp/MidiExport.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/shared/cpp/PreviewSynth.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/shared/cpp/PluginState.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/shared/cpp/WebResources.cpp
+)
+target_include_directories(RanzeShared INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/shared/cpp)
+
+# 埋め込む UI はファイル名（basename）で配信する（shared/cpp/WebResources）。同じ名前のファイルが 2 つあったらビルドを止める
+function(ranze_check_unique_names)
+    set(seen "")
+    foreach(f IN LISTS ARGN)
+        get_filename_component(n "${f}" NAME)
+        if(n IN_LIST seen)
+            message(FATAL_ERROR "埋め込む UI に同じ名前のファイルがあります：${n}（${f}）。WebView はファイル名で配信するので名前を変えてください")
+        endif()
+        list(APPEND seen "${n}")
+    endforeach()
+endfunction()
+
+# ──────────────────────────────────────────────────────
+# UI（ui/ ＋ 共通の shared/ui/ ＋ JUCE 付属の JS ブリッジ）をバイナリに埋め込む
 # ──────────────────────────────────────────────────────
 file(GLOB_RECURSE UI_FILES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/ui/*")
+file(GLOB_RECURSE SHARED_UI_FILES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/shared/ui/*")
 set(JUCE_JS_DIR "${juce_SOURCE_DIR}/modules/juce_gui_extra/native/javascript")
+set(CHORDNAVI_UI_FILES
+    ${UI_FILES}
+    ${SHARED_UI_FILES}
+    "${JUCE_JS_DIR}/index.js"
+    "${JUCE_JS_DIR}/check_native_interop.js"
+)
+ranze_check_unique_names(${CHORDNAVI_UI_FILES})
 
 juce_add_binary_data(GodokenUIData
     HEADER_NAME GodokenUIData.h
     NAMESPACE GodokenUIData
-    SOURCES
-        ${UI_FILES}
-        "${JUCE_JS_DIR}/index.js"
-        "${JUCE_JS_DIR}/check_native_interop.js"
+    SOURCES ${CHORDNAVI_UI_FILES}
 )
 
 # ──────────────────────────────────────────────────────
 # Plugin Target
 # ──────────────────────────────────────────────────────
 juce_add_plugin(ChordNavi
-    VERSION                     1.0.5
+    VERSION                     ${PROJECT_VERSION}   # project() のバージョンにそろえる
     COMPANY_NAME                Ranze
     PLUGIN_MANUFACTURER_CODE    Rnze
     PLUGIN_CODE                 Gdkn
@@ -64,9 +94,6 @@ juce_add_plugin(ChordNavi
 target_sources(ChordNavi PRIVATE
     Source/PluginProcessor.cpp
     Source/PluginEditor.cpp
-    Source/MidiExport.cpp
-    Source/PreviewSynth.cpp
-    Source/PluginState.cpp
     Source/StandaloneApp.cpp
 )
 
@@ -84,6 +111,7 @@ target_compile_definitions(ChordNavi PUBLIC
 
 target_link_libraries(ChordNavi
     PRIVATE
+        RanzeShared
         GodokenUIData
         juce::juce_audio_utils
         juce::juce_gui_extra
@@ -104,12 +132,8 @@ target_sources(MidiExportTests PRIVATE
     tests/MidiExportTests.cpp
     tests/PreviewSynthTests.cpp
     tests/PluginStateTests.cpp
-    Source/MidiExport.cpp
-    Source/PreviewSynth.cpp
-    Source/PluginState.cpp
+    tests/WebResourcesTests.cpp
 )
-
-target_include_directories(MidiExportTests PRIVATE Source)
 
 target_compile_definitions(MidiExportTests PRIVATE
     JUCE_USE_CURL=0
@@ -119,6 +143,7 @@ target_compile_definitions(MidiExportTests PRIVATE
 
 target_link_libraries(MidiExportTests
     PRIVATE
+        RanzeShared
         juce::juce_audio_basics
         juce::juce_data_structures
     PUBLIC
