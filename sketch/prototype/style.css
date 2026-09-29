@@ -119,7 +119,14 @@ h1{font-size:17px;font-weight:900;letter-spacing:.02em;margin:0 6px 0 0;white-sp
 .sheet::-webkit-scrollbar{width:8px}.sheet::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px}
 
 /* セクション */
-.sec{margin-top:10px;border-left:4px solid var(--c);padding-left:8px}
+.sec{margin-top:10px;border-left:4px solid var(--c);padding-left:8px;position:relative}
+/* 色の棒（左の枠線）の上に重ねるつまみ：つかんで上下に移動 */
+.sec-grip{position:absolute;left:-9px;top:0;bottom:0;width:14px;cursor:grab;z-index:2;touch-action:none}
+.sec-grip:hover{background:linear-gradient(90deg,transparent 3px,var(--c) 3px,var(--c) 9px,transparent 9px);opacity:.55}
+.sec.dragging{opacity:.4}
+body.grabbing,body.grabbing *{cursor:grabbing!important}
+.sec-drop{position:absolute;left:4px;right:12px;height:3px;border-radius:2px;background:var(--chord);pointer-events:none;z-index:5;box-shadow:0 0 0 2px rgba(196,69,106,.2)}
+.sec-drop[hidden]{display:none}
 .sec.dragover{outline:2px dashed var(--c)}
 .sec-head{display:flex;align-items:center;gap:5px;margin-bottom:4px}
 .sec-sw{width:16px;height:16px;border-radius:50%;background:var(--c);border:0;padding:0;cursor:pointer;flex-shrink:0}

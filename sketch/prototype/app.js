@@ -344,6 +344,9 @@ function renderSheet(){
     const {from,to}=tl.secRanges[si], color=SECTION_COLORS[s.color%SECTION_COLORS.length];
     const sec=h('section','sec');sec.style.setProperty('--c',color);sec.dataset.si=si;
     if(range&&range.from===from&&range.to===to)sec.classList.add('selected');
+    // 左の色の棒：つかんで上下にドラッグするとセクションごと移動
+    const grip=h('div','sec-grip');grip.title=`「${s.name}」をドラッグして移動`;grip.setAttribute('aria-hidden','true');
+    sec.appendChild(grip);
     sec.appendChild(sectionHead(s,si));
     const rows=h('div','rows');
     for(let r=from;r<to;r+=ui.perRow){
@@ -478,6 +481,7 @@ function sectionHead(s,si){
 
 /* ---------- シートの操作 ---------- */
 sheet.addEventListener('pointerdown',e=>{
+  if(e.button===0&&e.target.closest('.sec-grip')){e.preventDefault();startSectionDrag(e,+e.target.closest('.sec').dataset.si);return;}
   if(e.button!==0||e.target.closest('.sec-head,.add-sec'))return;
   const mark=e.target.closest('.mark'), blk=e.target.closest('.blk'), no=e.target.closest('.bar-no'), lane=e.target.closest('.lane');
   const bar=e.target.closest('.bar');
@@ -514,6 +518,48 @@ function startRangeDrag(e,gi,onNumber){
   const up=()=>{removeEventListener('pointermove',move);removeEventListener('pointerup',up);};
   addEventListener('pointermove',move);addEventListener('pointerup',up);
 }
+// セクションの移動：色の棒をつかんで上下に。落とす位置（セクションの間）に線を出す。
+// シートの上端・下端に近づけると自動でスクロールする。Esc で取り消し
+function startSectionDrag(e,si){
+  const secs=[...sheet.querySelectorAll('.sec')], me=secs[si], s=song.sections[si];
+  const line=h('div','sec-drop');sheet.appendChild(line);
+  me.classList.add('dragging');document.body.classList.add('grabbing');
+  ghost.hidden=false;ghost.textContent=`「${s.name}」を移動`;
+  let target=si, y=e.clientY, raf=0, cancelled=false;
+  const place=()=>{
+    const sr=sheet.getBoundingClientRect(), k=sr.height/sheet.clientHeight;
+    // 落とす位置：ポインタより下にある最初のセクションの前（どれも上なら最後）
+    target=secs.length;
+    for(let i=0;i<secs.length;i++){const r=secs[i].getBoundingClientRect();if(y<r.top+r.height/2){target=i;break;}}
+    const ref=secs[target]??secs.at(-1), rr=ref.getBoundingClientRect();
+    const top=(target<secs.length?rr.top-5:rr.bottom+3)-sr.top+sheet.scrollTop*k;
+    line.style.top=top/k+'px';
+    line.hidden=target===si||target===si+1;   // 今の位置と同じなら線を出さない
+  };
+  const tick=()=>{
+    const sr=sheet.getBoundingClientRect(), edge=40*sr.height/sheet.clientHeight;
+    if(y<sr.top+edge)sheet.scrollTop-=12;else if(y>sr.bottom-edge)sheet.scrollTop+=12;
+    place();raf=requestAnimationFrame(tick);
+  };
+  const move=ev=>{y=ev.clientY;ghost.style.left=ev.clientX+10+'px';ghost.style.top=ev.clientY+8+'px';place();};
+  const end=()=>{
+    cancelAnimationFrame(raf);removeEventListener('pointermove',move);removeEventListener('pointerup',up);removeEventListener('keydown',key,true);
+    line.remove();me.classList.remove('dragging');document.body.classList.remove('grabbing');ghost.hidden=true;
+  };
+  const up=ev=>{
+    if(ev&&ev.clientY!=null&&!cancelled){y=ev.clientY;place();}   // 素早く放したときも放した位置で決める
+    end();
+    if(cancelled||target===si||target===si+1)return;
+    const to=target>si?target-1:target;
+    commit(()=>{const [x]=song.sections.splice(si,1);song.sections.splice(to,0,x);});
+    const r=tl.secRanges[to];sel=null;range={from:r.from,to:r.to};cursor={gi:r.from,pos:0};render();scrollToBar(r.from);
+  };
+  const key=ev=>{if(ev.key==='Escape'){ev.stopPropagation();ev.preventDefault();cancelled=true;up();}};
+  move(e);
+  addEventListener('pointermove',move);addEventListener('pointerup',up);addEventListener('keydown',key,true);
+  raf=requestAnimationFrame(tick);
+}
+
 // ブロック：クリックで選択＋試聴、ドラッグで移動（Alt でコピー）、右端で長さ
 function startBlockDrag(e,blkEl){
   const si=+blkEl.dataset.si, id=blkEl.dataset.id, c=song.sections[si].chords.find(x=>x.id===id);if(!c)return;
