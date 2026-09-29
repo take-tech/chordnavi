@@ -97,7 +97,7 @@ sketch/prototype/
 
 ## この先（JUCE 化）
 
-1. ~~共通部品の切り出し~~（済み・2026-09-29）：`shared/ui/`（theory・guitar・wheel・juce-bridge）と `shared/cpp/`（MidiExport・PreviewSynth・PluginState・WebResources。INTERFACE ライブラリ RanzeShared）。ChordNavi は画面（五度圏の SVG・文字）が切り出し前と一致、テスト 39 件（配信のテスト4件を追加）、Standalone・VST3・AU のビルドを確認。MIDI ドラッグの JS・テーマは製品ごとに違うので、2〜3 で ChordSketch 用を作るときに共通化を見直す
+1. ~~共通部品の切り出し~~（済み・2026-09-29）：`shared/ui/`（theory・guitar・wheel・juce-bridge）と `shared/cpp/`（MidiExport・PreviewSynth・PluginState・WebResources。INTERFACE ライブラリ RanzeShared）。ChordNavi は画面（五度圏の SVG・文字）が切り出し前と一致、テスト 39 件（配信のテスト4件を追加）、Standalone・VST3・AU のビルドを確認。Debug ビルドの Standalone を起動して、表示・五度圏・試聴が動くことを確認（ユーザー確認）。MIDI ドラッグの JS・テーマは製品ごとに違うので、2〜3 で ChordSketch 用を作るときに共通化を見直す
 2. CMake に ChordSketch のターゲットを追加（プラグインコードは ChordNavi と別）。空の画面が出るところまで
 3. `MidiExport` をノート列＋テンポ・拍子のメタイベントを受ける形に広げる（パターン・食いの計算は JS の song.js が正、C++ は SMF を書くだけ）と単体テスト
 4. 試聴：C++ のシンセに曲全体を予約し、再生位置を C++ の時計で UI へ返す。ドラム音も C++ に
