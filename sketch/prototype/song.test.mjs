@@ -1,7 +1,7 @@
 // song.js の単体テスト：node sketch/prototype/song.test.mjs
 import assert from 'node:assert/strict';
 import {demoSong,newSong,newSection,newChord,timeline,placedChords,renderSong,buildSmf,placeChord,resizeChord,insertBars,
-  setMark,pruneMarks,mergeSections,splitSection,cloneSection,stretchChord,insertProgression,tickToSec,secToTick,copyRange,pasteAt,nameOf,rangeTicks,PPQ,safeFileName,voicingOf,STRUM_TICKS} from './song.js';
+  setMark,pruneMarks,setKeyMark,keyRegion,mergeSections,splitSection,cloneSection,stretchChord,insertProgression,tickToSec,secToTick,copyRange,pasteAt,nameOf,rangeTicks,PPQ,safeFileName,voicingOf,STRUM_TICKS} from './song.js';
 
 const B=PPQ*4;
 let n=0;const test=(name,f)=>{f();n++;console.log('ok',name);};
@@ -184,6 +184,23 @@ test('ボイシング：ギターの8分刻みは裏拍でアップ（高い弦�
   const up=renderSong(s).notes.filter(n=>n.t>=PPQ/2&&n.t<PPQ/2+STRUM_TICKS*6);
   assert.ok(up.length>=4);
   assert.deepEqual(up.map(n=>n.n),[...up.map(n=>n.n)].sort((a,b)=>b-a));
+});
+test('途中のキー変更：度数はその位置のキーが基準、コードも移調／音を保つ',()=>{
+  const mk=()=>{const s=newSong();s.sections=[newSection('A',1,2),newSection('サビ',3,2)];
+    placeChord(s,0,newChord(0,0,B,0,''));placeChord(s,0,newChord(1,0,B,7,''));placeChord(s,1,newChord(0,0,B,5,''));placeChord(s,1,newChord(1,0,B,7,''));return s;};
+  // 移調（度数を保つ）：サビを D へ
+  let s=mk();setKeyMark(s,1,0,{idx:2,mode:'major'},false);
+  assert.deepEqual(placedChords(s).map(p=>nameOf(s,p.c,p.key)),['C','G','G','A']);
+  assert.deepEqual(renderSong(s).notes.filter(n=>n.t===B*2).map(n=>n.n),[43,55,59,62]);   // G（D キーの IV）
+  const tl=timeline(s);assert.deepEqual([tl.bars[1].key.idx,tl.bars[2].key.idx],[0,2]);
+  assert.deepEqual(keyRegion(tl,3),{from:2,to:4,key:{idx:2,mode:'major'},mark:{si:1,bar:0}});
+  // 音を保つ：サビの F・G はそのまま、度数だけ D キーの ♭III・IV に
+  s=mk();setKeyMark(s,1,0,{idx:2,mode:'major'},true);
+  assert.deepEqual(placedChords(s).map(p=>nameOf(s,p.c,p.key)),['C','G','F','G']);
+  assert.deepEqual(s.sections[1].chords.map(c=>c.off),[3,5]);
+  // 外す（音を保つ）と元の度数に戻る、直前と同じキーの変更点は消える
+  setKeyMark(s,1,0,null,true);assert.deepEqual(s.sections[1].chords.map(c=>c.off),[5,7]);
+  s.sections[1].marks.push({bar:0,pos:0,key:{idx:0,mode:'major'}});pruneMarks(s);assert.equal(s.sections[1].marks.length,0);
 });
 test('ファイル名',()=>{assert.equal(safeFileName('サビ F♯m7 B♭'),'F#m7_Bb');});
 console.log(`${n} tests passed`);

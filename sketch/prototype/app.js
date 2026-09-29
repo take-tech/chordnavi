@@ -3,7 +3,7 @@ import {MAJ_LABEL,MIN_LABEL,SIG,WHEEL_CELLS,DIATONIC,CHORD,chordDeg,chordAt,chor
 import {PPQ,METERS,SNAPS,snapTicks,barTicksOf,beatTicksOf,SECTION_COLORS,SECTION_PRESETS,PATTERNS,MIN_BPM,MAX_BPM,
   newSong,demoSong,newSection,newChord,cloneSection,timeline,placedChords,placeChord,removeChord,resizeChord,
   setSectionBars,insertBars,stretchChord,pruneMarks,mergeSections,splitSection,insertProgression,setMark,rangeTicks,copyRange,pasteAt,renderSong,buildSmf,safeFileName,
-  songTonic,songFlat,nameOf,tempoAt,voicingOf,patternById,VOICINGS,GUITAR_AREAS} from './song.js';
+  songTonic,songFlat,nameOf,tempoAt,keyTonic,sameKey,setKeyMark,keyRegion,transposeBars,voicingOf,patternById,VOICINGS,GUITAR_AREAS} from './song.js';
 import * as player from './player.js';
 
 /* ---------- 状態 ---------- */
@@ -28,7 +28,7 @@ function validSong(x){
   if(!VOICINGS.some(v=>v.id===s.voicing))s.voicing='piano';
   if(!GUITAR_AREAS.some(v=>v.id===s.guitarArea))s.guitarArea='low';
   s.octave=Math.max(-2,Math.min(2,s.octave|0));s.bassOctave=Math.max(-2,Math.min(2,s.bassOctave|0));
-  s.sections=s.sections.filter(c=>c&&c.bars>0).map(c=>({...newSection(),...c,chords:(c.chords||[]).filter(ch=>ch&&CHORD[ch.q]&&ch.len>0),marks:c.marks||[]}));
+  s.sections=s.sections.filter(c=>c&&c.bars>0).map(c=>({...newSection(),...c,chords:(c.chords||[]).filter(ch=>ch&&CHORD[ch.q]&&ch.len>0),marks:(c.marks||[]).filter(m=>!m.key||(m.key.idx>=0&&m.key.idx<12&&['major','minor'].includes(m.key.mode)))}));
   return s;
 }
 try{
@@ -56,12 +56,15 @@ function fixSelection(){
 
 /* ---------- 表記 ---------- */
 const $=id=>document.getElementById(id);
-const tonic=()=>songTonic(song);
-const flat=()=>songFlat(song);
+// 五度圏・パレット・コード作成・MIDI 入力は、カーソルのある場所のキー（途中で転調していればそのキー）
+const curKey=()=>tl.bars[cursor.gi]?.key||song.key;
+const tonic=()=>keyTonic(curKey());
+const flat=()=>isFlatKey(curKey().idx);
 const nameOfItem=it=>chordNameOf(chordAt(tonic(),[it.off,it.q,it.boff]),flat(),tonic());
 const degOfItem=it=>chordDeg(it.off,it.q,it.boff);
-const chordOfItem=it=>chordAt(tonic(),[it.off,it.q,it.boff]);
-const keyLabel=()=>keyNameOf(song.key.idx,song.key.mode);
+const chordOfItem=(it,key=curKey())=>chordAt(keyTonic(key),[it.off,it.q,it.boff]);
+const keyLabel=(key=curKey())=>keyNameOf(key.idx,key.mode);
+const songKeyLabel=()=>keyLabel(song.key);
 const snapOf=meter=>snapTicks(ui.snap,meter);
 function fmtLen(t,meter){
   const bt=beatTicksOf(meter), nb=t/bt, bars=Math.floor(nb/meter[0]+1e-9), rem=nb-bars*meter[0];
@@ -126,7 +129,7 @@ const cMode=txt(wheel,0,32,'',{fill:'var(--muted)','font-size':11});
 el('path',{d:'M-9,-212 L9,-212 L0,-197 Z',fill:'#E3A21A'},wheel);
 function drawOverlay(){
   gOverlay.innerHTML='';gStatic.innerHTML='';
-  for(const [rel,outer,deg,isT] of WHEEL_CELLS[song.key.mode]){
+  for(const [rel,outer,deg,isT] of WHEEL_CELLS[curKey().mode]){
     const a=rel*30, r0=outer?R.o0:R.i0, r1=outer?R.o1:R.i1;
     el('path',{d:arc(r0,r1,a-15,a+15),fill:isT?'#E3A21A':'#2E8C80','fill-opacity':isT?.9:(rel===2?.35:.6)},gOverlay);
     const [x,y]=P(outer?134:80,a);
@@ -146,16 +149,17 @@ function rotateTo(idx,instant){
   const step=now=>{const p=dur?Math.min(1,(now-t0)/dur):1, e=1-Math.pow(1-p,3);rot=from+(to-from)*e;applyRot(rot);if(p<1)anim=requestAnimationFrame(step);else rot=to;};
   anim=requestAnimationFrame(step);
 }
-// キーの変更：既定は度数を保って移調。「音名を保つ」ならコード名が変わらないよう度数を付け替える
+// キーの変更：カーソルのある範囲（曲の頭または途中のキーの変更点〜次の変更点）のキーを変える。
+// 既定は度数を保って移調。「音名を保つ」なら、その範囲のコードの度数を付け替えてコード名（鳴る音）を変えない
 function setKey(idx,mode){
-  if(idx===song.key.idx&&mode===song.key.mode)return;
-  const before=tonic();
+  const k=curKey();
+  if(idx===k.idx&&mode===k.mode)return;
+  const r=keyRegion(tl,cursor.gi), before=keyTonic(k);
   commit(()=>{
-    song.key={idx,mode};
-    if(ui.keepNames){
-      const d=mod12(before-tonic());
-      for(const s of song.sections)for(const c of s.chords){c.off=mod12(c.off+d);if(c.boff!=null)c.boff=mod12(c.boff+d);}
-    }
+    if(r.mark){const m=song.sections[r.mark.si].marks.find(x=>x.bar===r.mark.bar&&x.key);m.key={idx,mode};}
+    else song.key={idx,mode};
+    if(ui.keepNames)transposeBars(song,tl,r.from,r.to,mod12(before-tonicOf(idx,mode)));
+    pruneMarks(song);
   });
   rotateTo(idx);
 }
@@ -175,7 +179,7 @@ function paletteChip(item){
   b.addEventListener('dblclick',()=>insertAtCursor(item));
   return b;
 }
-const diaItems=()=>DIATONIC[ui.dia][song.key.mode].map(([off,q])=>({off,q}));
+const diaItems=()=>DIATONIC[ui.dia][curKey().mode].map(([off,q])=>({off,q}));
 function customItem(){
   const off=+$('bRoot').value, q=$('bQ').value, bv=+$('bBass').value;
   return {off,q,...(bv!==off?{boff:bv}:{})};
@@ -201,8 +205,8 @@ $('bRoot').addEventListener('change',()=>{if($('bBass').value===lastRoot)$('bBas
 for(const id of ['bRoot','bQ','bBass'])$(id).addEventListener('change',()=>{renderPalette();previewItem(customItem());});
 document.querySelectorAll('#diaSeg button').forEach(b=>b.addEventListener('click',()=>{ui.dia=b.dataset.v;renderPalette();persist();}));
 
-function previewItem(it){
-  const {bass,upper}=voicingOf(song,chordOfItem(it));
+function previewItem(it,key=curKey()){
+  const {bass,upper}=voicingOf(song,chordOfItem(it,key));
   player.playNotes(song.bass?[bass,...upper]:upper,ui.timbre);
 }
 function insertAtCursor(it){
@@ -231,10 +235,10 @@ function fitText(box,min=8){
 
 /* ---------- 定番コード進行（ChordNavi の PROGRESSIONS） ---------- */
 const progSel=$('progSel'), progVar=$('progVar');
-const curProg=()=>{const p=PROGRESSIONS[ui.prog[song.key.mode]];return p&&p.mode===song.key.mode?p:PROGRESSIONS.find(x=>x.mode===song.key.mode);};
+const curProg=()=>{const m=curKey().mode, p=PROGRESSIONS[ui.prog[m]];return p&&p.mode===m?p:PROGRESSIONS.find(x=>x.mode===m);};
 const curBars=()=>{const v=variantsOf(curProg());return (v[ui.progVar]||v[0]).c;};
 function renderProg(){
-  const mode=song.key.mode, p=curProg();
+  const mode=curKey().mode, p=curProg();
   progSel.innerHTML='';
   for(const [extra,label] of [[false,'定番'],[true,'その他']]){
     const g=h('optgroup');g.label=label;
@@ -262,7 +266,7 @@ function renderProg(){
   $('progPlay').textContent=progPreview&&player.isPlaying()?'停止':'試聴';
   $('progIns').title=`カーソルのある小節（${cursor.gi+1}小節目）から${bars.length}小節を上書きで入れる（1コード＝1小節）`;
 }
-progSel.addEventListener('change',()=>{ui.prog[song.key.mode]=+progSel.value;ui.progVar=0;stopProgPreview();renderProg();persist();});
+progSel.addEventListener('change',()=>{ui.prog[curKey().mode]=+progSel.value;ui.progVar=0;stopProgPreview();renderProg();persist();});
 progVar.addEventListener('change',()=>{ui.progVar=+progVar.value;stopProgPreview();renderProg();persist();});
 // 試聴：曲の設定（パターン・オクターブ・音色）で、カーソル位置のテンポ・拍子で鳴らす
 let progPreview=false;
@@ -372,8 +376,8 @@ function renderSheet(){
       if(first&&(p.start-b.start)%beatTicksOf(b.meter)!==0)blk.classList.add('anti');   // 拍の裏から始まるコード（食い）
       if(sel&&sel.id===p.c.id)blk.classList.add('sel');
       if(playingId===p.c.id)blk.classList.add('playing');
-      blk.append(h('span','n',first?nameOf(song,p.c):w>30?nameOf(song,p.c):''),h('span','d',first?degOfItem(p.c):''));
-      blk.title=`${nameOf(song,p.c)}（${degOfItem(p.c)}）${fmtLen(p.end-p.start,b.meter)}　パターン：${patternById(p.pattern).name}${p.c.pattern?'（このコードだけ）':''}`;
+      blk.append(h('span','n',first||w>30?nameOf(song,p.c,p.key):''),h('span','d',first?degOfItem(p.c):''));
+      blk.title=`${nameOf(song,p.c,p.key)}（${degOfItem(p.c)}）${fmtLen(p.end-p.start,b.meter)}　パターン：${patternById(p.pattern).name}${p.c.pattern?'（このコードだけ）':''}`;
       if(first&&p.c.pattern){const t=h('span','ptag',patternById(p.c.pattern).short);t.title='このコードだけのパターン：'+patternById(p.c.pattern).name;blk.appendChild(t);blk.classList.add('haspat');}
       if(e===p.end)blk.appendChild(h('div','rs'));
       lane.appendChild(blk);
@@ -420,7 +424,8 @@ function barCell(b,rowEnd,songEnd){
   if(range&&b.gi>=range.from&&b.gi<range.to)bar.classList.add('insel');
   const no=h('div','bar-no',String(b.gi+1));no.title='クリック・ドラッグで小節を選択、ダブルクリックでテンポ・拍子を変更';
   const sec=song.sections[b.si];
-  for(const m of sec.marks.filter(m=>m.bar===b.bar).sort((x,y)=>(y.meter?1:0)-(x.meter?1:0)||(x.pos||0)-(y.pos||0))){
+  for(const m of sec.marks.filter(m=>m.bar===b.bar).sort((x,y)=>(y.key?2:y.meter?1:0)-(x.key?2:x.meter?1:0)||(x.pos||0)-(y.pos||0))){
+    if(m.key)no.appendChild(Object.assign(h('span','mark key','Key '+keyLabel(m.key)),{title:'キーの変更（クリックで編集）'}));
     if(m.meter)no.appendChild(Object.assign(h('span','mark meter',m.meter.join('/')),{title:'拍子の変更（クリックで編集）'}));
     if(m.bpm){const t=h('span','mark tempo',`♩=${m.bpm}${m.pos?' @'+beatSub(m.pos,b.meter):''}`);t.title='テンポの変更（クリックで編集）';t.dataset.pos=m.pos||0;no.appendChild(t);}
   }
@@ -598,7 +603,7 @@ function startBlockDrag(e,blkEl){
       tl=timeline(song);render();
       return;
     }
-    ghost.hidden=false;ghost.textContent=nameOf(song,c)+(ev.altKey?'（コピー）':'');
+    ghost.hidden=false;ghost.textContent=nameOf(song,c,p.key)+(ev.altKey?'（コピー）':'');
     ghost.style.left=ev.clientX+10+'px';ghost.style.top=ev.clientY+8+'px';
     if(!hit){target=null;showDrop(null);return;}
     let abs=hit.b.start+hit.tick-grab;
@@ -611,7 +616,7 @@ function startBlockDrag(e,blkEl){
     removeEventListener('pointermove',move);removeEventListener('pointerup',up);
     ghost.hidden=true;showDrop(null);
     if(resizing){if(moved){changed();previewSel();}else undoStack.pop();return;}
-    if(!moved){previewItem(c);return;}
+    if(!moved){previewItem(c,p.key);return;}
     if(!target)return;
     const b=tl.bars[target.gi];
     commit(()=>{
@@ -641,8 +646,17 @@ function openMarkPop(gi,pos,anchor){
   const met=h('select','');met.appendChild(Object.assign(h('option','','変更なし'),{value:''}));
   for(const m of METERS)met.appendChild(Object.assign(h('option','',m.join('/')),{value:m.join('/')}));
   met.value=atStart?song.meter.join('/'):mm?mm.meter.join('/'):'';
-  pop.append(h('span','lbl','テンポ ♩='),bpm,h('span','lbl','位置'),posSel,h('span','lbl','拍子（小節の頭）'),met);
-  pop.appendChild(h('p','note','テンポは半拍単位の位置で、拍子は小節の頭で変えられます。空欄・「変更なし」にすると外します。直前と同じ値にしたときもタグは消えます。'));
+  // キー（小節の頭）。曲の頭のキーは五度圏で変える
+  const km=sec.marks.find(m=>m.bar===b.bar&&m.key);
+  const keyS=h('select','');keyS.appendChild(Object.assign(h('option','','変更なし'),{value:''}));
+  for(const m of ['major','minor'])for(let i=0;i<12;i++)keyS.appendChild(Object.assign(h('option','',(m==='major'?MAJ_LABEL[i]:MIN_LABEL[i])+(m==='major'?' メジャー':' マイナー')),{value:i+':'+m}));
+  keyS.value=km?km.key.idx+':'+km.key.mode:'';keyS.disabled=gi===0;
+  if(gi===0)keyS.title='曲の頭のキーは五度圏で変えます';
+  const trans=h('input','');trans.type='checkbox';trans.checked=!ui.keepNames;
+  const transL=h('label','chk');transL.append(trans,' 後ろのコードも移調する（度数を保つ）');
+  transL.title='オン：最後のサビを1音上げる、など（コードも一緒に移る）。オフ：鳴る音はそのままで、度数だけ新しいキーに付け替える';
+  pop.append(h('span','lbl','テンポ ♩='),bpm,h('span','lbl','位置'),posSel,h('span','lbl','拍子（小節の頭）'),met,h('span','lbl','キー（小節の頭）'),keyS,transL);
+  pop.appendChild(h('p','note','テンポは半拍単位の位置で、拍子とキーは小節の頭で変えられます。空欄・「変更なし」にすると外します。直前と同じ値にしたときもタグは消えます。'));
   const btns=h('div','btns');
   const ok=h('button','tg','適用');ok.setAttribute('aria-pressed','true');
   const cancel=h('button','','閉じる');
@@ -652,6 +666,8 @@ function openMarkPop(gi,pos,anchor){
       if(atStart){if(v)song.bpm=Math.min(MAX_BPM,Math.max(MIN_BPM,v));if(m)song.meter=m;pruneMarks(song);return;}
       if(tm&&(tm.pos||0)!==p)setMark(song,b.si,b.bar,tm.pos||0,{bpm:null,meter:mm?.meter});
       setMark(song,b.si,b.bar,p,{bpm:v||null,meter:m});
+      const kv=keyS.value, nk=kv?{idx:+kv.split(':')[0],mode:kv.split(':')[1]}:null;
+      if(gi>0&&(nk?!km||!sameKey(km.key,nk):!!km))setKeyMark(song,b.si,b.bar,nk,!trans.checked);
       pruneMarks(song);   // 直前と同じ値になった変更点はタグごと消す
     });
     closePop();
@@ -692,14 +708,14 @@ function renderFooter(){
   const keys=h('span','keys');
   const p=sel&&placedChords(song,tl).find(x=>x.c.id===sel.id);
   if(p){
-    const c=p.c, b=tl.bars.find(x=>p.start>=x.start&&p.start<x.start+x.ticks);
+    const c=p.c, b=tl.bars.find(x=>p.start>=x.start&&p.start<x.start+x.ticks), kt=keyTonic(p.key), kf=isFlatKey(p.key.idx);
     const edit=mut=>commit(()=>{const cc=song.sections[sel.si].chords.find(x=>x.id===sel.id);mut(cc);});
-    const root=h('select','');for(let off=0;off<12;off++)root.appendChild(Object.assign(h('option','',noteName(mod12(tonic()+off),flat())),{value:off}));
+    const root=h('select','');for(let off=0;off<12;off++)root.appendChild(Object.assign(h('option','',noteName(mod12(kt+off),kf)),{value:off}));
     root.value=c.off;root.onchange=()=>{const d=+root.value-c.off;edit(cc=>{cc.off=+root.value;if(cc.boff!=null)cc.boff=mod12(cc.boff+d);});previewSel();};
     const q=h('select','');for(const k of QUALITIES)q.appendChild(Object.assign(h('option','',k===''?'（メジャー）':CHORD[k].s),{value:k}));
     q.value=c.q;q.onchange=()=>{edit(cc=>{cc.q=q.value;});previewSel();};
     const bass=h('select','');bass.appendChild(Object.assign(h('option','','なし'),{value:''}));
-    for(let off=0;off<12;off++)bass.appendChild(Object.assign(h('option','',noteName(mod12(tonic()+off),flat())),{value:off}));
+    for(let off=0;off<12;off++)bass.appendChild(Object.assign(h('option','',noteName(mod12(kt+off),kf)),{value:off}));
     bass.value=c.boff??'';bass.onchange=()=>{edit(cc=>{if(bass.value===''||+bass.value===cc.off)delete cc.boff;else cc.boff=+bass.value;});previewSel();};
     const st=snapOf(b.meter);
     const minus=h('button','','−'),plus=h('button','','＋');
@@ -716,7 +732,7 @@ function renderFooter(){
     for(const x of PATTERNS)pat.appendChild(Object.assign(h('option','',x.name),{value:x.id}));
     pat.value=c.pattern||'';
     pat.onchange=()=>edit(cc=>{if(pat.value)cc.pattern=pat.value;else delete cc.pattern;});
-    f.append(h('b','who',nameOf(song,c)),h('span','',degOfItem(c)),h('span','sep'),'ルート',root,'種類',q,'ベース',bass,h('span','sep'),
+    f.append(h('b','who',nameOf(song,c,p.key)),h('span','',degOfItem(c)),h('span','sep'),'ルート',root,'種類',q,'ベース',bass,h('span','sep'),
       '長さ',minus,h('b','',fmtLen(p.end-p.start,b.meter)),plus,h('span','sep'),'パターン',pat,dup,del);
     keys.innerHTML='<kbd>←</kbd><kbd>→</kbd>移動 <kbd>⇧</kbd>+<kbd>←</kbd><kbd>→</kbd>長さ <kbd>↑</kbd><kbd>↓</kbd>半音 <kbd>⌫</kbd>削除 <kbd>Alt</kbd>+ドラッグでコピー';
   }else if(range){
@@ -730,7 +746,7 @@ function renderFooter(){
     keys.innerHTML='<kbd>⌘C</kbd>コピー <kbd>⌘V</kbd>貼り付け <kbd>⌫</kbd>コードを消す <kbd>Esc</kbd>解除';
   }else{
     const b=tl.bars[cursor.gi];
-    const markBtn=h('button','','テンポ・拍子を変更…');markBtn.onclick=()=>openMarkPop(cursor.gi,cursor.pos,markBtn);
+    const markBtn=h('button','','テンポ・拍子・キー…');markBtn.onclick=()=>openMarkPop(cursor.gi,cursor.pos,markBtn);
     const ins=h('button','','挿入');ins.onclick=()=>insertBarsAtCursor(1);ins.title='カーソルのある小節の前に1小節入れる';
     const rm=h('button','','削除');rm.onclick=()=>{range={from:cursor.gi,to:cursor.gi+1};deleteRangeBars();};rm.title='カーソルのある小節を消す';
     const paste=h('button','','貼り付け');paste.disabled=!clip;paste.onclick=pasteSel;
@@ -748,7 +764,7 @@ function splitAtCursor(){
   // 分けた後ろのセクションの名前をすぐ変えられるように
   const nameEl=sheet.querySelectorAll('.sec-name')[b.si+1];if(nameEl){nameEl.focus();nameEl.select();}
 }
-function previewSel(){const p=sel&&song.sections[sel.si]?.chords.find(x=>x.id===sel.id);if(p)previewItem(p);}
+function previewSel(){const p=sel&&placedChords(song,tl).find(x=>x.c.id===sel.id);if(p)previewItem(p.c,p.key);}
 function deleteSel(){
   if(sel){commit(()=>removeChord(song,sel.si,sel.id));sel=null;render();return;}
   if(range){
@@ -891,7 +907,7 @@ const SECTION_FILE={'Intro':'Intro','Aメロ':'Verse','Bメロ':'PreChorus','サ
 const ascii=s=>{const t=safeFileName(s);return t==='ChordSketch'&&!/ChordSketch/.test(s)?'':t;};
 function sectionFileLabel(s,si){return SECTION_FILE[s.name]||ascii(s.name)||`Section${si+1}`;}
 function fileName(label){
-  const key=safeFileName(keyLabel().split('/')[0]), title=ascii(song.title);
+  const key=safeFileName(songKeyLabel().split('/')[0]), title=ascii(song.title);
   return [key,title,label].filter(Boolean).join('_')+'.mid';
 }
 function currentExport(){
@@ -942,14 +958,14 @@ $('fileInput').addEventListener('change',async e=>{
   catch{alert('ChordSketch の曲ファイルとして読み込めませんでした。');}
 });
 function replaceSong(s){
-  player.stop();commit(()=>{song=s;});sel=null;range=null;cursor={gi:0,pos:0};rotateTo(song.key.idx,true);render();
+  player.stop();commit(()=>{song=s;});sel=null;range=null;cursor={gi:0,pos:0};rotateTo(curKey().idx,true);render();
 }
 
 /* ---------- コード譜（印刷／PDF） ---------- */
 function buildPrint(){
   const pr=$('print');pr.innerHTML='';
   pr.appendChild(h('h2','',song.title));
-  pr.appendChild(h('div','meta',`Key: ${keyLabel()}（${song.key.mode==='major'?'メジャー':'マイナー'}）　♩=${song.bpm}　${song.meter.join('/')}`));
+  pr.appendChild(h('div','meta',`Key: ${songKeyLabel()}（${song.key.mode==='major'?'メジャー':'マイナー'}）　♩=${song.bpm}　${song.meter.join('/')}`));
   const pcs=placedChords(song,tl);
   song.sections.forEach((s,si)=>{
     const {from,to}=tl.secRanges[si];
@@ -959,7 +975,7 @@ function buildPrint(){
       const row=h('div','prow');
       for(let gi=r;gi<Math.min(r+4,to);gi++){
         const b=tl.bars[gi], cell=h('div','pbar'+(gi===Math.min(r+4,to)-1?' end':'')+(gi===tl.bars.length-1?' final':''));
-        const marks=s.marks.filter(m=>m.bar===b.bar).sort((x,y)=>(y.meter?1:0)-(x.meter?1:0)).map(m=>m.meter?m.meter.join('/'):`♩=${m.bpm}`);
+        const marks=s.marks.filter(m=>m.bar===b.bar).sort((x,y)=>(y.key?2:y.meter?1:0)-(x.key?2:x.meter?1:0)).map(m=>m.key?`Key: ${keyLabel(m.key)}`:m.meter?m.meter.join('/'):`♩=${m.bpm}`);
         if(marks.length)cell.appendChild(h('span','pm',marks.join('  ')));
         if(gi===r)cell.appendChild(h('span','pn',String(gi+1)));
         const inBar=pcs.filter(p=>p.end>b.start&&p.start<b.start+b.ticks);
@@ -968,7 +984,7 @@ function buildPrint(){
           if(cont&&inBar.length>1)continue;   // 小節の途中で変わるなら前からの続きは書かない
           // 小節の終わり近く（食い）から始まるコードは、はみ出さないよう右端にそろえる
           const frac=Math.max(0,(p.start-b.start)/b.ticks), place=x=>{if(frac>.7){x.style.right='1mm';x.classList.add('late');}else x.style.left=frac*100+'%';};
-          const c=h('span','pc'+(cont?' cont':''),nameOf(song,p.c));place(c);cell.appendChild(c);
+          const c=h('span','pc'+(cont?' cont':''),nameOf(song,p.c,p.key));place(c);cell.appendChild(c);
           if($('prDeg').checked&&!cont){const d=h('span','pd',degOfItem(p.c));place(d);cell.appendChild(d);}
         }
         row.appendChild(cell);
@@ -1089,10 +1105,13 @@ function render(){
   pb.textContent=playing?'■':'▶';pb.setAttribute('aria-label',playing?'停止':'再生');pb.classList.toggle('on',playing);
   if(!playing){$('posDisp').textContent=fmtPos(cursor.gi,cursor.pos)||'1.1.1';$('posDisp').classList.remove('count');lastPos='';}
   $('undo').disabled=!undoStack.length;$('redo').disabled=!redoStack.length;
-  keySel.value=song.key.idx+':'+song.key.mode;
-  cKey.textContent=keyLabel();cSig.textContent=SIG[song.key.idx];cMode.textContent=song.key.mode==='major'?'メジャー':'マイナー';
+  const ck=curKey(), kr=keyRegion(tl,cursor.gi);
+  keySel.value=ck.idx+':'+ck.mode;
+  keySel.title=kr.from>0?`${kr.from+1}小節目からのキー（カーソルのある場所）`:'曲の頭のキー（途中で転調しているときはカーソルのある場所のキー）';
+  cKey.textContent=keyLabel(ck);cSig.textContent=SIG[ck.idx];
+  cMode.textContent=(ck.mode==='major'?'メジャー':'マイナー')+(kr.from>0?`・${kr.from+1}小節〜`:'');
   drawOverlay();
-  if(rotKey!==song.key.idx)rotateTo(song.key.idx);
+  if(rotKey!==ck.idx)rotateTo(ck.idx);
   renderOctUp();renderOctBass();
   const over=song.sections.filter(x=>x.pattern).map(x=>x.name);
   $('outInfo').textContent=over.length?`パターンを変えているセクション：${over.join('・')}`:'';
@@ -1107,4 +1126,4 @@ function fit(){
   $('stage').style.transform=`translate(-50%,-50%) scale(${s})`;
 }
 addEventListener('resize',()=>{fit();renderSheet();});
-fit();applyTheme();rotateTo(song.key.idx,true);render();renderLive();
+fit();applyTheme();rotateTo(curKey().idx,true);render();renderLive();

@@ -50,15 +50,17 @@ export function demoSong(){
 // 拍子の変更は小節の頭、テンポの変更は任意の位置（pos は小節内の tick）。セクションの並び順に流れる
 export function timeline(song){
   const bars=[],secRanges=[],meters=[];let tempos=[{tick:0,bpm:song.bpm}];
-  let meter=song.meter,tick=0;
+  let meter=song.meter,key=song.key,tick=0;
   song.sections.forEach((s,si)=>{
     const from=bars.length;
     for(let b=0;b<s.bars;b++){
       const mm=s.marks.find(m=>m.bar===b&&m.meter);
       if(mm)meter=mm.meter;
+      const km=s.marks.find(m=>m.bar===b&&m.key);
+      if(km)key=km.key;
       const t=barTicksOf(meter);
       if(!meters.length||meters.at(-1).meter.join('/')!==meter.join('/'))meters.push({tick,meter,gi:bars.length});
-      bars.push({si,bar:b,start:tick,ticks:t,meter,gi:bars.length});
+      bars.push({si,bar:b,start:tick,ticks:t,meter,key,keyMark:!!km,gi:bars.length});
       for(const m of s.marks)if(m.bar===b&&m.bpm)tempos.push({tick:tick+Math.min(m.pos||0,t-1),bpm:m.bpm});
       tick+=t;
     }
@@ -106,14 +108,15 @@ export function secGeom(tl,si){
 
 // 曲の中のコード（位置は曲の先頭からの tick）。重なっていたら前のコードを次のコードの頭で切る
 export function placedChords(song,tl=timeline(song)){
-  const t=tonicOf(song.key.idx,song.key.mode), out=[];
+  const out=[];
   song.sections.forEach((s,si)=>{
     const {from,to}=tl.secRanges[si];if(from===to)return;
     const secEnd=tl.bars[to-1].start+tl.bars[to-1].ticks;
     for(const c of s.chords){
       if(c.bar>=s.bars)continue;
       const b=tl.bars[from+c.bar], start=b.start+Math.min(c.pos,b.ticks-1), end=Math.min(start+c.len,secEnd);
-      if(end>start)out.push({c,si,start,end,ch:chordAt(t,[c.off,c.q,c.boff]),pattern:c.pattern||s.pattern||song.pattern});   // コード → セクション → 曲の順
+      // コードの度数（off）は、コードが始まる小節のキーの主音が基準（途中の転調に対応）
+      if(end>start)out.push({c,si,start,end,key:b.key,ch:chordAt(tonicOf(b.key.idx,b.key.mode),[c.off,c.q,c.boff]),pattern:c.pattern||s.pattern||song.pattern});   // コード → セクション → 曲の順
     }
   });
   out.sort((a,b)=>a.start-b.start);
@@ -121,10 +124,13 @@ export function placedChords(song,tl=timeline(song)){
   return out;
 }
 
-export const songTonic=song=>tonicOf(song.key.idx,song.key.mode);
+// key を省くと曲の頭のキー。途中で転調しているときは、そのコードの位置のキー（placedChords の key、timeline の bars[].key）を渡す
+export const keyTonic=key=>tonicOf(key.idx,key.mode);
+export const songTonic=song=>keyTonic(song.key);
 export const songFlat=song=>isFlatKey(song.key.idx);
-export const chordOf=(song,c)=>chordAt(songTonic(song),[c.off,c.q,c.boff]);
-export const nameOf=(song,c)=>chordNameOf(chordOf(song,c),songFlat(song),songTonic(song));
+export const chordOf=(song,c,key=song.key)=>chordAt(keyTonic(key),[c.off,c.q,c.boff]);
+export const nameOf=(song,c,key=song.key)=>chordNameOf(chordOf(song,c,key),isFlatKey(key.idx),keyTonic(key));
+export const sameKey=(a,b)=>a.idx===b.idx&&a.mode===b.mode;
 
 /* ---------- 編集（song を直接書き換える） ---------- */
 // セクションに置く。重なる範囲は上書き（前のコードは切る・前後に分ける、後ろのコードは頭を削る、中に収まるコードは消す）
@@ -227,24 +233,56 @@ export function insertBars(song,si,bar,count){
 // テンポ・拍子の変更点。bpm・meter が null ならその指定を外す。拍子は小節の頭のみ
 export function setMark(song,si,bar,pos,{bpm,meter}){
   const sec=song.sections[si];
-  const tempo=sec.marks.find(m=>m.bar===bar&&m.bpm&&(m.pos||0)===pos), met=sec.marks.find(m=>m.bar===bar&&m.meter);
+  const tempo=sec.marks.find(m=>m.bar===bar&&m.bpm&&(m.pos||0)===pos), met=sec.marks.find(m=>m.bar===bar&&m.meter);   // キーの変更点（setKeyMark）は触らない
   sec.marks=sec.marks.filter(m=>m!==tempo&&m!==met);
   if(bpm)sec.marks.push({bar,pos,bpm:Math.min(MAX_BPM,Math.max(MIN_BPM,bpm))});
   if(meter)sec.marks.push({bar,pos:0,meter});
+}
+
+// キーの変更点（小節の頭）。key が null なら外す。
+// keepSound なら、影響する範囲（この小節から次のキーの変更点まで）のコードの度数を付け替えて、鳴る音を保つ。
+// そうでなければ度数を保つ（＝コードも一緒に移調する。最後のサビを1音上げる、など）
+export function setKeyMark(song,si,bar,key,keepSound){
+  const tl0=timeline(song), gi=tl0.secRanges[si].from+bar;
+  const before=tl0.bars[gi].key;
+  const sec=song.sections[si];
+  sec.marks=sec.marks.filter(m=>!(m.bar===bar&&m.key));
+  if(key)sec.marks.push({bar,pos:0,key:{idx:key.idx,mode:key.mode}});
+  const tl=timeline(song), after=tl.bars[gi].key;
+  if(keepSound&&!sameKey(before,after)){const r=keyRegion(tl,gi);transposeBars(song,tl,r.from,r.to,mod12(keyTonic(before)-keyTonic(after)));}
+}
+// gi 小節目のキーが続く範囲（小節番号、to は含まない）と、その頭の変更点（曲の頭なら null）
+export function keyRegion(tl,gi){
+  let from=gi;while(from>0&&!tl.bars[from].keyMark)from--;
+  let to=gi+1;while(to<tl.bars.length&&!tl.bars[to].keyMark)to++;
+  const b=tl.bars[from];
+  return {from,to,key:b?b.key:null,mark:b&&b.keyMark?{si:b.si,bar:b.bar}:null};
+}
+// 小節の範囲 [from, to) で始まるコードの度数を d 半音ずらす
+export function transposeBars(song,tl,from,to,d){
+  if(!mod12(d))return;
+  song.sections.forEach((s,si)=>{
+    const base=tl.secRanges[si].from;
+    for(const c of s.chords){
+      const gi=base+c.bar;
+      if(gi>=from&&gi<to){c.off=mod12(c.off+d);if(c.boff!=null)c.boff=mod12(c.boff+d);}
+    }
+  });
 }
 
 // 直前に効いている値と同じテンポ・拍子の変更点を消す（曲の頭から順に見るので、消した結果いらなくなった後ろの変更点も消える）。
 // テンポ・拍子を変えたときに呼ぶ（セクションの並べ替えでは呼ばない：戻したときに変更点が消えないように）
 // only を指定すると、そのセクションの変更点だけを消す（値の流れは曲の頭から見る）
 export function pruneMarks(song,only=null){
-  let bpm=song.bpm, meter=song.meter.join('/');
+  let bpm=song.bpm, meter=song.meter.join('/'), key=song.key.idx+':'+song.key.mode;
   song.sections.forEach((s,si)=>{
     const keep=[];
-    const sorted=[...s.marks].sort((a,b)=>a.bar-b.bar||(b.meter?1:0)-(a.meter?1:0)||(a.pos||0)-(b.pos||0));
+    const sorted=[...s.marks].sort((a,b)=>a.bar-b.bar||(b.key?1:0)-(a.key?1:0)||(b.meter?1:0)-(a.meter?1:0)||(a.pos||0)-(b.pos||0));
     for(const m of sorted){
       if(m.bar>=s.bars)continue;
       const drop=only==null||only===si;
       if(m.meter){const k=m.meter.join('/');if(k===meter&&drop)continue;meter=k;}
+      if(m.key){const k=m.key.idx+':'+m.key.mode;if(k===key&&drop)continue;key=k;}
       if(m.bpm){if(m.bpm===bpm&&drop)continue;bpm=m.bpm;}
       keep.push(m);
     }
