@@ -1,9 +1,10 @@
 import {MAJ_LABEL,MIN_LABEL,SIG,WHEEL_CELLS,DIATONIC,CHORD,chordDeg,chordAt,chordName as chordNameOf,
-  noteName,tonicOf,isFlatKey,keyName as keyNameOf,detectChords,mod12,PROGRESSIONS,variantsOf,progressionDegrees} from '../../ui/theory.js';
+  noteName,tonicOf,isFlatKey,keyName as keyNameOf,detectChords,mod12,PROGRESSIONS,variantsOf,progressionDegrees,
+  CONFORM_SCALES,conformBars,diatonicOf,scaleById,chordPcs} from '../../ui/theory.js';
 import {PPQ,METERS,SNAPS,snapTicks,barTicksOf,beatTicksOf,SECTION_COLORS,SECTION_PRESETS,PATTERNS,MIN_BPM,MAX_BPM,
   newSong,demoSong,newSection,newChord,cloneSection,timeline,placedChords,placeChord,removeChord,resizeChord,
   setSectionBars,insertBars,stretchChord,stretchChordStart,pruneMarks,mergeSections,splitSection,insertProgression,setMark,rangeTicks,copyRange,pasteAt,renderSong,buildSmf,safeFileName,
-  songTonic,songFlat,nameOf,tempoAt,meterAt,tickToSec,withExtension,keyTonic,sameKey,setKeyMark,keyRegion,transposeBars,voicingOf,patternById,VOICINGS,GUITAR_AREAS} from './song.js';
+  songTonic,songFlat,nameOf,tempoAt,SKETCH_SCALES,keyScale,defaultScale,meterAt,tickToSec,withExtension,keyTonic,sameKey,setKeyMark,keyRegion,transposeBars,voicingOf,patternById,VOICINGS,GUITAR_AREAS} from './song.js';
 import * as player from './player.js';
 
 /* ---------- 状態 ---------- */
@@ -24,6 +25,7 @@ function validSong(x){
   s.bpm=Math.min(MAX_BPM,Math.max(MIN_BPM,+s.bpm||120));
   if(!METERS.some(m=>m.join()===s.meter.join()))s.meter=[4,4];
   if(!(s.key.idx>=0&&s.key.idx<12)||!['major','minor'].includes(s.key.mode))s.key={idx:0,mode:'major'};
+  if(s.key.scale&&!SKETCH_SCALES.some(x=>x.id===s.key.scale))delete s.key.scale;
   if(!PATTERNS.some(p=>p.id===s.pattern))s.pattern='whole';
   if(!VOICINGS.some(v=>v.id===s.voicing))s.voicing='piano';
   if(!GUITAR_AREAS.some(v=>v.id===s.guitarArea))s.guitarArea='low';
@@ -60,9 +62,12 @@ const $=id=>document.getElementById(id);
 const curKey=()=>tl.bars[cursor.gi]?.key||song.key;
 const tonic=()=>keyTonic(curKey());
 const flat=()=>isFlatKey(curKey().idx);
-const nameOfItem=it=>chordNameOf(chordAt(tonic(),[it.off,it.q,it.boff]),flat(),tonic());
-const degOfItem=it=>chordDeg(it.off,it.q,it.boff);
-const chordOfItem=(it,key=curKey())=>chordAt(keyTonic(key),[it.off,it.q,it.boff]);
+const nameOfItem=it=>chordNameOf(chordAt(tonic(),[it.off,it.q,it.boff,it.deg]),flat(),tonic());
+const degOfItem=it=>chordDeg(it.off,it.q,it.boff,it.deg);
+const chordOfItem=(it,key=curKey())=>chordAt(keyTonic(key),[it.off,it.q,it.boff,it.deg]);
+// カーソルのある場所のスケール。7音のスケールならダイアトニック・プリセットをそのスケールで作り直す
+const curScale=()=>keyScale(curKey());
+const scaleConforms=()=>CONFORM_SCALES.includes(curScale());
 const keyLabel=(key=curKey())=>keyNameOf(key.idx,key.mode);
 const songKeyLabel=()=>keyLabel(song.key);
 const snapOf=meter=>snapTicks(ui.snap,meter);
@@ -156,8 +161,9 @@ function setKey(idx,mode){
   if(idx===k.idx&&mode===k.mode)return;
   const r=keyRegion(tl,cursor.gi), before=keyTonic(k);
   commit(()=>{
-    if(r.mark){const m=song.sections[r.mark.si].marks.find(x=>x.bar===r.mark.bar&&x.key);m.key={idx,mode};}
-    else song.key={idx,mode};
+    const nk={idx,mode,...(mode===k.mode&&k.scale?{scale:k.scale}:{})};   // モードを変えたら既定のスケールに戻す（ChordNavi と同じ）
+    if(r.mark){const m=song.sections[r.mark.si].marks.find(x=>x.bar===r.mark.bar&&x.key);m.key=nk;}
+    else song.key=nk;
     if(ui.keepNames)transposeBars(song,tl,r.from,r.to,mod12(before-tonicOf(idx,mode)));
     pruneMarks(song);
   });
@@ -169,17 +175,36 @@ for(const m of ['major','minor'])for(let i=0;i<12;i++){
   o.value=i+':'+m;keySel.appendChild(o);
 }
 keySel.addEventListener('change',()=>{const [i,m]=keySel.value.split(':');setKey(+i,m);});
+// スケール：カーソルのある範囲のキーのスケールを変える（コードは変えない）
+const scaleSel=$('scaleSel');
+for(const x of SKETCH_SCALES)scaleSel.appendChild(Object.assign(h('option','',x.name),{value:x.id}));
+scaleSel.addEventListener('change',()=>{
+  const r=keyRegion(tl,cursor.gi), v=scaleSel.value;
+  commit(()=>{
+    const apply=k=>{if(v===defaultScale(k.mode))delete k.scale;else k.scale=v;};
+    if(r.mark)apply(song.sections[r.mark.si].marks.find(x=>x.bar===r.mark.bar&&x.key).key);else apply(song.key);
+    pruneMarks(song);
+  });
+});
 
 /* ---------- パレット（ダイアトニック・コードを作る） ---------- */
 function paletteChip(item){
-  const b=h('button','pchip');
+  const b=h('button','pchip'+(outOfScale(item)?' out':''));
   b.append(h('span','n',nameOfItem(item)),h('span','d',degOfItem(item)));
-  b.title='クリックで試聴、ダブルクリックでカーソル位置に入力、シートへドラッグで配置';
+  b.title='クリックで試聴、ダブルクリックでカーソル位置に入力、シートへドラッグで配置'+(outOfScale(item)?'（スケールの外の音を含む）':'');
   b.addEventListener('pointerdown',e=>startPaletteDrag(e,item));
   b.addEventListener('dblclick',()=>insertAtCursor(item));
   return b;
 }
-const diaItems=()=>DIATONIC[ui.dia][curKey().mode].map(([off,q])=>({off,q}));
+const diaItems=()=>scaleConforms()
+  ?diatonicOf(curScale(),ui.dia==='3'?3:4).map(([off,q,,deg])=>({off,q,deg}))
+  :DIATONIC[ui.dia][curKey().mode].map(([off,q])=>({off,q}));
+// 7音でないスケール（ペンタ・ブルースなど）では、スケールの外の音を含むコードを薄く出す
+const outOfScale=it=>{
+  if(scaleConforms())return false;
+  const iv=scaleById(curScale()).iv, t=tonic();
+  return chordPcs(chordOfItem(it)).some(pc=>!iv.includes(mod12(pc-t)));
+};
 function customItem(){
   const off=+$('bRoot').value, q=$('bQ').value, bv=+$('bBass').value;
   return {off,q,...(bv!==off?{boff:bv}:{})};
@@ -213,7 +238,7 @@ function insertAtCursor(it){
   const b=tl.bars[cursor.gi];if(!b)return;
   const len=insLenTicks(b.meter);let placed;
   editOpen=false;
-  commit(()=>{placed=placeChord(song,b.si,newChord(b.bar,cursor.pos,len,it.off,it.q,it.boff));if(placed)sel={si:b.si,id:placed.id};});
+  commit(()=>{placed=placeChord(song,b.si,{...newChord(b.bar,cursor.pos,len,it.off,it.q,it.boff),...(it.deg!=null?{deg:it.deg}:{})});if(placed)sel={si:b.si,id:placed.id};});
   if(placed){advanceCursor(b.start+cursor.pos+placed.len);previewItem(it);render();}
 }
 // 曲の中の tick → カーソル（最後の小節の終わりを越えたら最後の小節の頭）
@@ -237,7 +262,10 @@ function fitText(box,min=8){
 /* ---------- 定番コード進行（ChordNavi の PROGRESSIONS） ---------- */
 const progSel=$('progSel'), progVar=$('progVar');
 const curProg=()=>{const m=curKey().mode, p=PROGRESSIONS[ui.prog[m]];return p&&p.mode===m?p:PROGRESSIONS.find(x=>x.mode===m);};
-const curBars=()=>{const v=variantsOf(curProg());return (v[ui.progVar]||v[0]).c;};
+const curBars=()=>{
+  const v=variantsOf(curProg()), bars=(v[ui.progVar]||v[0]).c, sc=curScale();
+  return scaleConforms()&&sc!==defaultScale(curKey().mode)?conformBars(bars,curKey().mode,sc):bars;
+};
 function renderProg(){
   const mode=curKey().mode, p=curProg();
   progSel.innerHTML='';
@@ -726,7 +754,7 @@ function chordEditor(p){
   const opt=(s,text,value)=>s.appendChild(Object.assign(h('option','',text),{value}));
   const root=h('select','');for(let off=0;off<12;off++)opt(root,noteName(mod12(kt+off),kf),off);
   root.value=c.off;root.title='ルート';
-  root.onchange=()=>{const d=+root.value-c.off;edit(cc=>{cc.off=+root.value;if(cc.boff!=null)cc.boff=mod12(cc.boff+d);});previewSel();};
+  root.onchange=()=>{const d=+root.value-c.off;edit(cc=>{cc.off=+root.value;if(cc.boff!=null)cc.boff=mod12(cc.boff+d);delete cc.deg;});previewSel();};
   const q=h('select','');for(const k of QUALITIES)opt(q,k===''?'maj':CHORD[k].s,k);
   q.value=c.q;q.title='種類';q.onchange=()=>{edit(cc=>{cc.q=q.value;});previewSel();};
   // ベース：コード作成と同じく「/音名」、ルートと同じ音なら分数コードにしない
@@ -899,16 +927,21 @@ function startPlay(){
   player.play({
     render:()=>renderSong(song,rangeTicks(tl,r)),
     loop:()=>ui.loop, countIn:ui.countIn, metronome:()=>ui.metro, timbre:()=>ui.timbre,
-    onPos:(t,counting)=>onPos(t==null?null:playFrom+t,counting),
+    onPos:(t,counting,cnt)=>onPos(t==null?null:playFrom+t,counting,cnt),
     onEnd:()=>{playTick=null;playingId=null;render();}
   });
   render();
 }
 function togglePlay(){if(player.isPlaying()){player.stop();progPreview=false;playTick=null;playingId=null;render();}else startPlay();}
-function onPos(abs,counting){
+function onPos(abs,counting,cnt){
   const disp=$('posDisp');
   disp.classList.toggle('count',!!counting);
-  if(abs==null){if(lastPos!=='count'){disp.textContent='カウント';lastPos='count';}return;}
+  // カウントイン：拍の数だけ「・」を並べ、鳴った拍まで赤くする
+  if(abs==null){
+    const n=cnt?.n??4, k=cnt?.beat??-1, key='count:'+n+':'+k;
+    if(lastPos!==key){disp.innerHTML='';for(let i=0;i<n;i++)disp.appendChild(h('span','cdot'+(i<=k?' on':''),'•'));lastPos=key;}
+    return;
+  }
   playTick=abs;
   const b=tl.bars.find(x=>abs>=x.start&&abs<x.start+x.ticks)||tl.bars.at(-1);
   const s=fmtPos(b.gi,Math.floor((abs-b.start)/SIXTEENTH)*SIXTEENTH);
@@ -1267,10 +1300,14 @@ function render(){
   renderLcd();
   $('undo').disabled=!undoStack.length;$('redo').disabled=!redoStack.length;
   const ck=curKey(), kr=keyRegion(tl,cursor.gi);
+  scaleSel.value=keyScale(ck);
+  scaleSel.title=`スケール（${kr.from>0?kr.from+1+'小節目から':'曲の頭から'}）：7音のスケールでは、ダイアトニックとプリセットをそのスケールで作り直す`;
   keySel.value=ck.idx+':'+ck.mode;
   keySel.title=kr.from>0?`${kr.from+1}小節目からのキー（カーソルのある場所）`:'曲の頭のキー（途中で転調しているときはカーソルのある場所のキー）';
   cKey.textContent=keyLabel(ck);cSig.textContent=SIG[ck.idx];
-  cMode.textContent=(ck.mode==='major'?'メジャー':'マイナー')+(kr.from>0?`・${kr.from+1}小節〜`:'');
+  // 中央の下の行：モード（既定と違うスケールならスケール名。長い名前は「（」の前まで）と、途中のキーなら範囲の頭
+  const scName=keyScale(ck)!==defaultScale(ck.mode)?scaleById(keyScale(ck)).name.split('（')[0]:(ck.mode==='major'?'メジャー':'マイナー');
+  cMode.textContent=scName+(kr.from>0?`・${kr.from+1}小節〜`:'');
   drawOverlay();
   if(rotKey!==ck.idx)rotateTo(ck.idx);
   renderOctUp();renderOctBass();

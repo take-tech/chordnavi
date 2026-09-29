@@ -1,6 +1,6 @@
 /* ChordSketch：曲データと MIDI 生成の純粋関数（UI コードは置かない）
    音楽理論（コード・表記・判別）は ChordNavi の ui/theory.js を共有する */
-import {CHORD,chordAt,chordName as chordNameOf,tonicOf,isFlatKey,mod12} from '../../ui/theory.js';
+import {CHORD,chordAt,chordName as chordNameOf,tonicOf,isFlatKey,mod12,SCALES,scaleById} from '../../ui/theory.js';
 import {nearestVoicing,TAB_AREAS} from '../../ui/guitar.js';
 
 export const PPQ=480, WHOLE=PPQ*4;
@@ -116,7 +116,7 @@ export function placedChords(song,tl=timeline(song)){
       if(c.bar>=s.bars)continue;
       const b=tl.bars[from+c.bar], start=b.start+Math.min(c.pos,b.ticks-1), end=Math.min(start+c.len,secEnd);
       // コードの度数（off）は、コードが始まる小節のキーの主音が基準（途中の転調に対応）
-      if(end>start)out.push({c,si,start,end,key:b.key,ch:chordAt(tonicOf(b.key.idx,b.key.mode),[c.off,c.q,c.boff]),pattern:c.pattern||s.pattern||song.pattern});   // コード → セクション → 曲の順
+      if(end>start)out.push({c,si,start,end,key:b.key,ch:chordAt(tonicOf(b.key.idx,b.key.mode),[c.off,c.q,c.boff,c.deg]),pattern:c.pattern||s.pattern||song.pattern});   // コード → セクション → 曲の順
     }
   });
   out.sort((a,b)=>a.start-b.start);
@@ -128,9 +128,14 @@ export function placedChords(song,tl=timeline(song)){
 export const keyTonic=key=>tonicOf(key.idx,key.mode);
 export const songTonic=song=>keyTonic(song.key);
 export const songFlat=song=>isFlatKey(song.key.idx);
-export const chordOf=(song,c,key=song.key)=>chordAt(keyTonic(key),[c.off,c.q,c.boff]);
+export const chordOf=(song,c,key=song.key)=>chordAt(keyTonic(key),[c.off,c.q,c.boff,c.deg]);
 export const nameOf=(song,c,key=song.key)=>chordNameOf(chordOf(song,c,key),isFlatKey(key.idx),keyTonic(key));
-export const sameKey=(a,b)=>a.idx===b.idx&&a.mode===b.mode;
+export const sameKey=(a,b)=>a.idx===b.idx&&a.mode===b.mode&&keyScale(a)===keyScale(b);
+// スケール：キーと一緒に持つ（key.scale。無ければモードの既定＝メジャー／ナチュラル・マイナー）。
+// 選べるのは ChordNavi の SCALES のうちコードトーン以外。7音のスケールはダイアトニック・プリセットをそのスケールで作り直す
+export const SKETCH_SCALES=SCALES.filter(x=>!x.group);
+export const defaultScale=mode=>mode==='major'?'major':'nminor';
+export const keyScale=key=>key.scale&&scaleById(key.scale)&&!scaleById(key.scale).group?key.scale:defaultScale(key.mode);
 
 /* ---------- 編集（song を直接書き換える） ---------- */
 // セクションに置く。重なる範囲は上書き（前のコードは切る・前後に分ける、後ろのコードは頭を削る、中に収まるコードは消す）
@@ -257,7 +262,7 @@ export function setKeyMark(song,si,bar,key,keepSound){
   const before=tl0.bars[gi].key;
   const sec=song.sections[si];
   sec.marks=sec.marks.filter(m=>!(m.bar===bar&&m.key));
-  if(key)sec.marks.push({bar,pos:0,key:{idx:key.idx,mode:key.mode}});
+  if(key)sec.marks.push({bar,pos:0,key:{idx:key.idx,mode:key.mode,...(key.scale&&key.scale!==defaultScale(key.mode)?{scale:key.scale}:{})}});
   const tl=timeline(song), after=tl.bars[gi].key;
   if(keepSound&&!sameKey(before,after)){const r=keyRegion(tl,gi);transposeBars(song,tl,r.from,r.to,mod12(keyTonic(before)-keyTonic(after)));}
 }
@@ -275,7 +280,7 @@ export function transposeBars(song,tl,from,to,d){
     const base=tl.secRanges[si].from;
     for(const c of s.chords){
       const gi=base+c.bar;
-      if(gi>=from&&gi<to){c.off=mod12(c.off+d);if(c.boff!=null)c.boff=mod12(c.boff+d);}
+      if(gi>=from&&gi<to){c.off=mod12(c.off+d);if(c.boff!=null)c.boff=mod12(c.boff+d);delete c.deg;}
     }
   });
 }
@@ -284,7 +289,8 @@ export function transposeBars(song,tl,from,to,d){
 // テンポ・拍子を変えたときに呼ぶ（セクションの並べ替えでは呼ばない：戻したときに変更点が消えないように）
 // only を指定すると、そのセクションの変更点だけを消す（値の流れは曲の頭から見る）
 export function pruneMarks(song,only=null){
-  let bpm=song.bpm, meter=song.meter.join('/'), key=song.key.idx+':'+song.key.mode;
+  const kk=k=>k.idx+':'+k.mode+':'+keyScale(k);
+  let bpm=song.bpm, meter=song.meter.join('/'), key=kk(song.key);
   song.sections.forEach((s,si)=>{
     const keep=[];
     const sorted=[...s.marks].sort((a,b)=>a.bar-b.bar||(b.key?1:0)-(a.key?1:0)||(b.meter?1:0)-(a.meter?1:0)||(a.pos||0)-(b.pos||0));
@@ -292,7 +298,7 @@ export function pruneMarks(song,only=null){
       if(m.bar>=s.bars)continue;
       const drop=only==null||only===si;
       if(m.meter){const k=m.meter.join('/');if(k===meter&&drop)continue;meter=k;}
-      if(m.key){const k=m.key.idx+':'+m.key.mode;if(k===key&&drop)continue;key=k;}
+      if(m.key){const k=kk(m.key);if(k===key&&drop)continue;key=k;}
       if(m.bpm){if(m.bpm===bpm&&drop)continue;bpm=m.bpm;}
       keep.push(m);
     }
@@ -307,7 +313,7 @@ export const rangeTicks=(tl,{from,to})=>({from:tl.bars[from]?.start??0,to:to>=tl
 export function copyRange(song,{from,to}){
   const tl=timeline(song), r=rangeTicks(tl,{from,to});
   return {len:r.to-r.from,chords:placedChords(song,tl).filter(p=>p.end>r.from&&p.start<r.to).map(p=>{
-    const s=Math.max(p.start,r.from);return {at:s-r.from,len:Math.min(p.end,r.to)-s,off:p.c.off,q:p.c.q,boff:p.c.boff,pattern:p.c.pattern};
+    const s=Math.max(p.start,r.from);return {at:s-r.from,len:Math.min(p.end,r.to)-s,off:p.c.off,q:p.c.q,boff:p.c.boff,pattern:p.c.pattern,deg:p.c.deg};
   })};
 }
 // 貼り付け：曲の中の origin（tick）から上書き（セクションをまたぐときはそれぞれのセクションに置く）
@@ -315,7 +321,7 @@ export function pasteAt(song,origin,clip){
   for(const x of clip.chords){
     const tl=timeline(song), abs=origin+x.at, bar=tl.bars.find(b=>abs>=b.start&&abs<b.start+b.ticks);
     if(!bar)continue;
-    placeChord(song,bar.si,{...newChord(bar.bar,abs-bar.start,x.len,x.off,x.q,x.boff),...(x.pattern?{pattern:x.pattern}:{})});
+    placeChord(song,bar.si,{...newChord(bar.bar,abs-bar.start,x.len,x.off,x.q,x.boff),...(x.pattern?{pattern:x.pattern}:{}),...(x.deg!=null?{deg:x.deg}:{})});
   }
 }
 
@@ -329,7 +335,7 @@ export function insertProgression(song,gi,bars){
   bars.forEach((bar,i)=>{
     const b=tl.bars[gi+i];if(!b)return;
     const items=Array.isArray(bar[0])?bar:[bar], len=b.ticks/items.length;
-    items.forEach(([off,q,boff],k)=>placeChord(song,b.si,newChord(b.bar,k*len,len,off,q,boff)));
+    items.forEach(([off,q,boff,deg],k)=>placeChord(song,b.si,{...newChord(b.bar,k*len,len,off,q,boff),...(deg!=null?{deg}:{})}));
   });
   return {from:gi,to:gi+bars.length};
 }

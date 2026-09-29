@@ -117,13 +117,14 @@ export function play(opts){
   const a=ctx();a.resume();
   const bus=a.createGain();bus.connect(master);
   const r0=opts.render();
-  let lead=0;
+  let lead=0, count=null;
   if(opts.countIn){   // カウントイン：1小節のクリック（範囲の頭のテンポ・拍子）
     const m=r0.meters[0].meter, bpm=tempoAt(r0.tempos,0), beat=60/bpm*beatTicksOf(m)/480;
     lead=beat*m[0];
     for(let k=0;k<m[0];k++)drum(k===0?'clickHi':'click',a.currentTime+.08+k*beat,bus);
+    count={start:a.currentTime+.08,beat,n:m[0]};
   }
-  run={opts,bus,start:a.currentTime+.08+lead,data:null,idx:0,voices:new Set(),horizon:0};
+  run={opts,bus,start:a.currentTime+.08+lead,data:null,idx:0,voices:new Set(),horizon:0,count};
   load(r0);
   run.timer=setInterval(tick,25);
   run.raf=requestAnimationFrame(pos);
@@ -171,7 +172,9 @@ export function refresh(){
 function pos(){
   if(!run)return;
   const t=ac.currentTime-run.start;
-  run.opts.onPos(t<0?null:secToTick(run.data.r.tempos,Math.min(t,run.data.dur)),t<0);
+  // カウントイン中は何拍目か（0 から。鳴る前は -1）と拍の数を渡す
+  const c=run.count, cnt=t<0&&c?{beat:Math.min(c.n-1,Math.floor((ac.currentTime-c.start)/c.beat)),n:c.n}:null;
+  run.opts.onPos(t<0?null:secToTick(run.data.r.tempos,Math.min(t,run.data.dur)),t<0,cnt);
   run.raf=requestAnimationFrame(pos);
 }
 export function stop(){

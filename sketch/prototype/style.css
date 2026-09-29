@@ -70,7 +70,9 @@ h1{font-size:17px;font-weight:900;letter-spacing:.02em;margin:0 6px 0 0;white-sp
 .lcd #lcdKey:hover{color:#fff}
 .lcd .l1::before{content:'♩';font-size:12px;color:var(--lcd-dim);margin-right:auto}
 .lcd .l2::before{content:'';margin-right:auto}
-.lcd .pos.count{color:#FF8FA8}
+.lcd .pos.count{gap:5px}
+.lcd .cdot{color:var(--lcd-dim);font-size:16px;line-height:1;transition:color .05s}
+.lcd .cdot.on{color:#FF5C7A}   /* カウントイン：鳴った拍 */
 .loop svg{display:block}
 .ic{padding:2px 8px;font-size:14px}
 .menu{position:relative}
@@ -84,7 +86,7 @@ h1{font-size:17px;font-weight:900;letter-spacing:.02em;margin:0 6px 0 0;white-sp
 
 /* ---------- 左 ---------- */
 .left{display:flex;flex-direction:column;padding:9px 12px;gap:5px}
-#wheel{width:100%;max-width:248px;height:auto;display:block;margin:-4px auto -2px}
+#wheel{width:100%;max-width:222px;height:auto;display:block;margin:-4px auto -2px}
 #wheel .wedge{cursor:pointer;transition:filter .15s}
 #wheel .wedge:hover{filter:brightness(1.25)}
 #wheel .wedge:focus{outline:none}
@@ -96,6 +98,8 @@ h1{font-size:17px;font-weight:900;letter-spacing:.02em;margin:0 6px 0 0;white-sp
 .palette.one{grid-template-columns:minmax(0,1fr)}
 .pchip{border:1px solid var(--line);background:var(--card);border-radius:4px;padding:2px 5px;cursor:grab;min-width:0;text-align:left;touch-action:none}
 .pchip:hover{border-color:var(--ink2)}
+.pchip.out{opacity:.45}   /* スケールの外の音を含む（7音でないスケールのとき） */
+#scaleSel{flex:1;min-width:0}
 .pchip .n{display:block;font-weight:700;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pchip .d{display:block;font-size:10px;color:var(--muted);white-space:nowrap}
 .pchip{position:relative}

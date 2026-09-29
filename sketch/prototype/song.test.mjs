@@ -1,7 +1,8 @@
 // song.js の単体テスト：node sketch/prototype/song.test.mjs
 import assert from 'node:assert/strict';
 import {demoSong,newSong,newSection,newChord,timeline,placedChords,renderSong,buildSmf,placeChord,resizeChord,insertBars,
-  setMark,pruneMarks,setKeyMark,stretchChordStart,keyRegion,mergeSections,splitSection,cloneSection,stretchChord,insertProgression,tickToSec,secToTick,copyRange,pasteAt,nameOf,rangeTicks,PPQ,safeFileName,voicingOf,STRUM_TICKS,withExtension} from './song.js';
+  setMark,pruneMarks,setKeyMark,stretchChordStart,keyRegion,mergeSections,splitSection,cloneSection,stretchChord,insertProgression,tickToSec,secToTick,copyRange,pasteAt,nameOf,rangeTicks,PPQ,safeFileName,voicingOf,STRUM_TICKS,withExtension,keyScale,sameKey} from './song.js';
+import {diatonicOf,conformBars,chordDeg} from '../../ui/theory.js';
 
 const B=PPQ*4;
 let n=0;const test=(name,f)=>{f();n++;console.log('ok',name);};
@@ -245,6 +246,20 @@ test('保存の名前：拡張子が無ければ付ける',()=>{
   assert.equal(withExtension('曲.','.chordsketch'),'曲.chordsketch');         // 末尾のドットは外す
   assert.equal(withExtension('','.mid','Song'),'Song.mid');
   assert.equal(withExtension('.mid','.mid','Song'),'Song.mid');
+});
+test('スケール：既定はモードのスケール、度数番号でロクリアンの ♭V を正しく書く',()=>{
+  assert.equal(keyScale({idx:0,mode:'major'}),'major');assert.equal(keyScale({idx:9,mode:'minor'}),'nminor');
+  assert.equal(keyScale({idx:0,mode:'major',scale:'dorian'}),'dorian');assert.equal(keyScale({idx:0,mode:'major',scale:'ct_M7'}),'major');   // コードトーンは使わない
+  assert.ok(!sameKey({idx:0,mode:'major'},{idx:0,mode:'major',scale:'lydian'}));
+  const s=newSong();s.key={idx:0,mode:'major',scale:'locrian'};s.sections=[newSection('A',1,1)];
+  const [off,q,,deg]=diatonicOf('locrian',4)[4];                                    // ロクリアンの5度
+  placeChord(s,0,{...newChord(0,0,B,off,q),deg});
+  const p=placedChords(s)[0];
+  assert.equal(nameOf(s,p.c,p.key),'G♭M7');assert.equal(chordDeg(off,q,undefined,deg),'♭VM7');
+  // 定番進行もスケールに合わせて作り直せる（ドリアンの IVM7 → IV7）
+  const bars=conformBars([[5,'M7'],[7,'7']],'major','dorian');
+  assert.deepEqual(bars.map(b=>b[1]),['7','m7']);
+  insertProgression(s,0,bars);assert.ok(s.sections[0].chords.every(c=>c.deg!=null));
 });
 test('ファイル名',()=>{assert.equal(safeFileName('サビ F♯m7 B♭'),'F#m7_Bb');});
 console.log(`${n} tests passed`);
