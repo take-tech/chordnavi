@@ -69,6 +69,8 @@ h1{font-size:17px;font-weight:900;letter-spacing:.02em;margin:0 6px 0 0;white-sp
 .lcd .l2,.lcd .r2{font-size:11.5px;color:var(--lcd-lo)}
 .lcd #lcdKey{color:var(--lcd-dim)}
 .lcd #lcdKey:hover{color:#fff}
+.lcd #lcdTempo{cursor:ns-resize;touch-action:none}   /* つかんで上下でテンポ */
+body.tempo-drag,body.tempo-drag *{cursor:ns-resize!important}
 .lcd .l1::before{content:'♩';font-size:12px;color:var(--lcd-dim);margin-right:auto}
 .lcd .l2::before{content:'';margin-right:auto}
 .lcd .pos.count{gap:5px}

@@ -674,12 +674,14 @@ function startBlockDrag(e,blkEl){
 
 /* ---------- テンポ・拍子の変更（ポップアップ） ---------- */
 const pop=$('pop');
-function openMarkPop(gi,pos,anchor){
+// テンポ・拍子・キーの変更欄。only（'tempo'｜'meter'｜'key'）を渡すとその項目だけ（上部の位置の表示から開くとき）
+function openMarkPop(gi,pos,anchor,only=null){
   const b=tl.bars[gi];if(!b)return;
   const sec=song.sections[b.si], atStart=gi===0&&pos===0;
+  const doTempo=!only||only==='tempo', doMeter=!only||only==='meter', doKey=!only||only==='key';
   const tm=sec.marks.find(m=>m.bar===b.bar&&m.bpm&&(m.pos||0)===pos), mm=sec.marks.find(m=>m.bar===b.bar&&m.meter);
   pop.innerHTML='';
-  pop.appendChild(h('h4','',`${fmtPos(gi,pos)} からの変更`));
+  pop.appendChild(h('h4','',only==='tempo'?`テンポ（${fmtPos(gi,pos)} から）`:only==='meter'?`拍子（${gi+1}小節目から）`:only==='key'?`キー（${gi+1}小節目から）`:`${fmtPos(gi,pos)} からの変更`));
   const bpm=h('input','');bpm.type='number';bpm.min=MIN_BPM;bpm.max=MAX_BPM;
   bpm.value=atStart?song.bpm:tm?.bpm??'';bpm.placeholder=String(Math.round(tempoAt(tl.tempos,b.start+pos)));
   const posSel=h('select','');
@@ -698,19 +700,35 @@ function openMarkPop(gi,pos,anchor){
   const trans=h('input','');trans.type='checkbox';trans.checked=!ui.keepNames;
   const transL=h('label','chk');transL.append(trans,' 後ろのコードも移調する（度数を保つ）');
   transL.title='オン：最後のサビを1音上げる、など（コードも一緒に移る）。オフ：鳴る音はそのままで、度数だけ新しいキーに付け替える';
-  pop.append(h('span','lbl','テンポ ♩='),bpm,h('span','lbl','位置'),posSel,h('span','lbl','拍子（小節の頭）'),met,h('span','lbl','キー（小節の頭）'),keyS,transL);
-  pop.appendChild(h('p','note','テンポは半拍単位の位置で、拍子とキーは小節の頭で変えられます。空欄・「変更なし」にすると外します。直前と同じ値にしたときもタグは消えます。'));
+  if(doTempo)pop.append(h('span','lbl','テンポ ♩='),bpm,h('span','lbl','位置'),posSel);
+  if(doMeter)pop.append(h('span','lbl','拍子（小節の頭）'),met);
+  if(doKey)pop.append(h('span','lbl','キー（小節の頭）'),keyS,transL);
+  pop.appendChild(h('p','note',only==='tempo'?'空欄にすると外します。上部の表示のテンポは、つかんで上下にドラッグしても変えられます。':
+    only?'「変更なし」にすると外します。直前と同じ値にしたときもタグは消えます。':
+    'テンポは半拍単位の位置で、拍子とキーは小節の頭で変えられます。空欄・「変更なし」にすると外します。直前と同じ値にしたときもタグは消えます。'));
   const btns=h('div','btns');
   const ok=h('button','tg','適用');ok.setAttribute('aria-pressed','true');
   const cancel=h('button','','閉じる');
   ok.onclick=()=>{
     const v=Math.round(+bpm.value), m=met.value?met.value.split('/').map(Number):null, p=+posSel.value;
+    const clampBpm=x=>Math.min(MAX_BPM,Math.max(MIN_BPM,x));
     commit(()=>{
-      if(atStart){if(v)song.bpm=Math.min(MAX_BPM,Math.max(MIN_BPM,v));if(m)song.meter=m;pruneMarks(song);return;}
-      if(tm&&(tm.pos||0)!==p)setMark(song,b.si,b.bar,tm.pos||0,{bpm:null,meter:mm?.meter});
-      setMark(song,b.si,b.bar,p,{bpm:v||null,meter:m});
-      const kv=keyS.value, nk=kv?{idx:+kv.split(':')[0],mode:kv.split(':')[1]}:null;
-      if(gi>0&&(nk?!km||!sameKey(km.key,nk):!!km))setKeyMark(song,b.si,b.bar,nk,!trans.checked);
+      // 出している項目だけを変える
+      if(doTempo){
+        if(atStart){if(v)song.bpm=clampBpm(v);}
+        else{
+          sec.marks=sec.marks.filter(x=>x!==tm&&!(x.bar===b.bar&&x.bpm&&(x.pos||0)===p));
+          if(v)sec.marks.push({bar:b.bar,pos:p,bpm:clampBpm(v)});
+        }
+      }
+      if(doMeter){
+        if(atStart){if(m)song.meter=m;}
+        else{sec.marks=sec.marks.filter(x=>x!==mm);if(m)sec.marks.push({bar:b.bar,pos:0,meter:m});}
+      }
+      if(doKey){
+        const kv=keyS.value, nk=kv?{idx:+kv.split(':')[0],mode:kv.split(':')[1]}:null;
+        if(gi>0&&(nk?!km||!sameKey(km.key,nk):!!km))setKeyMark(song,b.si,b.bar,nk,!trans.checked);
+      }
       pruneMarks(song);   // 直前と同じ値になった変更点はタグごと消す
     });
     closePop();
@@ -720,7 +738,7 @@ function openMarkPop(gi,pos,anchor){
   pop.hidden=false;
   const r=anchor.getBoundingClientRect();
   pop.style.left=Math.min(innerWidth-pop.offsetWidth-8,r.left)+'px';pop.style.top=Math.min(innerHeight-pop.offsetHeight-8,r.bottom+4)+'px';
-  bpm.focus();
+  (doTempo?bpm:doMeter?met:keyS).focus();
   pop.onkeydown=e=>{e.stopPropagation();if(e.key==='Enter')ok.click();if(e.key==='Escape')closePop();};
 }
 // セクションの色：パレットから選ぶ
@@ -989,19 +1007,48 @@ function renderLcd(t=lcdTick()){
   $('lcdKey').title=kr&&kr.mark?`キー（${kr.from+1}小節目から。押すと変更）`:'キー（曲の頭のキーは五度圏で変更）';
 }
 // 押すと、その値を決めている場所（曲の頭か、途中の変更点）を編集する
-$('lcdTempo').onclick=e=>{
-  const t=lcdTick();let x=tl.tempos[0];for(const y of tl.tempos){if(y.tick>t)break;x=y;}
-  if(x.tick===0){openMarkPop(0,0,e.currentTarget);return;}
-  const b=barOf(x.tick);openMarkPop(b.gi,x.tick-b.start,e.currentTarget);
-};
+// テンポ：いま効いているテンポの出どころ（曲の頭 or 途中の変更点）
+function tempoSource(t){
+  let x=tl.tempos[0];for(const y of tl.tempos){if(y.tick>t)break;x=y;}
+  if(x.tick===0){
+    const b0=tl.bars[0], m0=b0&&song.sections[b0.si].marks.find(m=>m.bar===0&&m.bpm&&!(m.pos||0));
+    return m0?{mark:m0,gi:0,pos:0}:{song:true,gi:0,pos:0};
+  }
+  const b=barOf(x.tick), pos=x.tick-b.start;
+  return {mark:song.sections[b.si].marks.find(m=>m.bar===b.bar&&m.bpm&&(m.pos||0)===pos),gi:b.gi,pos};
+}
+// つかんで上下にドラッグ：上へ動かすと速く（3px で 1 BPM）。動かさずに離したらテンポだけの変更欄
+$('lcdTempo').addEventListener('pointerdown',e=>{
+  if(e.button!==0)return;
+  e.preventDefault();
+  const src=tempoSource(lcdTick()), y0=e.clientY, v0=src.song?song.bpm:src.mark.bpm, el=e.currentTarget;
+  let dragging=false;
+  const move=ev=>{
+    const dy=y0-ev.clientY;
+    if(!dragging&&Math.abs(dy)<3)return;
+    if(!dragging){dragging=true;snapshot();document.body.classList.add('tempo-drag');}
+    const v=Math.min(MAX_BPM,Math.max(MIN_BPM,Math.round(v0+dy/3)));
+    const cur=src.song?song.bpm:src.mark.bpm;
+    if(v===cur)return;
+    if(src.song)song.bpm=v;else src.mark.bpm=v;
+    tl=timeline(song);lcdLast='';renderLcd();renderSheet();player.refresh();
+  };
+  const up=()=>{
+    removeEventListener('pointermove',move);removeEventListener('pointerup',up);
+    document.body.classList.remove('tempo-drag');
+    if(dragging){pruneMarks(song);changed();return;}   // 離したら確定（直前と同じ値になった変更点は消す）
+    openMarkPop(src.gi,src.pos,el,'tempo');
+  };
+  addEventListener('pointermove',move);addEventListener('pointerup',up);
+});
 $('lcdMeter').onclick=e=>{
   const t=lcdTick();let x=tl.meters[0];for(const y of tl.meters){if(y.tick>t)break;x=y;}
-  openMarkPop(x.gi||0,0,e.currentTarget);
+  openMarkPop(x.gi||0,0,e.currentTarget,'meter');
 };
 $('lcdKey').onclick=e=>{
   const b=barOf(lcdTick())||tl.bars[0];if(!b)return;
   const kr=keyRegion(tl,b.gi);
-  if(kr.mark)openMarkPop(kr.from,0,e.currentTarget);else keySel.focus();
+  if(kr.mark)openMarkPop(kr.from,0,e.currentTarget,'key');else keySel.focus();
 };
 
 const playhead=h('div','playhead');
