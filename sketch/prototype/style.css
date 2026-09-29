@@ -134,7 +134,6 @@ h1{font-size:17px;font-weight:900;letter-spacing:.02em;margin:0 6px 0 0;white-sp
 .lbl.strong{font-weight:700;color:var(--ink2)}
 #metro{width:120px}
 #areaSeg[hidden]{display:none}
-#outInfo{flex-shrink:1;min-width:0;overflow:hidden;text-overflow:ellipsis;font-size:11px}
 .title{width:100px!important}
 .timbre{margin-top:4px}
 .timbre select{flex:1}

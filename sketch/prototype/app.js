@@ -1311,8 +1311,6 @@ function render(){
   drawOverlay();
   if(rotKey!==ck.idx)rotateTo(ck.idx);
   renderOctUp();renderOctBass();
-  const over=song.sections.filter(x=>x.pattern).map(x=>x.name);
-  $('outInfo').textContent=over.length?`パターンを変えているセクション：${over.join('・')}`:'';
   const ex=currentExport();
   $('dragLabel').textContent=!range?'曲全体':ex.si>=0?`「${song.sections[ex.si].name}」`:rangeLabel(range);
   renderPalette();renderProg();renderSheet();renderFooter();
