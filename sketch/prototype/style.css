@@ -273,3 +273,8 @@ body.grabbing,body.grabbing *{cursor:grabbing!important}
 .blk.narrow.haspat .n{padding-right:0}
 .footer .blk-pat{max-width:170px}
 .footer .blk-pat.over{border-color:var(--tone);color:var(--tone);font-weight:700}
+
+/* 名前を付けて保存 */
+.pop .save-row{grid-column:1/-1;display:flex;align-items:center;gap:4px}
+.pop .save-name{width:220px;font-size:13px}
+.pop .save-row .ext{color:var(--muted);font-size:12px}

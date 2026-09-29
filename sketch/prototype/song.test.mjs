@@ -1,7 +1,7 @@
 // song.js の単体テスト：node sketch/prototype/song.test.mjs
 import assert from 'node:assert/strict';
 import {demoSong,newSong,newSection,newChord,timeline,placedChords,renderSong,buildSmf,placeChord,resizeChord,insertBars,
-  setMark,pruneMarks,setKeyMark,stretchChordStart,keyRegion,mergeSections,splitSection,cloneSection,stretchChord,insertProgression,tickToSec,secToTick,copyRange,pasteAt,nameOf,rangeTicks,PPQ,safeFileName,voicingOf,STRUM_TICKS} from './song.js';
+  setMark,pruneMarks,setKeyMark,stretchChordStart,keyRegion,mergeSections,splitSection,cloneSection,stretchChord,insertProgression,tickToSec,secToTick,copyRange,pasteAt,nameOf,rangeTicks,PPQ,safeFileName,voicingOf,STRUM_TICKS,withExtension} from './song.js';
 
 const B=PPQ*4;
 let n=0;const test=(name,f)=>{f();n++;console.log('ok',name);};
@@ -236,6 +236,15 @@ test('バラード：音の高さの順で 1・2・4・3（ピアノ・ギター
     const [a,b,c,d]=[0,PPQ,PPQ*2,PPQ*3].map(t=>t===0?Math.min(...r.filter(n=>n.t===0).map(n=>n.n)):at(t));
     assert.ok(a<b&&b<d&&d<c,v+'：'+[a,b,c,d].join(','));
   }
+});
+test('保存の名前：拡張子が無ければ付ける',()=>{
+  assert.equal(withExtension('サビ案','.mid'),'サビ案.mid');
+  assert.equal(withExtension('song.MID','.mid'),'song.MID');                 // 大文字でも付けない
+  assert.equal(withExtension('song.mid','.chordsketch'),'song.mid.chordsketch');
+  assert.equal(withExtension('  a/b:c?  ','.mid'),'a_b_c_.mid');             // 使えない文字は _
+  assert.equal(withExtension('曲.','.chordsketch'),'曲.chordsketch');         // 末尾のドットは外す
+  assert.equal(withExtension('','.mid','Song'),'Song.mid');
+  assert.equal(withExtension('.mid','.mid','Song'),'Song.mid');
 });
 test('ファイル名',()=>{assert.equal(safeFileName('サビ F♯m7 B♭'),'F#m7_Bb');});
 console.log(`${n} tests passed`);

@@ -523,4 +523,11 @@ export function safeFileName(s){
   const t=s.replace(/♯/g,'#').replace(/♭/g,'b').replace(/[^A-Za-z0-9_#\-]+/g,'_').replace(/_+/g,'_').replace(/^_|_$/g,'');
   return t||'ChordSketch';
 }
+// 保存するときのファイル名：使えない文字は _、末尾の空白・ドットは外し、拡張子（ext、例 '.mid'）が無ければ付ける（大文字小文字は区別しない）。
+// 空なら fallback。ネイティブの保存ダイアログ（JUCE 版）でも同じ決まりにする
+export function withExtension(name,ext,fallback='ChordSketch'){
+  let n=String(name??'').replace(/[\\/:*?"<>|\u0000-\u001f]/g,'_').trim().replace(/[.\s]+$/,'');
+  if(!n||n===ext)n=fallback;
+  return n.toLowerCase().endsWith(ext.toLowerCase())?n:n+ext;
+}
 export {mod12};

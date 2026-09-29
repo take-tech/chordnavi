@@ -3,7 +3,7 @@ import {MAJ_LABEL,MIN_LABEL,SIG,WHEEL_CELLS,DIATONIC,CHORD,chordDeg,chordAt,chor
 import {PPQ,METERS,SNAPS,snapTicks,barTicksOf,beatTicksOf,SECTION_COLORS,SECTION_PRESETS,PATTERNS,MIN_BPM,MAX_BPM,
   newSong,demoSong,newSection,newChord,cloneSection,timeline,placedChords,placeChord,removeChord,resizeChord,
   setSectionBars,insertBars,stretchChord,stretchChordStart,pruneMarks,mergeSections,splitSection,insertProgression,setMark,rangeTicks,copyRange,pasteAt,renderSong,buildSmf,safeFileName,
-  songTonic,songFlat,nameOf,tempoAt,keyTonic,sameKey,setKeyMark,keyRegion,transposeBars,voicingOf,patternById,VOICINGS,GUITAR_AREAS} from './song.js';
+  songTonic,songFlat,nameOf,tempoAt,withExtension,keyTonic,sameKey,setKeyMark,keyRegion,transposeBars,voicingOf,patternById,VOICINGS,GUITAR_AREAS} from './song.js';
 import * as player from './player.js';
 
 /* ---------- 状態 ---------- */
@@ -941,7 +941,33 @@ dragSel.addEventListener('dragstart',e=>{
   e.dataTransfer.setData('DownloadURL',`audio/midi:${name}:data:audio/midi;base64,${b64(smfFor(r,label))}`);
   e.dataTransfer.effectAllowed='copy';
 });
-$('saveMidi').onclick=()=>{const {r,label}=currentExport();download(new Blob([smfFor(r,label)],{type:'audio/midi'}),fileName(label));};
+$('saveMidi').onclick=async()=>{
+  const {r,label}=currentExport();
+  const name=await askFileName(fileName(label),'.mid',$('saveMidi'));
+  if(name)download(new Blob([smfFor(r,label)],{type:'audio/midi'}),name);
+};
+// 保存の名前を聞く。拡張子（ext）が無ければ付ける（withExtension）。取り消しなら null
+function askFileName(def,ext,anchor){
+  return new Promise(resolve=>{
+    const base=def.toLowerCase().endsWith(ext)?def.slice(0,-ext.length):def;
+    pop.innerHTML='';pop.appendChild(h('h4','','名前を付けて保存'));
+    const input=h('input','save-name');input.type='text';input.value=base;input.setAttribute('aria-label','ファイル名');
+    const row=h('div','save-row');row.append(input,h('span','ext',ext));
+    pop.appendChild(row);
+    pop.appendChild(h('p','note',`拡張子（${ext}）は付けなくても自動で付きます。`));
+    const btns=h('div','btns'), ok=h('button','tg','保存'), cancel=h('button','','閉じる');ok.setAttribute('aria-pressed','true');
+    const done=v=>{pop.hidden=true;resolve(v);};
+    ok.onclick=()=>done(withExtension(input.value,ext,base||'ChordSketch'));
+    cancel.onclick=()=>done(null);
+    btns.append(cancel,ok);pop.appendChild(btns);
+    pop.hidden=false;
+    const rr=anchor.getBoundingClientRect();
+    pop.style.left=Math.max(8,Math.min(innerWidth-pop.offsetWidth-8,rr.right-pop.offsetWidth))+'px';
+    pop.style.top=Math.min(innerHeight-pop.offsetHeight-8,rr.bottom+4)+'px';
+    input.focus();input.select();
+    pop.onkeydown=e=>{e.stopPropagation();if(e.key==='Enter')ok.click();if(e.key==='Escape')cancel.click();};
+  });
+}
 function download(blob,name){
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();
   setTimeout(()=>URL.revokeObjectURL(a.href),1000);
@@ -956,7 +982,9 @@ fileMenu.addEventListener('click',e=>{
   if(act==='new')replaceSong(newSong());
   if(act==='demo')replaceSong(demoSong());
   if(act==='open')$('fileInput').click();
-  if(act==='save')download(new Blob([JSON.stringify({app:'ChordSketch',v:1,song},null,1)],{type:'application/json'}),(ascii(song.title)||'song')+'.chordsketch');
+  if(act==='save')askFileName((song.title||'song')+'.chordsketch','.chordsketch',$('fileBtn')).then(name=>{
+    if(name)download(new Blob([JSON.stringify({app:'ChordSketch',v:1,song},null,1)],{type:'application/json'}),name);
+  });
 });
 $('fileInput').addEventListener('change',async e=>{
   const f=e.target.files[0];e.target.value='';if(!f)return;
