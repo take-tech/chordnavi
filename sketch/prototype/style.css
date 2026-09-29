@@ -257,7 +257,7 @@ body.grabbing,body.grabbing *{cursor:grabbing!important}
 .prog-row{display:flex;gap:4px;align-items:center}
 .prog-row select{min-width:0;flex:1}
 #progSel{flex:1.6}
-.prog-row .ins{flex:1}   /* 見た目は「試聴」と同じ（幅だけ広げる） */
+#progPlay,.prog-row .ins{flex:1 1 0;min-width:0}   /* 「試聴」「挿入」は同じ幅 */
 .prog-names{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));row-gap:2px;border-right:1px solid var(--ink2)}
 .prog-names .pb{display:flex;gap:1px;align-items:center;min-width:0;border-left:1px solid var(--ink2);padding:0 3px;height:16px;overflow:hidden}
 .prog-names .pb{font-size:10px}
