@@ -6,7 +6,7 @@ export const TIMBRES=[
   {id:'piano',name:'ピアノ'},{id:'triangle',name:'シンプル（三角波）'},{id:'organ',name:'オルガン'},{id:'pad',name:'パッド'}
 ];
 export const METRONOMES=[
-  {id:'off',name:'メトロノームなし'},{id:'click',name:'♪ クリック'},{id:'8beat',name:'♪ 8ビート'},{id:'16beat',name:'♪ 16ビート'},{id:'shuffle',name:'♪ シャッフル'}
+  {id:'off',name:'メトロノームなし'},{id:'click',name:'♪ クリック'},{id:'8beat',name:'♪ 8ビート'},{id:'16beat',name:'♪ 16ビート'},{id:'shuffle',name:'♪ シャッフル'},{id:'four',name:'♪ 4つ打ち（EDM）'}
 ];
 
 let ac=null, master=null, noise=null, muted=false;
@@ -98,6 +98,17 @@ export function backbeat(P){
 export function barDrums(kind,meter){
   const out=[], {P,size,compound}=pulsesOf(meter);
   if(kind==='click'){for(let k=0;k<meter[0];k++)out.push([k,k===0?'clickHi':'click']);return out;}
+  // 4つ打ち（EDM）：大きな拍ごとにキック、2つ目ごとにクラップ（スネア）、裏にハイハット
+  if(kind==='four'){
+    const {P,size}=pulsesOf(meter);
+    for(let p=0;p<P;p++){
+      const at=p*size;
+      out.push([at,'kick']);
+      if(p%2===1)out.push([at,'snare']);
+      out.push([at+size/2,'hatAcc']);
+    }
+    return out;
+  }
   const bb=backbeat(P);
   for(let p=0;p<P;p++){
     const at=p*size;

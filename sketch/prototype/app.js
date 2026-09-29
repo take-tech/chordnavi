@@ -5,7 +5,7 @@ import {createWheel} from '../../shared/ui/wheel.js';
 import {PPQ,METERS,SNAPS,snapTicks,barTicksOf,beatTicksOf,SECTION_COLORS,SECTION_PRESETS,PATTERNS,MIN_BPM,MAX_BPM,
   newSong,demoSong,newSection,newChord,cloneSection,timeline,placedChords,placeChord,removeChord,resizeChord,
   setSectionBars,insertBars,appendSectionFrom,stretchChord,stretchChordStart,pruneMarks,mergeSections,splitSection,insertProgression,setMark,rangeTicks,copyRange,pasteAt,renderSong,buildSmf,safeFileName,
-  songTonic,songFlat,nameOf,tempoAt,NEW_TITLE,SKETCH_SCALES,keyScale,defaultScale,meterAt,tickToSec,withExtension,keyTonic,sameKey,setKeyMark,keyRegion,transposeBars,voicingOf,patternById,VOICINGS,GUITAR_AREAS} from './song.js';
+  songTonic,songFlat,nameOf,tempoAt,PATTERN_GROUPS,NEW_TITLE,SKETCH_SCALES,keyScale,defaultScale,meterAt,tickToSec,withExtension,keyTonic,sameKey,setKeyMark,keyRegion,transposeBars,voicingOf,patternById,VOICINGS,GUITAR_AREAS} from './song.js';
 import * as player from './player.js';
 
 /* ---------- 状態 ---------- */
@@ -115,6 +115,14 @@ const QUALITIES=['','m','7','M7','m7','m7b5','dim','dim7','aug','sus4','7sus4','
 for(const q of Object.keys(CHORD))if(!QUALITIES.includes(q))QUALITIES.push(q);
 const INS_LENS=[['2bar','2小節'],['bar','1小節'],['2beat','2拍'],['beat','1拍'],['half','半拍']];
 
+// パターンの選択肢をまとまり（基本・バンド・EDM）ごとに入れる
+function addPatternOptions(sel){
+  for(const g of PATTERN_GROUPS){
+    const og=document.createElement('optgroup');og.label=g.name;
+    for(const p of PATTERNS.filter(x=>x.group===g.id))og.appendChild(Object.assign(document.createElement('option'),{value:p.id,textContent:p.name}));
+    sel.appendChild(og);
+  }
+}
 function h(tag,cls,text){const e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;}
 
 /* ---------- 五度圏（shared/ui/wheel.js。ChordNavi と共通） ---------- */
@@ -454,7 +462,7 @@ function sectionHead(s,si){
   nb.addEventListener('keydown',e=>e.stopPropagation());
   const pat=h('select','pat'+(s.pattern?' over':''));pat.title='このセクションの MIDI パターン';
   pat.appendChild(Object.assign(h('option','','パターン：曲と同じ'),{value:''}));
-  for(const p of PATTERNS)pat.appendChild(Object.assign(h('option','',p.name),{value:p.id}));
+  addPatternOptions(pat);
   pat.value=s.pattern||'';
   pat.addEventListener('change',()=>commit(()=>{s.pattern=pat.value||null;}));
   const {from,to}=tl.secRanges[si];
@@ -784,7 +792,7 @@ function chordEditor(p){
   const secPat=song.sections[sel.si].pattern||song.pattern;
   const pat=h('select','blk-pat'+(c.pattern?' over':''));pat.title='このコードだけの MIDI パターン';
   opt(pat,`セクションと同じ（${patternById(secPat).short}）`,'');
-  for(const x of PATTERNS)opt(pat,x.name,x.id);
+  addPatternOptions(pat);
   pat.value=c.pattern||'';
   pat.onchange=()=>edit(cc=>{if(pat.value)cc.pattern=pat.value;else delete cc.pattern;});
   const dup=h('button','','複製');dup.title='すぐ後ろに同じコードを置く（⌘D）';dup.onclick=duplicateSel;
@@ -1376,7 +1384,7 @@ function renderLive(){
 const metroMenu=$('metroMenu');
 for(const m of player.METRONOMES.filter(x=>x.id!=='off'))metroMenu.appendChild(Object.assign(h('button','',m.name.replace(/^♪\s*/,'')),{value:m.id,role:'menuitemradio'}));
 for(const t of player.TIMBRES)$('timbre').appendChild(Object.assign(h('option','',t.name),{value:t.id}));
-for(const p of PATTERNS)$('pattern').appendChild(Object.assign(h('option','',p.name),{value:p.id}));
+addPatternOptions($('pattern'));
 for(const [v,n] of INS_LENS)$('insLen').appendChild(Object.assign(h('option','',n),{value:v}));
 for(const p of SECTION_PRESETS)$('secNames').appendChild(Object.assign(h('option'),{value:p.name}));
 $('title').addEventListener('change',e=>commit(()=>{song.title=e.target.value.trim()||'無題';}));

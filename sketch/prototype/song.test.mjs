@@ -1,7 +1,7 @@
 // song.js の単体テスト：node sketch/prototype/song.test.mjs
 import assert from 'node:assert/strict';
 import {demoSong,newSong,newSection,newChord,timeline,placedChords,renderSong,buildSmf,placeChord,resizeChord,insertBars,
-  setMark,pruneMarks,setKeyMark,appendSectionFrom,stretchChordStart,keyRegion,mergeSections,splitSection,cloneSection,stretchChord,insertProgression,tickToSec,secToTick,copyRange,pasteAt,nameOf,rangeTicks,PPQ,safeFileName,voicingOf,STRUM_TICKS,withExtension,keyScale,sameKey} from './song.js';
+  setMark,pruneMarks,setKeyMark,appendSectionFrom,stretchChordStart,keyRegion,mergeSections,splitSection,cloneSection,stretchChord,insertProgression,tickToSec,secToTick,copyRange,pasteAt,nameOf,rangeTicks,PPQ,safeFileName,voicingOf,STRUM_TICKS,withExtension,keyScale,sameKey,PATTERNS,PATTERN_GROUPS} from './song.js';
 import {diatonicOf,conformBars,chordDeg} from '../../shared/ui/theory.js';
 import {barDrums,pulsesOf,backbeat} from './player.js';
 
@@ -276,6 +276,8 @@ test('ドラム：3拍子系（3/4・6/8・9/8）も大きな拍ごとに組み�
   assert.deepEqual(hats('shuffle',[6,8]),[0,2,3,5]);                    // 3連の1つ目と3つ目
   assert.equal(hats('16beat',[3,4]).length,12);
   assert.ok(barDrums('8beat',[7,8]).every(([x])=>x<7));                 // 小節からはみ出さない
+  assert.equal(ks('four',[4,4]),'0K 1K 1S 2K 3K 3S');                   // 4つ打ち
+  assert.equal(ks('four',[6,8]),'0K 3K 3S');
 });
 test('別の曲の最後にセクションを付ける：コード名・位置はそのまま（キー・拍子が違えば変更点を付ける）',()=>{
   const a=demoSong();                                   // C メジャー 4/4
@@ -289,6 +291,21 @@ test('別の曲の最後にセクションを付ける：コード名・位置�
   assert.equal(b.sections[0].chords.length,1);assert.equal(a.sections.length,3);         // 元の曲・付け先の前のセクションは変えない
   // 同じキー・拍子なら変更点は付けない（元からあるテンポの変更点はそのまま）
   const c=demoSong();appendSectionFrom(a,1,c);assert.deepEqual(c.sections.at(-1).marks,[]);
+});
+test('パターンを増やす：バンド・EDM、すべて小節の中に収まる、オフビートは拍の頭で鳴らさない',()=>{
+  for(const p of PATTERNS){
+    const s=newSong();s.pattern=p.id;s.sections=[newSection('A',1,2)];placeChord(s,0,newChord(0,0,B,0,''));placeChord(s,0,newChord(1,0,B,7,''));
+    const r=renderSong(s).notes;
+    assert.ok(r.length>0,p.id+'：音がある');
+    assert.ok(r.every(n=>n.t>=0&&n.t+n.d<=B*2&&n.v>0&&n.v<=127),p.id+'：小節の中・ベロシティ');
+    assert.ok(PATTERN_GROUPS.some(g=>g.id===p.group)&&p.short,p.id+'：まとまりと短い名前');
+  }
+  const s=newSong();s.pattern='offbeat';s.sections=[newSection('A',1,1)];placeChord(s,0,newChord(0,0,B,0,''));
+  const on=renderSong(s).notes.filter(n=>n.t%PPQ===0);
+  assert.equal(on.length,0);                                                  // 拍の頭には無い
+  s.pattern='trance';assert.equal(new Set(renderSong(s).notes.filter(n=>n.n>=48).map(n=>n.t)).size,16);   // 16分で刻む
+  s.pattern='waltz';s.meter=[3,4];s.sections=[newSection('A',1,1)];placeChord(s,0,newChord(0,0,B*3/4,0,''));
+  assert.deepEqual([...new Set(renderSong(s).notes.map(n=>n.t))],[0,PPQ,PPQ*2]);   // ワルツ：1拍目ベース、2・3拍目和音
 });
 test('ファイル名',()=>{assert.equal(safeFileName('サビ F♯m7 B♭'),'F#m7_Bb');});
 console.log(`${n} tests passed`);
