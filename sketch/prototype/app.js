@@ -3,7 +3,7 @@ import {MAJ_LABEL,MIN_LABEL,SIG,WHEEL_CELLS,DIATONIC,CHORD,chordDeg,chordAt,chor
 import {PPQ,METERS,SNAPS,snapTicks,barTicksOf,beatTicksOf,SECTION_COLORS,SECTION_PRESETS,PATTERNS,MIN_BPM,MAX_BPM,
   newSong,demoSong,newSection,newChord,cloneSection,timeline,placedChords,placeChord,removeChord,resizeChord,
   setSectionBars,insertBars,stretchChord,stretchChordStart,pruneMarks,mergeSections,splitSection,insertProgression,setMark,rangeTicks,copyRange,pasteAt,renderSong,buildSmf,safeFileName,
-  songTonic,songFlat,nameOf,tempoAt,withExtension,keyTonic,sameKey,setKeyMark,keyRegion,transposeBars,voicingOf,patternById,VOICINGS,GUITAR_AREAS} from './song.js';
+  songTonic,songFlat,nameOf,tempoAt,meterAt,tickToSec,withExtension,keyTonic,sameKey,setKeyMark,keyRegion,transposeBars,voicingOf,patternById,VOICINGS,GUITAR_AREAS} from './song.js';
 import * as player from './player.js';
 
 /* ---------- 状態 ---------- */
@@ -913,6 +913,7 @@ function onPos(abs,counting){
   const b=tl.bars.find(x=>abs>=x.start&&abs<x.start+x.ticks)||tl.bars.at(-1);
   const s=fmtPos(b.gi,Math.floor((abs-b.start)/SIXTEENTH)*SIXTEENTH);
   if(s!==lastPos){disp.textContent=s;lastPos=s;scrollToBar(b.gi);}
+  renderLcd(abs);
   const p=placedChords(song,tl).find(x=>abs>=x.start&&abs<x.end);
   const id=p?.c.id??null;
   if(id!==playingId){
@@ -922,6 +923,40 @@ function onPos(abs,counting){
   }
   placePlayhead();
 }
+/* ---------- 位置の表示（テンポ・拍子・キー・位置・経過時間） ---------- */
+// 再生中は再生位置、止まっているときはカーソル位置の値
+const lcdTick=()=>playTick!=null&&player.isPlaying()?playTick:(tl.bars[cursor.gi]?.start??0)+cursor.pos;
+let lcdLast='';
+function renderLcd(t=lcdTick()){
+  const b=barOf(Math.min(t,Math.max(0,tl.total-1)))||tl.bars[0];
+  const bpm=tempoAt(tl.tempos,t), m=meterAt(tl.meters,t), k=b?b.key:song.key;
+  const sec=tickToSec(tl.tempos,t), time=`${Math.floor(sec/60)}:${(sec%60).toFixed(1).padStart(4,'0')}`;
+  const s=[bpm,m.join('/'),k.idx,k.mode,time].join('|');
+  if(s===lcdLast)return;
+  lcdLast=s;
+  $('lcdBpm').textContent=(Math.round(bpm*10)/10).toFixed(1);
+  $('lcdMeter').textContent=m.join('/');
+  $('lcdKey').textContent='Key '+keyLabel(k);
+  $('lcdTime').textContent=time;
+  const kr=b?keyRegion(tl,b.gi):null;
+  $('lcdKey').title=kr&&kr.mark?`キー（${kr.from+1}小節目から。押すと変更）`:'キー（曲の頭のキーは五度圏で変更）';
+}
+// 押すと、その値を決めている場所（曲の頭か、途中の変更点）を編集する
+$('lcdTempo').onclick=e=>{
+  const t=lcdTick();let x=tl.tempos[0];for(const y of tl.tempos){if(y.tick>t)break;x=y;}
+  if(x.tick===0){openMarkPop(0,0,e.currentTarget);return;}
+  const b=barOf(x.tick);openMarkPop(b.gi,x.tick-b.start,e.currentTarget);
+};
+$('lcdMeter').onclick=e=>{
+  const t=lcdTick();let x=tl.meters[0];for(const y of tl.meters){if(y.tick>t)break;x=y;}
+  openMarkPop(x.gi||0,0,e.currentTarget);
+};
+$('lcdKey').onclick=e=>{
+  const b=barOf(lcdTick())||tl.bars[0];if(!b)return;
+  const kr=keyRegion(tl,b.gi);
+  if(kr.mark)openMarkPop(kr.from,0,e.currentTarget);else keySel.focus();
+};
+
 const playhead=h('div','playhead');
 function placePlayhead(){
   if(playTick==null||!player.isPlaying()){playhead.remove();return;}
@@ -1157,7 +1192,6 @@ function renderLive(){
 }
 
 /* ---------- 上部・ツールバーのコントロール ---------- */
-for(const m of METERS)$('meter').appendChild(Object.assign(h('option','',m.join('/')),{value:m.join('/')}));
 for(const m of player.METRONOMES)$('metro').appendChild(Object.assign(h('option','',m.name),{value:m.id}));
 for(const t of player.TIMBRES)$('timbre').appendChild(Object.assign(h('option','',t.name),{value:t.id}));
 for(const p of PATTERNS)$('pattern').appendChild(Object.assign(h('option','',p.name),{value:p.id}));
@@ -1165,8 +1199,6 @@ for(const [v,n] of INS_LENS)$('insLen').appendChild(Object.assign(h('option','',
 for(const p of SECTION_PRESETS)$('secNames').appendChild(Object.assign(h('option'),{value:p.name}));
 $('title').addEventListener('change',e=>commit(()=>{song.title=e.target.value.trim()||'無題';}));
 $('title').addEventListener('keydown',e=>{if(e.key==='Enter')e.target.blur();});
-$('bpm').addEventListener('change',e=>commit(()=>{song.bpm=Math.min(MAX_BPM,Math.max(MIN_BPM,Math.round(+e.target.value)||120));pruneMarks(song);}));
-$('meter').addEventListener('change',e=>commit(()=>{song.meter=e.target.value.split('/').map(Number);pruneMarks(song);}));
 $('pattern').addEventListener('change',e=>commit(()=>{song.pattern=e.target.value;}));
 const uiSet=(k,v)=>{ui[k]=v;render();persist();};
 $('metro').addEventListener('change',e=>{uiSet('metro',e.target.value);player.refresh();});
@@ -1221,7 +1253,7 @@ dark.addEventListener('change',applyTheme);
 /* ---------- 描画 ---------- */
 function render(){
   const pressed=(id,on)=>$(id).setAttribute('aria-pressed',!!on);
-  $('title').value=song.title;$('bpm').value=song.bpm;$('meter').value=song.meter.join('/');
+  $('title').value=song.title;
   $('metro').value=ui.metro;$('timbre').value=ui.timbre;$('pattern').value=song.pattern;$('insLen').value=ui.insLen;
   pressed('countIn',ui.countIn);pressed('loopBtn',ui.loop);pressed('stepBtn',ui.step);pressed('keepNames',ui.keepNames);pressed('bassBtn',song.bass);
   document.querySelectorAll('#snapSeg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.v===ui.snap));
@@ -1232,6 +1264,7 @@ function render(){
   const playing=player.isPlaying(), pb=$('playBtn');
   pb.textContent=playing?'■':'▶';pb.setAttribute('aria-label',playing?'停止':'再生');pb.classList.toggle('on',playing);
   if(!playing){$('posDisp').textContent=fmtPos(cursor.gi,cursor.pos)||'1.1.1';$('posDisp').classList.remove('count');lastPos='';}
+  renderLcd();
   $('undo').disabled=!undoStack.length;$('redo').disabled=!redoStack.length;
   const ck=curKey(), kr=keyRegion(tl,cursor.gi);
   keySel.value=ck.idx+':'+ck.mode;
