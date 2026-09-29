@@ -968,6 +968,37 @@ function replaceSong(s){
 }
 
 /* ---------- コード譜（印刷／PDF） ---------- */
+// 食い：小節の終わりまで1拍未満のところから始まり、次の小節へ続くコード（コード譜では次の小節の頭に「<」付きで書く）
+const barOf=abs=>tl.bars.find(x=>abs>=x.start&&abs<x.start+x.ticks);
+function isAnti(p){
+  const b=barOf(p.start);if(!b)return false;
+  const be=b.start+b.ticks;
+  return p.start>b.start&&be-p.start<beatTicksOf(b.meter)&&p.end>be;
+}
+// 印刷のプレビューを出したあとで、重なったコード名を詰める：まず文字を小さく（8pt まで）、それでも重なれば右へずらす
+function layoutPrint(){
+  const GAP=4;
+  for(const cell of document.querySelectorAll('#print .pbar')){
+    const boxes=[...cell.querySelectorAll('.pch')].sort((x,y)=>x.getBoundingClientRect().left-y.getBoundingClientRect().left);
+    const cr=cell.getBoundingClientRect();
+    for(let i=0;i<boxes.length;i++){
+      const cur=boxes[i], prev=boxes[i-1], R=el=>el.getBoundingClientRect();
+      const hitsPrev=()=>!!prev&&R(prev).right+GAP>R(cur).left, overRight=()=>R(cur).right>cr.right+1;
+      const pt=el=>parseFloat(getComputedStyle(el).fontSize)*72/96;
+      // 1. 小節の右からはみ出すなら右端にそろえる
+      if(overRight()){cur.style.left='auto';cur.style.right='1mm';cur.style.paddingLeft='0';}
+      // 2. 右端にそろえても入らなければ、後ろのコード名を小さくする（8pt まで）
+      let size=pt(cur);
+      while(overRight()&&size>8){size-=.5;cur.style.fontSize=size+'pt';}
+      // 3. 前のコード名と重なるなら、大きいほうから交互に小さくして大きさをそろえる。それでも重なれば右へずらす
+      let ps=prev?pt(prev):0;
+      while(hitsPrev()&&(size>8||ps>8)){
+        if(ps>=size&&ps>8){ps-=.5;prev.style.fontSize=ps+'pt';}else{size-=.5;cur.style.fontSize=size+'pt';}
+      }
+      if(hitsPrev()){cur.style.right='auto';cur.style.left=R(prev).right+GAP-cr.left+'px';}
+    }
+  }
+}
 function buildPrint(){
   const pr=$('print');pr.innerHTML='';
   pr.appendChild(h('h2','',song.title));
@@ -984,14 +1015,29 @@ function buildPrint(){
         const marks=s.marks.filter(m=>m.bar===b.bar).sort((x,y)=>(y.key?2:y.meter?1:0)-(x.key?2:x.meter?1:0)).map(m=>m.key?`Key: ${keyLabel(m.key)}`:m.meter?m.meter.join('/'):`♩=${m.bpm}`);
         if(marks.length)cell.appendChild(h('span','pm',marks.join('  ')));
         if(gi===r)cell.appendChild(h('span','pn',String(gi+1)));
-        const inBar=pcs.filter(p=>p.end>b.start&&p.start<b.start+b.ticks);
-        for(const p of inBar){
-          const cont=p.start<b.start;
-          if(cont&&inBar.length>1)continue;   // 小節の途中で変わるなら前からの続きは書かない
-          // 小節の終わり近く（食い）から始まるコードは、はみ出さないよう右端にそろえる
-          const frac=Math.max(0,(p.start-b.start)/b.ticks), place=x=>{if(frac>.7){x.style.right='1mm';x.classList.add('late');}else x.style.left=frac*100+'%';};
-          const c=h('span','pc'+(cont?' cont':''),nameOf(song,p.c,p.key));place(c);cell.appendChild(c);
-          if($('prDeg').checked&&!cont){const d=h('span','pd',degOfItem(p.c));place(d);cell.appendChild(d);}
+        // 小節の半分（偶数拍子）または各拍（奇数拍子）に小さな縦棒
+        const n=b.meter[0];
+        for(let k=1;k<n;k++)if(n%2?true:k===n/2){const t=h('span','ptick'+(n%2?' small':''));t.style.left=k/n*100+'%';cell.appendChild(t);}
+        const be=b.start+b.ticks, items=[];
+        for(const p of pcs){
+          if(p.end<=b.start||p.start>=be)continue;
+          if(isAnti(p)&&p.start>=b.start)continue;            // 食い：次の小節の頭に書く
+          if(p.start<b.start){
+            const pb=barOf(p.start);
+            if(isAnti(p)&&pb&&pb.gi===b.gi-1)items.push({p,frac:0,anti:true});   // 前の小節から食い込んだコード
+            else items.push({p,frac:0,cont:true});
+          }else items.push({p,frac:(p.start-b.start)/b.ticks});
+        }
+        // 前からの続きは、小節の頭のほうで別のコードが始まるなら書かない
+        const shown=items.filter(x=>!x.cont||!items.some(y=>!y.cont&&y.frac<.25));
+        for(const x of shown){
+          const box=h('span','pch'+(x.cont?' cont':'')+(x.anti?' anti':''));
+          box.style.left=x.frac*100+'%';
+          const name=h('span','pc',nameOf(song,x.p.c,x.p.key));
+          if(x.anti)name.prepend(Object.assign(h('span','pa','<'),{title:'食い（前の小節から先に鳴る）'}));
+          box.appendChild(name);
+          if($('prDeg').checked&&!x.cont)box.appendChild(h('span','pd',degOfItem(x.p.c)));
+          cell.appendChild(box);
         }
         row.appendChild(cell);
       }
@@ -1000,8 +1046,8 @@ function buildPrint(){
     pr.appendChild(ps);
   });
 }
-$('printBtn').onclick=()=>{buildPrint();$('printWrap').hidden=false;};
-$('prDeg').onchange=buildPrint;
+$('printBtn').onclick=()=>{buildPrint();$('printWrap').hidden=false;layoutPrint();};
+$('prDeg').onchange=()=>{buildPrint();layoutPrint();};
 $('prClose').onclick=()=>{$('printWrap').hidden=true;};
 // PDF のファイル名は document.title になる
 $('prGo').onclick=()=>{const t=document.title;document.title=song.title||'ChordSketch';print();document.title=t;};

@@ -232,11 +232,14 @@ body.grabbing,body.grabbing *{cursor:grabbing!important}
 .print .pbar{position:relative;height:13mm;border-left:1.2px solid #000}
 .print .pbar.end{border-right:1.2px solid #000}
 .print .pbar.final{border-right:3.5px double #000}
-.print .pc{position:absolute;top:4.5mm;font-size:13pt;font-weight:700;white-space:nowrap;padding-left:1.5mm}
-.print .pc.late{padding-left:0;font-size:11pt}
-.print .pc.cont{font-weight:400;color:#777}
+.print .pch{position:absolute;top:4mm;font-size:13pt;padding-left:1.5mm;white-space:nowrap;line-height:1.1}
+.print .pc{display:block;font-size:1em;font-weight:700}
+.print .pch.cont .pc{font-weight:400;color:#777}
+.print .pa{font-size:.7em;font-weight:700;margin-right:1px;vertical-align:.15em}   /* 食いの印 */
+.print .ptick{position:absolute;bottom:0;width:0;height:2.6mm;border-left:.8px solid #666}
+.print .ptick.small{height:1.6mm;border-left-color:#999}
 .print .pm{position:absolute;top:0;left:1.5mm;font-size:7.5pt;color:#333;white-space:nowrap}
-.print .pd{position:absolute;top:10mm;font-size:7pt;color:#666;white-space:nowrap;padding-left:1.5mm}
+.print .pd{display:block;font-size:7pt;color:#666;font-weight:400;margin-top:.3mm}
 .print .pn{position:absolute;bottom:0;left:1mm;font-size:6.5pt;color:#999}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 
