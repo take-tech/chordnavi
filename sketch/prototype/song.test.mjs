@@ -1,7 +1,7 @@
 // song.js の単体テスト：node sketch/prototype/song.test.mjs
 import assert from 'node:assert/strict';
 import {demoSong,newSong,newSection,newChord,timeline,placedChords,renderSong,buildSmf,placeChord,resizeChord,insertBars,
-  setMark,pruneMarks,mergeSections,cloneSection,stretchChord,insertProgression,tickToSec,secToTick,copyRange,pasteAt,nameOf,rangeTicks,PPQ,safeFileName} from './song.js';
+  setMark,pruneMarks,mergeSections,splitSection,cloneSection,stretchChord,insertProgression,tickToSec,secToTick,copyRange,pasteAt,nameOf,rangeTicks,PPQ,safeFileName} from './song.js';
 
 const B=PPQ*4;
 let n=0;const test=(name,f)=>{f();n++;console.log('ok',name);};
@@ -152,6 +152,19 @@ test('セクションの結合：パターンが違うと後ろのコードに�
   const r0=renderSong(s);mergeSections(s,0);
   assert.deepEqual(renderSong(s),r0);assert.equal(s.sections[0].chords[1].pattern,'eighth');
   assert.equal(mergeSections(s,0),false);                    // 次が無いときは何もしない
+});
+test('セクションの分割：結合の逆、またぐコードは2つに切る',()=>{
+  const s=demoSong(), r0=renderSong(s);
+  assert.ok(splitSection(s,1,4));                               // Aメロを 4＋4 に
+  assert.deepEqual(s.sections.map(x=>x.name+x.bars),['Intro4','Aメロ4','Aメロ4','サビ8']);
+  assert.deepEqual(renderSong(s),r0);                           // 小節線で分けたので MIDI は同じ
+  mergeSections(s,1);assert.deepEqual(renderSong(s),r0);
+  // 2小節のコードの途中で分ける
+  const t=newSong();t.sections=[newSection('A',1,4)];placeChord(t,0,newChord(1,0,B*2,0,''));t.sections[0].marks=[{bar:3,pos:0,bpm:90}];
+  splitSection(t,0,2);
+  assert.deepEqual(t.sections.map(x=>x.chords.map(c=>[c.bar,c.len/B])),[[[1,1]],[[0,1]]]);
+  assert.deepEqual(t.sections[1].marks,[{bar:1,pos:0,bpm:90}]);
+  assert.equal(splitSection(t,0,0),false);assert.equal(splitSection(t,0,2),false);
 });
 test('ファイル名',()=>{assert.equal(safeFileName('サビ F♯m7 B♭'),'F#m7_Bb');});
 console.log(`${n} tests passed`);

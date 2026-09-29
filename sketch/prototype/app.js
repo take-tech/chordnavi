@@ -2,7 +2,7 @@ import {MAJ_LABEL,MIN_LABEL,SIG,WHEEL_CELLS,DIATONIC,CHORD,chordDeg,chordAt,chor
   noteName,tonicOf,isFlatKey,keyName as keyNameOf,detectChords,mod12,PROGRESSIONS,variantsOf,progressionDegrees} from '../../ui/theory.js';
 import {PPQ,METERS,SNAPS,snapTicks,barTicksOf,beatTicksOf,SECTION_COLORS,SECTION_PRESETS,PATTERNS,MIN_BPM,MAX_BPM,
   newSong,demoSong,newSection,newChord,cloneSection,timeline,placedChords,placeChord,removeChord,resizeChord,
-  setSectionBars,insertBars,stretchChord,pruneMarks,mergeSections,insertProgression,setMark,rangeTicks,copyRange,pasteAt,renderSong,buildSmf,safeFileName,
+  setSectionBars,insertBars,stretchChord,pruneMarks,mergeSections,splitSection,insertProgression,setMark,rangeTicks,copyRange,pasteAt,renderSong,buildSmf,safeFileName,
   songTonic,songFlat,nameOf,tempoAt,voicingOf,patternById} from './song.js';
 import * as player from './player.js';
 
@@ -126,12 +126,13 @@ function drawOverlay(){
     txt(gStatic,x,y,deg,{fill:'#fff','font-size':outer?11:9,'font-weight':700,opacity:.95});
   }
 }
-let rot=0,anim=null;
+let rot=0,anim=null,rotKey=null;   // rotKey：回している先のキー（元に戻す・ファイルを開くでも回すため）
 function applyRot(r){
   const tr=`rotate(${r})`;gWedges.setAttribute('transform',tr);gLabels.setAttribute('transform',tr);
   for(const n of labelNodes)n.t.setAttribute('transform',`rotate(${-r},${n.x},${n.y})`);
 }
 function rotateTo(idx,instant){
+  rotKey=idx;
   const target=-idx*30, d=((target-rot)%360+540)%360-180, from=rot, to=rot+d;
   const dur=instant||matchMedia('(prefers-reduced-motion: reduce)').matches?0:750, t0=performance.now();
   cancelAnimationFrame(anim);
@@ -179,11 +180,12 @@ function renderPalette(){
   // コードを作る：ルート・ベースの選択肢は今のキーの音名で
   for(const id of ['bRoot','bBass']){
     const s=$(id), v=s.value;s.innerHTML='';
-    if(id==='bBass')s.appendChild(Object.assign(h('option','','ベース'),{value:''}));
-    for(let off=0;off<12;off++)s.appendChild(Object.assign(h('option','',noteName(mod12(tonic()+off),flat())),{value:off}));
+    if(id==='bBass')s.appendChild(Object.assign(h('option','','/ベース'),{value:''}));
+    for(let off=0;off<12;off++)s.appendChild(Object.assign(h('option','',(id==='bBass'?'/':'')+noteName(mod12(tonic()+off),flat())),{value:off}));
     s.value=v||(id==='bRoot'?'0':'');
   }
   const c=$('custom');c.innerHTML='';c.appendChild(paletteChip(customItem()));
+  document.querySelectorAll('.left .pchip .n').forEach(n=>fitText(n,9));
   document.querySelectorAll('#diaSeg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.v===ui.dia));
 }
 for(const q of QUALITIES)$('bQ').appendChild(Object.assign(h('option','',q===''?'maj':CHORD[q].s),{value:q}));
@@ -207,6 +209,17 @@ function advanceCursor(abs){
   scrollToBar(cursor.gi);
 }
 
+// 入りきらない文字は、その要素だけ文字を小さくして収める（下限 min px）。
+// scrollWidth は小数を丸めるので、文字の幅は Range で測る（拡大縮小中の画面座標どうしで比べる）
+function fitText(box,min=8){
+  box.style.fontSize='';
+  let size=parseFloat(getComputedStyle(box).fontSize);
+  const range=document.createRange();range.selectNodeContents(box);
+  const cs=getComputedStyle(box), k=box.getBoundingClientRect().width/(box.offsetWidth||1);
+  const room=()=>box.getBoundingClientRect().width-(parseFloat(cs.paddingLeft)+parseFloat(cs.paddingRight))*k-.5;
+  while(range.getBoundingClientRect().width>room()&&size>min){size-=.5;box.style.fontSize=size+'px';}
+}
+
 /* ---------- 定番コード進行（ChordNavi の PROGRESSIONS） ---------- */
 const progSel=$('progSel'), progVar=$('progVar');
 const curProg=()=>{const p=PROGRESSIONS[ui.prog[song.key.mode]];return p&&p.mode===song.key.mode?p:PROGRESSIONS.find(x=>x.mode===song.key.mode);};
@@ -225,7 +238,14 @@ function renderProg(){
   if(ui.progVar>=variantsOf(p).length)ui.progVar=0;
   progVar.value=ui.progVar;
   const bars=curBars(), names=$('progNames');
-  names.textContent=bars.map(bar=>(Array.isArray(bar[0])?bar:[bar]).map(([off,q,boff])=>nameOfItem({off,q,boff})).join('・')).join(' – ');
+  // 1行4小節のミニ譜面（長い進行も見切れない。1小節に2つなら並べる）
+  names.innerHTML='';
+  for(const bar of bars){
+    const cell=h('span','pb');
+    for(const [off,q,boff] of Array.isArray(bar[0])?bar:[bar])cell.appendChild(h('span','pc',nameOfItem({off,q,boff})));
+    cell.title=cell.textContent;names.appendChild(cell);
+  }
+  names.querySelectorAll('.pb').forEach(cell=>fitText(cell,7.5));
   names.title=progressionDegrees(bars);
   $('progPlay').textContent=progPreview&&player.isPlaying()?'停止':'試聴';
   $('progIns').title=`${fmtPos(cursor.gi,0).split(' ')[0]}から${bars.length}小節を上書きで入れる（1コード＝1小節）`;
@@ -435,7 +455,12 @@ function sectionHead(s,si){
     commit(()=>{if(mergeSections(song,si))pruneMarks(song,si);});
     sel=null;range={from,to:tl.secRanges[si].to};cursor={gi:from,pos:0};render();
   };
-  head.append(sw,name,nb,h('span','n','小節'),pat,pick,drag,dup,merge,up,down,del);
+  // カーソルのある小節の頭で2つに分ける（このセクションの2小節目以降にカーソルがあるとき）
+  const cb=tl.bars[cursor.gi], canSplit=!!cb&&cb.si===si&&cb.bar>0;
+  const split=h('button','','分割');split.disabled=!canSplit;
+  split.title=canSplit?`${cursor.gi+1}小節目の頭でこのセクションを2つに分ける`:'分けたい小節をクリックしてカーソルを置いてから押す（セクションの2小節目以降）';
+  split.onclick=()=>splitAtCursor();
+  head.append(sw,name,nb,h('span','n','小節'),pat,pick,drag,dup,split,merge,up,down,del);
   return head;
 }
 
@@ -637,10 +662,19 @@ function renderFooter(){
     const ins=h('button','','小節を挿入');ins.onclick=()=>insertBarsAtCursor(1);
     const rm=h('button','','この小節を削除');rm.onclick=()=>{range={from:cursor.gi,to:cursor.gi+1};deleteRangeBars();};
     const paste=h('button','','貼り付け');paste.disabled=!clip;paste.onclick=pasteSel;
-    f.append('カーソル',h('b','',b?fmtPos(cursor.gi,cursor.pos):'—'),markBtn,ins,rm,paste);
+    const split=h('button','','ここでセクションを分割');split.disabled=!b||b.bar===0;split.onclick=splitAtCursor;
+    split.title='カーソルのある小節の頭でセクションを2つに分ける';
+    f.append('カーソル',h('b','',b?fmtPos(cursor.gi,cursor.pos):'—'),markBtn,ins,rm,split,paste);
     keys.innerHTML='<kbd>1</kbd>〜<kbd>7</kbd>ダイアトニックを入力 <kbd>←</kbd><kbd>→</kbd>カーソル <kbd>Space</kbd>再生 <kbd>⌘A</kbd>全選択';
   }
   f.appendChild(keys);
+}
+function splitAtCursor(){
+  const b=tl.bars[cursor.gi];if(!b||b.bar===0)return;
+  commit(()=>splitSection(song,b.si,b.bar));
+  sel=null;range=null;render();
+  // 分けた後ろのセクションの名前をすぐ変えられるように
+  const nameEl=sheet.querySelectorAll('.sec-name')[b.si+1];if(nameEl){nameEl.focus();nameEl.select();}
 }
 function previewSel(){const p=sel&&song.sections[sel.si]?.chords.find(x=>x.id===sel.id);if(p)previewItem(p);}
 function deleteSel(){
@@ -980,6 +1014,7 @@ function render(){
   keySel.value=song.key.idx+':'+song.key.mode;
   cKey.textContent=keyLabel();cSig.textContent=SIG[song.key.idx];cMode.textContent=song.key.mode==='major'?'メジャー':'マイナー';
   drawOverlay();
+  if(rotKey!==song.key.idx)rotateTo(song.key.idx);
   renderOctUp();renderOctBass();
   const over=song.sections.filter(x=>x.pattern).map(x=>x.name);
   $('outInfo').textContent=over.length?`パターンを変えているセクション：${over.join('・')}`:'';

@@ -185,6 +185,28 @@ export function mergeSections(song,si){
   song.sections.splice(si+1,1);
   return true;
 }
+// si を bar 小節目の頭で2つに分ける（mergeSections の逆）。後ろは同じ名前・色・パターンの新しいセクション。
+// 分け目をまたぐコードは2つに切る（後ろは同じコード。MIDI では同じコードへのタイ・小節頭の音としてつながる）
+export function splitSection(song,si,bar){
+  const a=song.sections[si];
+  if(!a||bar<=0||bar>=a.bars)return false;
+  const tl=timeline(song), g=secGeom(tl,si), cut=g.toLocal(bar,0);
+  const b={...newSection(a.name,a.color,a.bars-bar),pattern:a.pattern};
+  const keep=[];
+  for(const c of a.chords){
+    const s0=g.toLocal(c.bar,c.pos), e0=s0+c.len;
+    if(e0<=cut){keep.push(c);continue;}
+    if(s0>=cut){b.chords.push({...c,bar:c.bar-bar});continue;}
+    keep.push({...c,len:cut-s0});
+    b.chords.push({...c,id:uid(),bar:0,pos:0,len:e0-cut});
+  }
+  a.chords=keep;
+  b.marks=a.marks.filter(m=>m.bar>=bar).map(m=>({...m,bar:m.bar-bar}));
+  a.marks=a.marks.filter(m=>m.bar<bar);
+  a.bars=bar;
+  song.sections.splice(si+1,0,b);
+  return true;
+}
 // bar の前に count 小節を入れる（負なら bar から削除）
 export function insertBars(song,si,bar,count){
   const sec=song.sections[si];

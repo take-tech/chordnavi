@@ -20,7 +20,7 @@ body{color:var(--ink);font-family:"Hiragino Sans","Yu Gothic UI","Noto Sans JP",
 input,select{-webkit-user-select:auto;user-select:auto}
 button,svg{-webkit-user-drag:none}
 .stage{position:absolute;left:50%;top:50%;width:1280px;height:780px;transform-origin:center center;background:var(--bg);
-  display:grid;grid-template-columns:286px minmax(0,1fr);grid-template-rows:50px minmax(0,1fr);gap:12px;padding:16px}
+  display:grid;grid-template-columns:320px minmax(0,1fr);grid-template-rows:50px minmax(0,1fr);gap:12px;padding:16px}
 .panel{background:var(--panel);border:1px solid var(--line);border-radius:6px;min-width:0;min-height:0}
 button,select,input{font:inherit;color:var(--ink)}
 button{font-size:12px;border:1px solid var(--line);background:var(--card);border-radius:4px;padding:3px 9px;cursor:pointer;white-space:nowrap}
@@ -60,9 +60,11 @@ h1{font-size:17px;font-weight:900;letter-spacing:.02em;margin:0 6px 0 0;white-sp
 
 /* ---------- 左 ---------- */
 .left{display:flex;flex-direction:column;padding:9px 12px;gap:5px}
-#wheel{width:100%;height:auto;display:block;margin:-4px 0 -2px}
+#wheel{width:100%;max-width:248px;height:auto;display:block;margin:-4px auto -2px}
 #wheel .wedge{cursor:pointer;transition:filter .15s}
 #wheel .wedge:hover{filter:brightness(1.25)}
+#wheel .wedge:focus{outline:none}
+#wheel .wedge:focus-visible{stroke:var(--root);stroke-width:3}
 .keyrow{display:flex;gap:6px;align-items:center}
 .keyrow select{flex:1;min-width:0}
 .sub-head{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);margin-top:4px;padding-top:6px;border-top:1px solid var(--line)}
@@ -77,8 +79,12 @@ h1{font-size:17px;font-weight:900;letter-spacing:.02em;margin:0 6px 0 0;white-sp
 .palette.one .pchip{display:flex;align-items:baseline;gap:8px;padding:3px 8px}
 .builder{display:flex;gap:3px;align-items:center}
 .builder select{min-width:0;flex:1}
-.builder .palette.one{flex:.9;min-width:0}
+#bRoot{flex:0 0 50px}#bQ{flex:0 0 66px}#bBass{flex:0 0 60px}
+.builder .palette.one{flex:1;min-width:0}
 .builder select{padding:3px 2px}
+.builder .palette.one .pchip{display:block;padding:1px 6px}
+.builder .pchip .n{font-size:12.5px;line-height:1.25;letter-spacing:-.02em}
+.builder .pchip .d{font-size:9px;line-height:1.1}
 .builder .pchip{padding:1px 6px}
 #wheel{flex-shrink:0}
 #timbre{width:130px}
@@ -226,8 +232,12 @@ kbd{font:inherit;font-size:10px;border:1px solid var(--line);border-bottom-width
 .prog-row select{min-width:0;flex:1}
 #progSel{flex:1.6}
 .prog-row .ins{flex:1;font-weight:700;border-color:var(--ink2)}
-.prog-names{font-size:12px;font-weight:700;color:var(--ink2);line-height:1.35;min-height:17px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
-.prog-names .deg{font-weight:400;color:var(--muted);font-size:10px}
+.prog-names{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));row-gap:2px;border-right:1px solid var(--ink2)}
+.prog-names .pb{display:flex;gap:2px;align-items:center;min-width:0;border-left:1px solid var(--ink2);padding:0 3px;height:16px;overflow:hidden}
+.prog-names .pb{font-size:10px}
+.prog-names .pc{font-size:1em;font-weight:700;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;letter-spacing:-.02em}
+.prog-names .pc+.pc{font-size:.95em}
+.prog-names .pb{padding:0 2px}
 
 /* コードごとのパターン */
 .blk .ptag{position:absolute;right:6px;top:2px;font-size:9px;font-weight:700;line-height:13px;padding:0 4px;border-radius:3px;background:var(--tone);color:#fff;pointer-events:none}
