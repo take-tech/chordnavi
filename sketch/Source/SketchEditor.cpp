@@ -334,7 +334,8 @@ void SketchEditor::songSaveAs (const juce::Array<juce::var>& args,
     // 前に保存したファイルがあればその隣、無ければ書類フォルダ
     const auto dir = juce::File::isAbsolutePath (path) ? juce::File (path).getParentDirectory()
                                                        : juce::File::getSpecialLocation (juce::File::userDocumentsDirectory);
-    const auto initial = MidiExport::withExtensionIfMissing (dir.getChildFile (MidiExport::safeFileName (name.isEmpty() ? "song" : name)),
+    // 曲ファイルは日本語の名前のままにする（MIDI のドラッグ用の safeFileName は ASCII だけにするので使わない）
+    const auto initial = MidiExport::withExtensionIfMissing (dir.getChildFile (juce::File::createLegalFileName (name.isEmpty() ? "song" : name)),
                                                              songExtension.substring (1));
 
     fileChooser = std::make_unique<juce::FileChooser> (juce::String::fromUTF8 ("曲を保存"), initial, "*" + songExtension);
