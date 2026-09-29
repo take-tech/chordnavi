@@ -35,6 +35,7 @@ target_sources(RanzeShared INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}/shared/cpp/PreviewSynth.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/shared/cpp/PluginState.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/shared/cpp/WebResources.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/shared/cpp/SongPlayer.cpp
 )
 target_include_directories(RanzeShared INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/shared/cpp)
 
@@ -205,6 +206,7 @@ target_sources(MidiExportTests PRIVATE
     tests/PreviewSynthTests.cpp
     tests/PluginStateTests.cpp
     tests/WebResourcesTests.cpp
+    tests/SongPlayerTests.cpp
 )
 
 target_compile_definitions(MidiExportTests PRIVATE

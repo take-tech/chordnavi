@@ -57,6 +57,12 @@ public:
     void noteOff (int note);
     void allNotesOff();
 
+    // 曲の試聴（ChordSketch の SongPlayer）用。オーディオスレッドから、次の render() の前に呼ぶ。
+    // 次の render() の startIn サンプル目から length サンプル鳴らす（その後リリース）。owner は止めるときの印（0 以外）
+    void startNote (int note, float velocity, juce::int64 startIn, juce::int64 length, Timbre timbre, int owner);
+    // owner の音をフェードで止める（まだ鳴っていない音は取り消し）。オーディオスレッドから呼ぶ
+    void fadeOwner (int owner);
+
     // バッファを上書きで書き込む（全チャンネル同じ信号）
     void render (juce::AudioBuffer<float>& buffer);
 
@@ -87,6 +93,7 @@ private:
         bool active = false;
         Timbre timbre = Timbre::triangle;
         int midiNote = -1;            // MIDI 入力で鳴らしている音（試聴は -1）
+        int owner = 0;                // startNote() で鳴らした音の印（0 は それ以外）
         bool liveRelease = false;     // 三角波を離したときもリリースで消す
         float velGain = 1.0f;
         juce::int64 startIn = 0;      // 鳴り始めまでのサンプル数

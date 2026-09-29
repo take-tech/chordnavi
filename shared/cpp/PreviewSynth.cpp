@@ -191,6 +191,26 @@ void PreviewSynth::startDue (juce::int64 now)
     }
 }
 
+void PreviewSynth::startNote (int note, float velocity, juce::int64 startIn, juce::int64 length, Timbre timbre, int owner)
+{
+    auto& v = findFreeVoice();
+    startVoice (v, juce::jlimit (0, 127, note), juce::jmax<juce::int64> (0, startIn), juce::jmax<juce::int64> (1, length), timbre);
+    v.owner   = owner;
+    v.velGain = std::pow (juce::jlimit (0.0f, 1.0f, velocity), 0.7f) * 1.2f;
+}
+
+void PreviewSynth::fadeOwner (int owner)
+{
+    const auto fade = (juce::int64) (fadeSeconds * sampleRate);
+
+    for (auto& v : voices)
+    {
+        if (! v.active || v.owner != owner) continue;
+        if (v.startIn > 0)       v.active = false;
+        else if (v.fadeLeft < 0) v.fadeLeft = fade;
+    }
+}
+
 void PreviewSynth::noteOn (int note, float velocity, Timbre timbre)
 {
     noteOff (note);   // 同じ音を弾き直したら前の音はリリース
