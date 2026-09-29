@@ -360,7 +360,7 @@ const VEL={bass:88,chord:80,arp:78}, ACC=12, SOFT=-26;
 // ポジションは song.guitarArea（ロー／ミドル／ハイ）あたりで、前のコードのフォーム prev から手の移動が少ない形。
 // 見つからないコード（sus4(♭5) など）はピアノの形にする
 export const VOICINGS=[{id:'piano',name:'ピアノ'},{id:'guitar',name:'ギター'}];
-export const GUITAR_AREAS=[{id:'low',name:'ロー'},{id:'mid',name:'ミドル'},{id:'high',name:'ハイ'}];
+export const GUITAR_AREAS=[{id:'low',name:'Low'},{id:'mid',name:'Mid'},{id:'high',name:'High'}];
 export function voicingOf(song,ch,prev=null){
   if(song.voicing==='guitar'){
     const form=nearestVoicing(ch,TAB_AREAS[song.guitarArea]??TAB_AREAS.low,prev);
