@@ -122,7 +122,7 @@ export function play(opts){
     lead=beat*m[0];
     for(let k=0;k<m[0];k++)drum(k===0?'clickHi':'click',a.currentTime+.08+k*beat,bus);
   }
-  run={opts,bus,start:a.currentTime+.08+lead,data:null,idx:0,stops:new Set()};
+  run={opts,bus,start:a.currentTime+.08+lead,data:null,idx:0,voices:new Set(),horizon:0};
   load(r0);
   run.timer=setInterval(tick,25);
   run.raf=requestAnimationFrame(pos);
@@ -136,16 +136,36 @@ function load(r){
 function tick(){
   if(!run)return;
   const a=ac, ahead=a.currentTime+.15, {events,dur}=run.data;
+  for(const v of run.voices)if(v.end<a.currentTime)run.voices.delete(v);
   while(run.idx<events.length&&run.start+events[run.idx].sec<ahead){
     const e=events[run.idx++], when=run.start+e.sec;
     if(when<a.currentTime-.05)continue;
     if(e.drum)drum(e.drum,when,run.bus);
-    else voice(e.n,e.v,when,e.end-e.sec,run.opts.timbre(),run.bus);
+    else startVoice(e,when,run.start+e.end);
   }
+  run.horizon=Math.max(run.horizon,ahead);
   if(run.idx>=events.length&&run.start+dur<ahead){
     if(run.opts.loop()){run.start+=dur;load(run.opts.render());}
     else if(a.currentTime>=run.start+dur){const cb=run.opts.onEnd;stop();cb&&cb();}
   }
+}
+// 予約した音は止められるように覚えておく（再生中の変更で差し替えるため）
+function startVoice(e,when,end){
+  const v={end,stop:voice(e.n,e.v,when,end-when,run.opts.timbre(),run.bus)};
+  run.voices.add(v);
+}
+/* 再生中の変更（音色・メトロノーム・パターン・コードの編集など）をすぐ反映する。
+   予約済みの少し先（horizon）から後ろを作り直す。鳴っている音は horizon で離し、
+   その時点でまだ続くはずの新しい音は horizon から鳴らす（全音符の途中で変えても音が途切れない） */
+export function refresh(){
+  if(!run)return;
+  const a=ac, H=Math.max(run.horizon,a.currentTime+.02);
+  for(const v of run.voices)if(v.end>H){v.stop(H);run.voices.delete(v);}
+  load(run.opts.render());
+  const t=H-run.start, {events}=run.data;
+  run.idx=events.findIndex(e=>run.start+e.sec>=H);
+  if(run.idx<0)run.idx=events.length;
+  if(t>0)for(const e of events.slice(0,run.idx))if(!e.drum&&e.end>t+.02)startVoice(e,H,run.start+e.end);
 }
 function pos(){
   if(!run)return;

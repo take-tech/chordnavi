@@ -41,7 +41,7 @@ let saveTimer=0;
 function persist(){clearTimeout(saveTimer);saveTimer=setTimeout(()=>localStorage.setItem(STORE,JSON.stringify({song,ui})),300);}
 function snapshot(){undoStack.push(JSON.stringify(song));if(undoStack.length>300)undoStack.shift();redoStack.length=0;}
 function commit(mut){snapshot();mut();changed();}
-function changed(){tl=timeline(song);fixSelection();render();persist();}
+function changed(){tl=timeline(song);fixSelection();render();persist();player.refresh();}   // 再生中ならすぐ反映
 function undo(){if(!undoStack.length)return;redoStack.push(JSON.stringify(song));song=JSON.parse(undoStack.pop());changed();}
 function redo(){if(!redoStack.length)return;undoStack.push(JSON.stringify(song));song=JSON.parse(redoStack.pop());changed();}
 function fixSelection(){
@@ -816,8 +816,8 @@ $('bpm').addEventListener('change',e=>commit(()=>{song.bpm=Math.min(MAX_BPM,Math
 $('meter').addEventListener('change',e=>commit(()=>{song.meter=e.target.value.split('/').map(Number);}));
 $('pattern').addEventListener('change',e=>commit(()=>{song.pattern=e.target.value;}));
 const uiSet=(k,v)=>{ui[k]=v;render();persist();};
-$('metro').addEventListener('change',e=>uiSet('metro',e.target.value));
-$('timbre').addEventListener('change',e=>uiSet('timbre',e.target.value));
+$('metro').addEventListener('change',e=>{uiSet('metro',e.target.value);player.refresh();});
+$('timbre').addEventListener('change',e=>{uiSet('timbre',e.target.value);player.refresh();});
 $('insLen').addEventListener('change',e=>uiSet('insLen',e.target.value));
 $('countIn').onclick=()=>uiSet('countIn',!ui.countIn);
 $('loopBtn').onclick=()=>uiSet('loop',!ui.loop);
