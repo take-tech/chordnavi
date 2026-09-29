@@ -9,14 +9,18 @@ import * as player from './player.js';
 
 /* ---------- 状態 ---------- */
 const STORE='chordsketch.v1';
-const UI_DEFAULT={snap:'beat',perRow:4,insLen:'bar',dia:'7',timbre:'piano',metro:'click',metroOn:true,countIn:false,countBars:1,songFile:'',loop:false,keepNames:false,step:false,theme:'light',prog:{major:0,minor:13},progVar:0};
+const UI_DEFAULT={snap:'beat',perRow:4,insLen:'bar',dia:'7',timbre:'piano',metro:'click',metroOn:true,countIn:false,countBars:1,loop:false,keepNames:false,step:false,theme:'light',prog:{major:0,minor:13},progVar:0};
 let song, ui={...UI_DEFAULT};
 let tl;                     // timeline(song) のキャッシュ（changed() で更新）
 let sel=null;               // 選択中のコード {si,id}
 let cursor={gi:0,pos:0};    // 入力カーソル（曲の通しの小節番号・小節内 tick）
 let range=null;             // 選択範囲 {from,to}（小節番号、to は含まない）
 let clip=null;              // コピーしたコード
-const undoStack=[],redoStack=[];
+let undoStack=[],redoStack=[];
+// タブ（Standalone・ブラウザ版だけ。プラグイン版は TABS=false にして1曲だけにする）。
+// 表示中の曲の状態は上の変数（song・undoStack・sel…）をそのまま使い、切り替えるときに docs と入れ替える
+const TABS=true;
+let docs=[], active=0;
 
 // 保存データの読み込み（形が合わなければ既定値）
 function validSong(x){
@@ -35,16 +39,25 @@ function validSong(x){
 }
 try{
   const saved=JSON.parse(localStorage.getItem(STORE)||'null');
-  song=validSong(saved?.song);
+  if(Array.isArray(saved?.docs))docs=saved.docs.map(d=>({song:validSong(d.song),file:typeof d.file==='string'?d.file:''})).filter(d=>d.song);
+  else if(saved?.song){const s=validSong(saved.song);if(s)docs=[{song:s,file:saved.ui?.songFile||''}];}   // 前の保存形式（曲1つ）
+  active=Math.max(0,Math.min(docs.length-1,saved?.active|0));
+  song=docs[active]?.song;
   if(saved?.ui)for(const k in UI_DEFAULT)if(typeof saved.ui[k]===typeof UI_DEFAULT[k])ui[k]=saved.ui[k];
 }catch{}
 // 前の保存形式：metro が 'off' ならメトロノームはオフ（種類はクリック）
 if(ui.metro==='off'){ui.metro='click';ui.metroOn=false;}
 song=song||demoSong();
+if(!docs.length)docs=[{song,file:''}];
+docs[active].song=song;
 tl=timeline(song);
 
 let saveTimer=0;
-function persist(){clearTimeout(saveTimer);saveTimer=setTimeout(()=>localStorage.setItem(STORE,JSON.stringify({song,ui})),300);}
+// 自動保存：開いているタブを全部（表示中のタブは今の song・ファイル名）
+function persist(){clearTimeout(saveTimer);saveTimer=setTimeout(()=>{
+  const all=docs.map((d,i)=>i===active?{song,file:songFile}:{song:d.song,file:d.file||''});
+  localStorage.setItem(STORE,JSON.stringify({docs:all,active,ui}));
+},300);}
 function snapshot(){undoStack.push(JSON.stringify(song));if(undoStack.length>300)undoStack.shift();redoStack.length=0;}
 function commit(mut){snapshot();mut();changed();}
 function changed(){tl=timeline(song);fixSelection();render();persist();player.refresh();markDirty();}   // 再生中ならすぐ反映
@@ -1134,26 +1147,26 @@ function download(blob,name){
 }
 
 /* ---------- ファイル ---------- */
-function markDirty(){dirty=true;renderFileState();}   // 保存していない変更あり
+function markDirty(){dirty=true;renderFileState();renderTabs();}   // 保存していない変更あり
 const fileMenu=$('fileMenu');
 $('fileBtn').onclick=e=>{e.stopPropagation();$('themeMenu').hidden=true;$('metroMenu').hidden=true;fileMenu.hidden=!fileMenu.hidden;};
 addEventListener('click',()=>{fileMenu.hidden=true;});
 fileMenu.addEventListener('click',e=>{
   const act=e.target.closest('[data-act]')?.dataset.act;if(!act)return;
   fileMenu.hidden=true;
-  if(act==='new'){replaceSong(newSong());setFile('',null);}
-  if(act==='demo'){replaceSong(demoSong());setFile('',null);}
+  if(act==='new')openInTab(newSong());
+  if(act==='demo')openInTab(demoSong());
   if(act==='open')openFile();
   if(act==='save')saveFile();
   if(act==='saveas')saveFileAs();
 });
 // 上書き保存・名前を付けて保存。ブラウザでは File System Access API（Chrome など）があれば同じファイルに書き込む。
 // 無ければ「名前を付けて保存」は名前を聞いてダウンロード、「上書き保存」は同じ名前でダウンロードし直す（JUCE 版はネイティブのファイルに書く）
-let fileHandle=null, songFile=ui.songFile||'', dirty=false;
+let fileHandle=null, songFile=docs[active]?.file||'', dirty=false;
 const SONG_EXT='.chordsketch', PICK_TYPES=[{description:'ChordSketch の曲',accept:{'application/json':[SONG_EXT]}}];
 const songJSON=()=>JSON.stringify({app:'ChordSketch',v:1,song},null,1);
 async function writeHandle(hd){const w=await hd.createWritable();await w.write(songJSON());await w.close();}
-function setFile(name,handle){songFile=name;fileHandle=handle||null;ui.songFile=name;dirty=false;persist();renderFileState();}
+function setFile(name,handle){songFile=name;fileHandle=handle||null;dirty=false;persist();renderFileState();renderTabs();}
 function renderFileState(){
   $('fileState').hidden=!dirty;
   $('fileBtn').title=`ファイル：${songFile||'（まだ保存していない曲）'}${dirty?'・保存していない変更あり':''}`;
@@ -1186,15 +1199,62 @@ async function openFile(){
   $('fileInput').click();
 }
 function loadSongText(text,name,handle){
-  try{const s=validSong(JSON.parse(text).song);if(!s)throw 0;replaceSong(s);setFile(name,handle);}
+  try{const s=validSong(JSON.parse(text).song);if(!s)throw 0;openInTab(s,name,handle);}
   catch{alert('ChordSketch の曲ファイルとして読み込めませんでした。');}
 }
 $('fileInput').addEventListener('change',async e=>{
   const f=e.target.files[0];e.target.value='';if(!f)return;
   loadSongText(await f.text(),f.name,null);
 });
-function replaceSong(s){
-  player.stop();commit(()=>{song=s;});sel=null;range=null;cursor={gi:0,pos:0};rotateTo(curKey().idx,true);render();
+/* ---------- タブ ---------- */
+// 表示中のタブの状態を docs にしまう／docs から出す
+function stashDoc(){docs[active]={song,undo:undoStack,redo:redoStack,sel,cursor,range,scroll:sheet.scrollTop,handle:fileHandle,file:songFile,dirty};}
+function loadDoc(i){
+  const d=docs[i];active=i;
+  song=d.song;undoStack=d.undo||[];redoStack=d.redo||[];sel=d.sel||null;cursor=d.cursor||{gi:0,pos:0};range=d.range||null;
+  fileHandle=d.handle||null;songFile=d.file||'';dirty=!!d.dirty;editOpen=false;
+  tl=timeline(song);fixSelection();rotateTo(curKey().idx,true);render();sheet.scrollTop=d.scroll||0;renderFileState();
+}
+function switchTab(i){
+  if(i===active||!docs[i])return;
+  player.stop();progPreview=false;playTick=null;playingId=null;
+  stashDoc();loadDoc(i);persist();
+}
+// 何も入力していない「新しい曲」のタブ（ここに開くならタブを増やさない）
+const pristine=()=>!dirty&&!songFile&&song.title==='新しい曲'&&song.sections.every(s=>!s.chords.length);
+function openInTab(s,name='',handle=null){
+  player.stop();progPreview=false;playTick=null;playingId=null;
+  if(!TABS||!pristine()){if(TABS){stashDoc();docs.push({});active=docs.length-1;}}
+  docs[active]={song:s,file:name,handle,undo:[],redo:[],dirty:false};
+  loadDoc(active);persist();
+}
+function closeTab(i){
+  const d=i===active?{song,dirty}:docs[i];
+  if(d.dirty&&!confirm(`「${d.song.title}」の変更を保存していません。閉じますか？`))return;
+  if(i===active)stashDoc();
+  docs.splice(i,1);
+  if(!docs.length)docs=[{song:newSong(),undo:[],redo:[]}];
+  const next=Math.min(i<active?active-1:active,docs.length-1);
+  player.stop();loadDoc(next);persist();
+}
+function renderTabs(){
+  const bar=$('tabs');if(!bar)return;
+  bar.hidden=!TABS;if(!TABS)return;
+  bar.innerHTML='';
+  docs.forEach((d,i)=>{
+    const s=i===active?song:d.song, isDirty=i===active?dirty:d.dirty, file=i===active?songFile:d.file;
+    const t=h('div','tab'+(i===active?' on':''));t.setAttribute('role','tab');t.setAttribute('aria-selected',i===active);
+    t.title=(file||'まだ保存していない曲')+(isDirty?'・保存していない変更あり':'');
+    t.append(h('span','tname',s.title||'無題'));
+    if(isDirty)t.append(h('span','tdot','●'));
+    const x=h('button','tclose','×');x.title='このタブを閉じる';x.setAttribute('aria-label','閉じる');
+    x.onclick=e=>{e.stopPropagation();closeTab(i);};
+    t.append(x);
+    t.onclick=()=>switchTab(i);
+    bar.appendChild(t);
+  });
+  const add=h('button','tadd','＋');add.title='新しい曲のタブを開く';add.onclick=()=>openInTab(newSong());
+  bar.appendChild(add);
 }
 
 /* ---------- コード譜（印刷／PDF） ---------- */
@@ -1440,7 +1500,7 @@ function render(){
   renderOctUp();renderOctBass();
   const ex=currentExport();
   $('dragLabel').textContent=!range?'曲全体':ex.si>=0?`「${song.sections[ex.si].name}」`:rangeLabel(range);
-  renderPalette();renderProg();renderSheet();renderFooter();
+  renderPalette();renderProg();renderSheet();renderFooter();renderTabs();
 }
 
 /* ---------- 画面の拡大縮小（スクロールなし、ChordNavi と同じ） ---------- */

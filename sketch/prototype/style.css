@@ -336,3 +336,16 @@ body.grabbing,body.grabbing *{cursor:grabbing!important}
 .menu-pop button kbd{float:right;margin-left:16px;font:inherit;font-size:11px;color:var(--faint)}
 .file-state{color:var(--chord);font-size:10px;margin-left:-3px}
 .file-state[hidden]{display:none}
+
+/* タブ（開いている曲。Standalone・ブラウザ版だけ） */
+.tabs{display:flex;align-items:flex-end;gap:2px;padding:5px 10px 0;border-bottom:1px solid var(--line);background:var(--grid2);min-height:30px;overflow:hidden;border-radius:6px 6px 0 0}
+.tabs[hidden]{display:none}
+.tab{display:flex;align-items:center;gap:5px;max-width:190px;padding:3px 4px 3px 11px;border:1px solid var(--line);border-bottom:0;border-radius:6px 6px 0 0;
+  background:var(--panel);color:var(--muted);font-size:12px;cursor:pointer;margin-bottom:-1px}
+.tab.on{background:var(--card);color:var(--ink);font-weight:700;border-color:var(--line);box-shadow:inset 0 2px 0 var(--live)}
+.tab .tname{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.tab .tdot{color:var(--chord);font-size:9px}
+.tab .tclose{border:0;background:none;padding:0 4px;font-size:14px;line-height:1;color:var(--faint)}
+.tab .tclose:hover{color:var(--chord)}
+.tadd{border:0;background:none;font-size:15px;color:var(--muted);padding:0 8px 3px}
+.tadd:hover{color:var(--live)}
