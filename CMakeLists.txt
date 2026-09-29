@@ -151,6 +151,7 @@ juce_add_plugin(ChordSketch
     FORMATS                     Standalone
     PRODUCT_NAME                "ChordSketch"
     BUNDLE_ID                   com.ranze.chordsketch
+    ICON_BIG                    "${CMAKE_CURRENT_SOURCE_DIR}/sketch/assets/icon/ChordSketch.png"   # 案 B（五度圏＋タイムライン）。元データは icon_B.svg
     IS_SYNTH                    TRUE
     NEEDS_MIDI_INPUT            TRUE
     NEEDS_MIDI_OUTPUT           FALSE
