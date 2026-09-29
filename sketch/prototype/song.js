@@ -169,6 +169,22 @@ export function setSectionBars(song,si,n){
   sec.chords=sec.chords.filter(c=>c.bar<n);
   sec.marks=sec.marks.filter(m=>m.bar<n);
 }
+// si と次のセクションを1つにする（名前・色・パターンは前のもの）。後ろのコード・変更点は小節をずらして引き継ぐ。
+// パターンが違うときは、後ろのコードに元のパターンをコードごとのパターンとして付けて、鳴り方を変えない
+export function mergeSections(song,si){
+  const a=song.sections[si], b=song.sections[si+1];
+  if(!a||!b)return false;
+  const pa=a.pattern||song.pattern, pb=b.pattern||song.pattern;
+  for(const c of b.chords){
+    const cc={...c,bar:c.bar+a.bars};
+    if(!cc.pattern&&pa!==pb)cc.pattern=pb;
+    a.chords.push(cc);
+  }
+  for(const m of b.marks)a.marks.push({...m,bar:m.bar+a.bars});
+  a.bars+=b.bars;
+  song.sections.splice(si+1,1);
+  return true;
+}
 // bar の前に count 小節を入れる（負なら bar から削除）
 export function insertBars(song,si,bar,count){
   const sec=song.sections[si];
@@ -196,19 +212,21 @@ export function setMark(song,si,bar,pos,{bpm,meter}){
 
 // 直前に効いている値と同じテンポ・拍子の変更点を消す（曲の頭から順に見るので、消した結果いらなくなった後ろの変更点も消える）。
 // テンポ・拍子を変えたときに呼ぶ（セクションの並べ替えでは呼ばない：戻したときに変更点が消えないように）
-export function pruneMarks(song){
+// only を指定すると、そのセクションの変更点だけを消す（値の流れは曲の頭から見る）
+export function pruneMarks(song,only=null){
   let bpm=song.bpm, meter=song.meter.join('/');
-  for(const s of song.sections){
+  song.sections.forEach((s,si)=>{
     const keep=[];
     const sorted=[...s.marks].sort((a,b)=>a.bar-b.bar||(b.meter?1:0)-(a.meter?1:0)||(a.pos||0)-(b.pos||0));
     for(const m of sorted){
       if(m.bar>=s.bars)continue;
-      if(m.meter){const k=m.meter.join('/');if(k===meter)continue;meter=k;}
-      if(m.bpm){if(m.bpm===bpm)continue;bpm=m.bpm;}
+      const drop=only==null||only===si;
+      if(m.meter){const k=m.meter.join('/');if(k===meter&&drop)continue;meter=k;}
+      if(m.bpm){if(m.bpm===bpm&&drop)continue;bpm=m.bpm;}
       keep.push(m);
     }
     s.marks=keep;
-  }
+  });
 }
 
 /* ---------- 範囲（小節番号は曲全体の通し番号） ---------- */

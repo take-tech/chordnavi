@@ -2,7 +2,7 @@ import {MAJ_LABEL,MIN_LABEL,SIG,WHEEL_CELLS,DIATONIC,CHORD,chordDeg,chordAt,chor
   noteName,tonicOf,isFlatKey,keyName as keyNameOf,detectChords,mod12,PROGRESSIONS,variantsOf,progressionDegrees} from '../../ui/theory.js';
 import {PPQ,METERS,SNAPS,snapTicks,barTicksOf,beatTicksOf,SECTION_COLORS,SECTION_PRESETS,PATTERNS,MIN_BPM,MAX_BPM,
   newSong,demoSong,newSection,newChord,cloneSection,timeline,placedChords,placeChord,removeChord,resizeChord,
-  setSectionBars,insertBars,stretchChord,pruneMarks,insertProgression,setMark,rangeTicks,copyRange,pasteAt,renderSong,buildSmf,safeFileName,
+  setSectionBars,insertBars,stretchChord,pruneMarks,mergeSections,insertProgression,setMark,rangeTicks,copyRange,pasteAt,renderSong,buildSmf,safeFileName,
   songTonic,songFlat,nameOf,tempoAt,voicingOf,patternById} from './song.js';
 import * as player from './player.js';
 
@@ -426,7 +426,16 @@ function sectionHead(s,si){
   const down=h('button','','↓');down.title='後ろへ';down.disabled=si===song.sections.length-1;
   down.onclick=()=>commit(()=>{[song.sections[si+1],song.sections[si]]=[song.sections[si],song.sections[si+1]];});
   const del=h('button','','削除');del.onclick=()=>commit(()=>song.sections.splice(si,1));
-  head.append(sw,name,nb,h('span','n','小節'),pat,pick,drag,dup,up,down,del);
+  // 次のセクションと1つにする（複製したサビを1つのサビにするなど）
+  const next=song.sections[si+1];
+  const merge=h('button','','次と結合');merge.disabled=!next;
+  merge.title=next?`次のセクション「${next.name}」をこのセクションの後ろにつないで1つにする（名前・色はこのセクション）`:'次のセクションがありません';
+  merge.onclick=()=>{
+    const from=tl.secRanges[si].from;
+    commit(()=>{if(mergeSections(song,si))pruneMarks(song,si);});
+    sel=null;range={from,to:tl.secRanges[si].to};cursor={gi:from,pos:0};render();
+  };
+  head.append(sw,name,nb,h('span','n','小節'),pat,pick,drag,dup,merge,up,down,del);
   return head;
 }
 

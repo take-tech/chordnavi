@@ -1,7 +1,7 @@
 // song.js の単体テスト：node sketch/prototype/song.test.mjs
 import assert from 'node:assert/strict';
 import {demoSong,newSong,newSection,newChord,timeline,placedChords,renderSong,buildSmf,placeChord,resizeChord,insertBars,
-  setMark,pruneMarks,stretchChord,insertProgression,tickToSec,secToTick,copyRange,pasteAt,nameOf,rangeTicks,PPQ,safeFileName} from './song.js';
+  setMark,pruneMarks,mergeSections,cloneSection,stretchChord,insertProgression,tickToSec,secToTick,copyRange,pasteAt,nameOf,rangeTicks,PPQ,safeFileName} from './song.js';
 
 const B=PPQ*4;
 let n=0;const test=(name,f)=>{f();n++;console.log('ok',name);};
@@ -133,6 +133,25 @@ test('コードごとのパターン：コード → セクション → 曲の�
   // コピー＆貼り付けでもパターンを保つ
   pasteAt(s,0,copyRange(s,{from:1,to:2}));
   assert.equal(placedChords(s)[0].pattern,'quarter');
+});
+test('セクションの結合：複製したサビを1つに、音は変わらない',()=>{
+  const s=demoSong(), before=renderSong(s);
+  s.sections.splice(3,0,cloneSection(s.sections[2]));        // サビを複製して2回続ける
+  const dup=renderSong(s);
+  assert.ok(mergeSections(s,2));
+  assert.equal(s.sections.length,3);assert.equal(s.sections[2].bars,16);assert.equal(s.sections[2].name,'サビ');
+  assert.deepEqual(renderSong(s),dup);                       // 結合しても MIDI は同じ
+  assert.equal(s.sections[2].marks.filter(m=>m.bpm).length,2);  // 2つ目のサビ頭のテンポ変更も残る（同じ値なので pruneMarks をすれば消える）
+  pruneMarks(s,2);assert.equal(s.sections[2].marks.length,1);
+  assert.ok(before.notes.length>0);
+});
+test('セクションの結合：パターンが違うと後ろのコードに元のパターンを付ける',()=>{
+  const s=newSong();s.pattern='whole';s.sections=[newSection('A',1,1),newSection('B',2,1)];
+  s.sections[1].pattern='eighth';
+  placeChord(s,0,newChord(0,0,B,0,''));placeChord(s,1,newChord(0,0,B,7,''));
+  const r0=renderSong(s);mergeSections(s,0);
+  assert.deepEqual(renderSong(s),r0);assert.equal(s.sections[0].chords[1].pattern,'eighth');
+  assert.equal(mergeSections(s,0),false);                    // 次が無いときは何もしない
 });
 test('ファイル名',()=>{assert.equal(safeFileName('サビ F♯m7 B♭'),'F#m7_Bb');});
 console.log(`${n} tests passed`);
