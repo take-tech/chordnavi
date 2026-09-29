@@ -84,7 +84,8 @@ body.tempo-drag,body.tempo-drag *{cursor:ns-resize!important}
 .lcd .cdot.on{color:#FF5C7A}   /* カウントイン：鳴った拍 */
 .loop svg{display:block}
 .ic{padding:2px 8px;font-size:14px}
-.menu{position:relative}
+.ic svg{display:block;margin:2px 0}   /* 文字のアイコンボタンと高さをそろえる */
+.menu{position:relative;display:flex;align-items:center}
 .menu-pop{position:absolute;right:0;top:28px;z-index:20;background:var(--card);border:1px solid var(--ink2);border-radius:6px;padding:4px;display:flex;flex-direction:column;min-width:170px;box-shadow:0 6px 20px rgba(30,39,66,.2)}
 .menu-pop[hidden]{display:none}
 .menu-pop button{border:0;text-align:left;background:none;padding:5px 10px}
