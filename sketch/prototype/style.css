@@ -101,10 +101,11 @@ h1{font-size:17px;font-weight:900;letter-spacing:.02em;margin:0 6px 0 0;white-sp
 .main{display:flex;flex-direction:column}
 .toolbar{display:flex;align-items:center;gap:6px;padding:8px 12px;border-bottom:1px solid var(--line);flex-wrap:nowrap}
 .toolbar>*,.top>*{flex-shrink:0}
-#pattern{width:190px}
+#pattern{width:168px}
 .toolbar.out{padding:5px 12px;background:var(--grid2)}
 .lbl.strong{font-weight:700;color:var(--ink2)}
 #metro{width:120px}
+#areaSeg[hidden]{display:none}
 #outInfo{flex-shrink:1;min-width:0;overflow:hidden;text-overflow:ellipsis;font-size:11px}
 .title{width:100px!important}
 .timbre{margin-top:4px}

@@ -1,6 +1,7 @@
 /* ChordSketch：曲データと MIDI 生成の純粋関数（UI コードは置かない）
    音楽理論（コード・表記・判別）は ChordNavi の ui/theory.js を共有する */
 import {CHORD,chordAt,chordName as chordNameOf,tonicOf,isFlatKey,mod12} from '../../ui/theory.js';
+import {nearestVoicing,TAB_AREAS} from '../../ui/guitar.js';
 
 export const PPQ=480, WHOLE=PPQ*4;
 export const barTicksOf=([n,d])=>n*WHOLE/d;
@@ -25,7 +26,7 @@ export const cloneSection=s=>({...structuredClone(s),id:uid(),chords:s.chords.ma
 
 export function newSong(){
   return {v:1,title:'新しい曲',key:{idx:0,mode:'major'},bpm:120,meter:[4,4],
-    pattern:'whole',octave:0,bassOctave:0,bass:true,sections:[newSection('Aメロ',1,8)]};
+    pattern:'whole',voicing:'piano',guitarArea:'low',octave:0,bassOctave:0,bass:true,sections:[newSection('Aメロ',1,8)]};
 }
 
 // 最初に開いたときのサンプル（Intro 4・Aメロ 8・サビ 8）。
@@ -305,9 +306,22 @@ const VEL={bass:88,chord:80,arp:78}, ACC=12, SOFT=-26;
 
 // ボイシング：ベース＝ルート（分数コードは指定音）を C2〜B2、上声＝ルートを C3〜B3 に置いて積む（ChordNavi と同じ）。
 // octave・bassOctave で上声・ベースをそれぞれオクターブ移動
-export function voicingOf(song,ch){
+// ボイシングは「ピアノ」と「ギター」を切り替える（song.voicing）。
+// ギター：ChordNavi の guitar.js で弾けるコードフォームを探す（最低音の弦＝ベース、残りの弦＝上声）。
+// ポジションは song.guitarArea（ロー／ミドル／ハイ）あたりで、前のコードのフォーム prev から手の移動が少ない形。
+// 見つからないコード（sus4(♭5) など）はピアノの形にする
+export const VOICINGS=[{id:'piano',name:'ピアノ'},{id:'guitar',name:'ギター'}];
+export const GUITAR_AREAS=[{id:'low',name:'ロー'},{id:'mid',name:'ミドル'},{id:'high',name:'ハイ'}];
+export function voicingOf(song,ch,prev=null){
+  if(song.voicing==='guitar'){
+    const form=nearestVoicing(ch,TAB_AREAS[song.guitarArea]??TAB_AREAS.low,prev);
+    if(form){
+      const [low,...rest]=form.notes;
+      return {bass:low+12*song.bassOctave,upper:rest.map(n=>n+12*song.octave),form};
+    }
+  }
   const up=CHORD[ch.q].iv.map(i=>48+ch.root+i+12*song.octave);
-  return {bass:36+(ch.bass??ch.root)+12*song.bassOctave,upper:up};
+  return {bass:36+(ch.bass??ch.root)+12*song.bassOctave,upper:up,form:null};
 }
 const arpNote=(upper,i)=>upper[i%upper.length]+12*Math.floor(i/upper.length);
 
@@ -315,8 +329,8 @@ const arpNote=(upper,i)=>upper[i%upper.length]+12*Math.floor(i/upper.length);
 // 途中から始まるコードは、その位置で伸びているはずのベース・和音を鳴らし直す（下の chase）。
 // それが小節線の1拍以内前なら「食い」として、小節頭の音を鳴らし直さずにタイでつなぐ
 // （次のコードが同じコードでセクションをまたぐときも。tie は前のコードの食いの音）
-function chordNotes(song,tl,p,tie){
-  const s=p.start, e=p.end, pat=patternById(p.pattern), {bass,upper}=voicingOf(song,p.ch), out=[];
+function chordNotes(song,tl,p,tie,voicing){
+  const s=p.start, e=p.end, pat=patternById(p.pattern), {bass,upper}=voicing, out=[];
   const barAt=t=>tl.bars.find(b=>t>=b.start&&t<b.start+b.ticks);
   let hits=[];
   for(const b of tl.bars){
@@ -368,9 +382,22 @@ function chordNotes(song,tl,p,tie){
     }
   }
   hits.forEach(emit);
+  if(song.voicing==='guitar')strum(out,tl);
   // 小節線の1拍以内前から始まって小節線で終わるコード：次の同じコードへタイでつなぐ
   const tail=forced&&!exact.length&&bs&&e===bs.start+bs.ticks&&e-s<=beatTicksOf(bs.meter)?forced:null;
   return {notes:out,tail};
+}
+// ギターのストローク：同時に鳴らすベース＋和音（3音以上）を弦ごとに少しずらす。
+// 拍の頭はダウン（低い弦から）、それ以外はアップ（高い弦から）。音の終わりはそろえる
+export const STRUM_TICKS=10;
+function strum(notes,tl){
+  const groups=new Map();
+  for(const n of notes)if(n.part!=='arp'){const g=groups.get(n.t)||[];g.push(n);groups.set(n.t,g);}
+  for(const [t,g] of groups){
+    if(g.length<3)continue;
+    const b=tl.bars.find(x=>t>=x.start&&t<x.start+x.ticks), down=!b||(t-b.start)%beatTicksOf(b.meter)===0;
+    g.sort((x,y)=>down?x.n-y.n:y.n-x.n).forEach((n,k)=>{const o=Math.min(k*STRUM_TICKS,n.d-1);n.t+=o;n.d-=o;});
+  }
 }
 const sameCode=(a,b)=>a.off===b.off&&a.q===b.q&&(a.boff??null)===(b.boff??null);
 
@@ -378,11 +405,12 @@ const sameCode=(a,b)=>a.off===b.off&&a.q===b.q&&(a.boff??null)===(b.boff??null);
 export function renderSong(song,range){
   const tl=timeline(song), lo=range?.from??0, hi=range?.to??tl.total, raw=[];
   const pcs=placedChords(song,tl);
-  let tail=null;
+  let tail=null, prevForm=null;
   pcs.forEach((p,i)=>{
+    const v=voicingOf(song,p.ch,prevForm);if(v.form)prevForm=v.form;
     const prev=pcs[i-1];
     const tie=tail&&prev&&prev.end===p.start&&sameCode(prev.c,p.c)?tail:null;
-    const r=chordNotes(song,tl,p,tie);
+    const r=chordNotes(song,tl,p,tie,v);
     raw.push(...r.notes);tail=r.tail;
   });
   const notes=[];

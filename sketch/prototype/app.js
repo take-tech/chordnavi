@@ -3,7 +3,7 @@ import {MAJ_LABEL,MIN_LABEL,SIG,WHEEL_CELLS,DIATONIC,CHORD,chordDeg,chordAt,chor
 import {PPQ,METERS,SNAPS,snapTicks,barTicksOf,beatTicksOf,SECTION_COLORS,SECTION_PRESETS,PATTERNS,MIN_BPM,MAX_BPM,
   newSong,demoSong,newSection,newChord,cloneSection,timeline,placedChords,placeChord,removeChord,resizeChord,
   setSectionBars,insertBars,stretchChord,pruneMarks,mergeSections,splitSection,insertProgression,setMark,rangeTicks,copyRange,pasteAt,renderSong,buildSmf,safeFileName,
-  songTonic,songFlat,nameOf,tempoAt,voicingOf,patternById} from './song.js';
+  songTonic,songFlat,nameOf,tempoAt,voicingOf,patternById,VOICINGS,GUITAR_AREAS} from './song.js';
 import * as player from './player.js';
 
 /* ---------- 状態 ---------- */
@@ -25,6 +25,8 @@ function validSong(x){
   if(!METERS.some(m=>m.join()===s.meter.join()))s.meter=[4,4];
   if(!(s.key.idx>=0&&s.key.idx<12)||!['major','minor'].includes(s.key.mode))s.key={idx:0,mode:'major'};
   if(!PATTERNS.some(p=>p.id===s.pattern))s.pattern='whole';
+  if(!VOICINGS.some(v=>v.id===s.voicing))s.voicing='piano';
+  if(!GUITAR_AREAS.some(v=>v.id===s.guitarArea))s.guitarArea='low';
   s.octave=Math.max(-2,Math.min(2,s.octave|0));s.bassOctave=Math.max(-2,Math.min(2,s.bassOctave|0));
   s.sections=s.sections.filter(c=>c&&c.bars>0).map(c=>({...newSection(),...c,chords:(c.chords||[]).filter(ch=>ch&&CHORD[ch.q]&&ch.len>0),marks:c.marks||[]}));
   return s;
@@ -981,6 +983,9 @@ $('stepBtn').onclick=()=>{uiSet('step',!ui.step);renderLive();};
 $('keepNames').onclick=()=>uiSet('keepNames',!ui.keepNames);
 $('bassBtn').onclick=()=>commit(()=>{song.bass=!song.bass;});
 document.querySelectorAll('#snapSeg button').forEach(b=>b.onclick=()=>uiSet('snap',b.dataset.v));
+// ボイシング（曲の設定なので元に戻せる。再生中ならすぐ反映）
+document.querySelectorAll('#voicingSeg button').forEach(b=>b.onclick=()=>{if(song.voicing!==b.dataset.v){commit(()=>{song.voicing=b.dataset.v;});previewSel();}});
+document.querySelectorAll('#areaSeg button').forEach(b=>b.onclick=()=>{if(song.guitarArea!==b.dataset.v){commit(()=>{song.guitarArea=b.dataset.v;});previewSel();}});
 document.querySelectorAll('#rowSeg button').forEach(b=>b.onclick=()=>uiSet('perRow',+b.dataset.v));
 $('undo').onclick=undo;$('redo').onclick=redo;
 function octControl(id,key){
@@ -992,7 +997,7 @@ function octControl(id,key){
   return ()=>{val.textContent=(song[key]>0?'+':'')+song[key];minus.disabled=song[key]<=-2;plus.disabled=song[key]>=2;};
 }
 const renderOctUp=octControl('octUp','octave'), renderOctBass=octControl('octBass','bassOctave');
-$('octUp').title='上声のオクターブ（0 = ルートが C3〜B3）';$('octBass').title='ベースのオクターブ（0 = C2〜B2）';
+$('octUp').title='上声のオクターブ（ピアノ：0 = ルートが C3〜B3、ギター：0 = フォームのまま）';$('octBass').title='ベースのオクターブ（ピアノ：0 = C2〜B2、ギター：0 = 一番低い弦のまま）';
 
 /* ---------- テーマ ---------- */
 const THEMES=['light','dark','auto'], THEME_NAME={light:'☀',dark:'☾',auto:'◐'};
@@ -1012,6 +1017,9 @@ function render(){
   pressed('countIn',ui.countIn);pressed('loopBtn',ui.loop);pressed('stepBtn',ui.step);pressed('keepNames',ui.keepNames);pressed('bassBtn',song.bass);
   document.querySelectorAll('#snapSeg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.v===ui.snap));
   document.querySelectorAll('#rowSeg button').forEach(b=>b.setAttribute('aria-pressed',+b.dataset.v===ui.perRow));
+  document.querySelectorAll('#voicingSeg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.v===song.voicing));
+  document.querySelectorAll('#areaSeg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.v===song.guitarArea));
+  $('areaSeg').hidden=song.voicing!=='guitar';
   const playing=player.isPlaying(), pb=$('playBtn');
   pb.textContent=playing?'■':'▶';pb.setAttribute('aria-label',playing?'停止':'再生');pb.classList.toggle('on',playing);
   if(!playing){$('posDisp').textContent=`${cursor.gi+1} : ${Math.floor(cursor.pos/beatTicksOf(tl.bars[cursor.gi]?.meter||song.meter))+1}`;$('posDisp').classList.remove('count');lastPos='';}

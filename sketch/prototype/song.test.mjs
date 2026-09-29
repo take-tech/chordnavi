@@ -1,7 +1,7 @@
 // song.js の単体テスト：node sketch/prototype/song.test.mjs
 import assert from 'node:assert/strict';
 import {demoSong,newSong,newSection,newChord,timeline,placedChords,renderSong,buildSmf,placeChord,resizeChord,insertBars,
-  setMark,pruneMarks,mergeSections,splitSection,cloneSection,stretchChord,insertProgression,tickToSec,secToTick,copyRange,pasteAt,nameOf,rangeTicks,PPQ,safeFileName} from './song.js';
+  setMark,pruneMarks,mergeSections,splitSection,cloneSection,stretchChord,insertProgression,tickToSec,secToTick,copyRange,pasteAt,nameOf,rangeTicks,PPQ,safeFileName,voicingOf,STRUM_TICKS} from './song.js';
 
 const B=PPQ*4;
 let n=0;const test=(name,f)=>{f();n++;console.log('ok',name);};
@@ -165,6 +165,25 @@ test('セクションの分割：結合の逆、またぐコードは2つに切�
   assert.deepEqual(t.sections.map(x=>x.chords.map(c=>[c.bar,c.len/B])),[[[1,1]],[[0,1]]]);
   assert.deepEqual(t.sections[1].marks,[{bar:1,pos:0,bpm:90}]);
   assert.equal(splitSection(t,0,0),false);assert.equal(splitSection(t,0,2),false);
+});
+test('ボイシング：ギターは弾けるフォーム（最低音＝ベース）、前のコードから近い形',()=>{
+  const s=newSong();s.voicing='guitar';s.sections=[newSection('A',1,2)];
+  placeChord(s,0,newChord(0,0,B,0,''));placeChord(s,0,newChord(1,0,B,7,''));
+  const c=voicingOf(s,{root:0,q:''});
+  assert.equal(c.bass%12,0);assert.ok(c.upper.length>=3&&c.upper.every(n=>n>c.bass&&n<=76));   // 1弦開放 E4＋15フレットまで
+  assert.deepEqual([c.bass,...c.upper],c.form.notes);
+  const r=renderSong(s), first=r.notes.filter(n=>n.t<STRUM_TICKS*6);
+  assert.deepEqual(first.map(n=>n.n),[...c.form.notes]);                    // ダウン：低い弦から
+  assert.deepEqual(first.map(n=>n.t),first.map((_,k)=>k*STRUM_TICKS));      // 弦ごとに少しずつずらす
+  assert.ok(first.every(n=>n.t+n.d===B));                                   // 終わりはそろえる
+  // ピアノは今までどおり
+  s.voicing='piano';assert.deepEqual(renderSong(s).notes.filter(n=>n.t===0).map(n=>n.n),[36,48,52,55]);
+});
+test('ボイシング：ギターの8分刻みは裏拍でアップ（高い弦から）',()=>{
+  const s=newSong();s.voicing='guitar';s.pattern='eighth';s.sections=[newSection('A',1,1)];placeChord(s,0,newChord(0,0,B,7,''));
+  const up=renderSong(s).notes.filter(n=>n.t>=PPQ/2&&n.t<PPQ/2+STRUM_TICKS*6);
+  assert.ok(up.length>=4);
+  assert.deepEqual(up.map(n=>n.n),[...up.map(n=>n.n)].sort((a,b)=>b-a));
 });
 test('ファイル名',()=>{assert.equal(safeFileName('サビ F♯m7 B♭'),'F#m7_Bb');});
 console.log(`${n} tests passed`);
