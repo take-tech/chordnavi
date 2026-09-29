@@ -13,7 +13,7 @@
     <input id="title" class="title" maxlength="60" aria-label="曲名">
     <div class="transport">
       <button id="toStart" title="先頭へ（Home）">⏮</button>
-      <button id="playBtn" class="play" title="Space キーでも再生／停止">▶ 再生</button>
+      <button id="playBtn" class="play" title="再生／停止（Space キー）" aria-label="再生">▶</button>
       <button id="loopBtn" class="tg" aria-pressed="false" title="選択範囲（なければ曲全体）を繰り返す">ループ</button>
       <span class="pos" id="posDisp">1 : 1</span>
     </div>
@@ -21,7 +21,7 @@
     <label class="fld" title="1小節目の拍子">拍子 <select id="meter"></select></label>
     <select id="metro" title="メトロノーム（試聴のみ）"></select>
     <button id="countIn" class="tg" aria-pressed="false" title="再生の前に1小節クリック">カウント</button>
-    <button id="muteBtn" class="tg" aria-pressed="false" title="ChordSketch の音をすべて消す（表示は動いたまま。M キー）">ミュート</button>
+    <button id="muteBtn" class="tg" aria-pressed="false" title="ミュート：ChordSketch の音をすべて消す（表示は動いたまま。M キー）" aria-label="ミュート">M</button>
     <span class="spacer"></span>
     <button id="undo" class="ic" title="元に戻す（⌘Z）">↶</button><button id="redo" class="ic" title="やり直し（⇧⌘Z）">↷</button>
     <div class="menu">
@@ -42,19 +42,21 @@
       <select id="keySel" aria-label="キー"></select>
       <button id="keepNames" class="tg small" aria-pressed="false" title="オン：キーを変えてもコード名を変えない（オフ：度数を保って移調）">音名を保つ</button>
     </div>
-    <div class="sub-head">ダイアトニックコード<span class="spacer"></span>
+    <div class="sub-head" title="クリックで試聴、ダブルクリックでカーソル位置に入力、シートへドラッグで配置。数字キー 1〜7 でも入力">ダイアトニックコード<span class="spacer"></span>
       <div class="seg small" id="diaSeg"><button data-v="7" aria-pressed="true">4和音</button><button data-v="3" aria-pressed="false">3和音</button></div></div>
     <div class="palette" id="dia"></div>
     <div class="sub-head">コードを作る</div>
     <div class="builder">
       <select id="bRoot" aria-label="ルート"></select><select id="bQ" aria-label="種類"></select><span class="slash">/</span><select id="bBass" aria-label="ベース"></select>
+      <div class="palette one" id="custom"></div>
     </div>
-    <div class="palette one" id="custom"></div>
+    <div class="sub-head">定番コード進行</div>
+    <div class="prog-row"><select id="progSel" aria-label="コード進行"></select><select id="progVar" aria-label="派生"></select></div>
+    <div class="prog-names" id="progNames"></div>
+    <div class="prog-row"><button id="progPlay" title="この進行を試聴（もう一度押すと止める）">試聴</button><button id="progIns" class="ins" title="カーソルのある小節から上書きで入れる（1コード＝1小節）">カーソルの小節から入れる</button></div>
     <div class="sub-head">MIDI 入力 <span class="midi-st" id="midiSt"></span><span class="spacer"></span>
       <button id="stepBtn" class="tg small" aria-pressed="false" title="弾いたコードをカーソルの位置に入れて、入力の長さだけ進む">ステップ入力</button></div>
     <div class="live" id="live"><span class="muted">MIDI 鍵盤で弾くとコード名を表示</span></div>
-    <label class="fld timbre">試聴の音色 <select id="timbre"></select></label>
-    <p class="tip">パレットのコードは<b>クリックで試聴</b>、<b>シートへドラッグで配置</b>。カーソルがあるときは数字キー 1〜7 でダイアトニックを入力。</p>
   </aside>
 
   <main class="main panel">
@@ -64,6 +66,8 @@
       <label class="fld" title="パレット・数字キー・MIDI 鍵盤で入れるコードの長さ">入力の長さ <select id="insLen"></select></label>
       <span class="lbl">1行</span>
       <div class="seg small" id="rowSeg"><button data-v="4">4小節</button><button data-v="8">8小節</button></div>
+      <span class="sep"></span>
+      <label class="fld" title="試聴の音色（MIDI には影響しない）">音色 <select id="timbre"></select></label>
       <span class="spacer"></span>
       <button class="handle" id="dragSel" draggable="true" title="選択範囲（なければ曲全体）を DAW へドラッグ">⠿ <span id="dragLabel">曲全体</span>をドラッグ</button>
       <button id="saveMidi">MIDI保存</button>

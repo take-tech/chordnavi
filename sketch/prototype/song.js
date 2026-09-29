@@ -156,6 +156,12 @@ export function resizeChord(song,si,id,len,minLen){
   const next=Math.min(g.len,...sec.chords.filter(x=>x.id!==id).map(x=>g.toLocal(x.bar,x.pos)).filter(t=>t>a));
   c.len=Math.max(minLen,Math.min(len,next-a));
 }
+// 長さの変更（伸ばした先のコードは上書き）。maxLen は2小節ぶんなど。セクションの終わりで切る
+export function stretchChord(song,si,id,len,minLen,maxLen){
+  const c=song.sections[si].chords.find(x=>x.id===id);
+  if(!c)return null;
+  return placeChord(song,si,{...c,len:Math.max(minLen,Math.min(maxLen,len))});
+}
 // セクションの小節数を変える。はみ出したコード・マークは消す（長さは切る）
 export function setSectionBars(song,si,n){
   const sec=song.sections[si];n=Math.max(1,Math.min(128,n));
@@ -207,6 +213,21 @@ export function pasteAt(song,origin,clip){
   }
 }
 
+// 定番進行（ChordNavi の PROGRESSIONS の小節の並び）を gi 小節目から入れる。1小節＝1小節、1小節に複数なら等分。
+// 曲の最後を越えるときは最後のセクションの小節を増やす。入れた小節の範囲を返す
+export function insertProgression(song,gi,bars){
+  if(!song.sections.length)return null;
+  let tl=timeline(song);
+  const need=gi+bars.length-tl.bars.length;
+  if(need>0){const last=song.sections.length-1;setSectionBars(song,last,song.sections[last].bars+need);tl=timeline(song);}
+  bars.forEach((bar,i)=>{
+    const b=tl.bars[gi+i];if(!b)return;
+    const items=Array.isArray(bar[0])?bar:[bar], len=b.ticks/items.length;
+    items.forEach(([off,q,boff],k)=>placeChord(song,b.si,newChord(b.bar,k*len,len,off,q,boff)));
+  });
+  return {from:gi,to:gi+bars.length};
+}
+
 /* ---------- MIDI パターン ---------- */
 // t・d は tick（4分音符＝480）。1小節ぶん（1920）を1周として小節の頭から繰り返し、小節の終わりで切る。
 // part：bass（ベース）／chord（上声すべて）／arp（上声の i 番目。数が足りなければ1オクターブ上に折り返す）。acc はアクセント
@@ -234,7 +255,7 @@ export function voicingOf(song,ch){
 const arpNote=(upper,i)=>upper[i%upper.length]+12*Math.floor(i/upper.length);
 
 // 1つのコード（p.start〜p.end）のノート。
-// パターンの音が無い位置から始まるコード（半拍の食いなど）は、頭に和音を足す。
+// 途中から始まるコードは、その位置で伸びているはずのベース・和音を鳴らし直す（下の chase）。
 // それが小節線の1拍以内前なら「食い」として、小節頭の音を鳴らし直さずにタイでつなぐ
 // （次のコードが同じコードでセクションをまたぐときも。tie は前のコードの食いの音）
 function chordNotes(song,tl,p,tie){
@@ -262,21 +283,36 @@ function chordNotes(song,tl,p,tie){
     for(const h of hits.filter(h=>h.t===s))for(const n of tie)if(n.part===h.part||h.part==='arp'&&n.part==='chord')n.d=Math.max(n.d,n.t<s?s-n.t+Math.min(h.d,e-s):n.d);
     hits=hits.filter(h=>h.t!==s);
   }
+  // 途中から始まるコード：パターンの中でその位置にまだ伸びているはずのベース・和音を、その位置から鳴らし直す
+  // （例：バラードの3拍目で変わるコード。3拍目にはアルペジオの1音しか無いが、ベースと和音も新しいコードで鳴らす）。
+  // 伸びている音も無く、その位置にパターンの音も無いときは、次のパターンの音まで和音を足す
   let forced=null;
-  if(!tie&&!hits.some(h=>h.t===s)){
-    const next=Math.min(e,...hits.map(h=>h.t));
-    forced=[...emit({t:s,d:next-s,part:'bass'}),...emit({t:s,d:next-s,part:'chord',acc:true})];
-    // 同じコードの中で小節線をまたぐ食い
-    const b=barAt(s), line=b?b.start+b.ticks:Infinity;
-    if(b&&line<e&&line-s<=beatTicksOf(b.meter)){
+  const exact=hits.filter(h=>h.t===s), bs=barAt(s);
+  if(!tie&&bs){
+    const chase=[];
+    for(let cyc=0;cyc<bs.ticks;cyc+=WHOLE)for(const ev of pat.ev){
+      if(ev.part==='arp'||exact.some(h=>h.part===ev.part))continue;
+      const t=bs.start+cyc+ev.t;
+      if(cyc+ev.t>=bs.ticks||t>=s)continue;
+      const end=t+Math.min(ev.d,bs.start+bs.ticks-t);
+      if(end>s&&!chase.some(c=>c.part===ev.part))chase.push({...ev,t:s,d:end-s,acc:true});
+    }
+    if(chase.length)forced=chase.flatMap(emit);
+    else if(!exact.length){
+      const next=Math.min(e,...hits.map(h=>h.t));
+      forced=[...emit({t:s,d:next-s,part:'bass'}),...emit({t:s,d:next-s,part:'chord',acc:true})];
+    }
+    if(forced&&!forced.length)forced=null;
+    // 同じコードの中で小節線をまたぐ食い（その位置にパターンの音が無いときだけ）
+    const line=bs.start+bs.ticks;
+    if(forced&&!exact.length&&line<e&&line-s<=beatTicksOf(bs.meter)){
       for(const h of hits.filter(h=>h.t===line))for(const n of forced)if(n.part===h.part||h.part==='arp'&&n.part==='chord')n.d=Math.max(n.d,line-s+Math.min(h.d,e-line));
       hits=hits.filter(h=>h.t!==line);
     }
   }
   hits.forEach(emit);
   // 小節線の1拍以内前から始まって小節線で終わるコード：次の同じコードへタイでつなぐ
-  const b=barAt(s);
-  const tail=forced&&b&&e===b.start+b.ticks&&e-s<=beatTicksOf(b.meter)?forced:null;
+  const tail=forced&&!exact.length&&bs&&e===bs.start+bs.ticks&&e-s<=beatTicksOf(bs.meter)?forced:null;
   return {notes:out,tail};
 }
 const sameCode=(a,b)=>a.off===b.off&&a.q===b.q&&(a.boff??null)===(b.boff??null);

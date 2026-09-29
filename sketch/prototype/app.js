@@ -1,14 +1,14 @@
 import {MAJ_LABEL,MIN_LABEL,SIG,WHEEL_CELLS,DIATONIC,CHORD,chordDeg,chordAt,chordName as chordNameOf,
-  noteName,tonicOf,isFlatKey,keyName as keyNameOf,detectChords,mod12} from '../../ui/theory.js';
+  noteName,tonicOf,isFlatKey,keyName as keyNameOf,detectChords,mod12,PROGRESSIONS,variantsOf,progressionDegrees} from '../../ui/theory.js';
 import {PPQ,METERS,SNAPS,snapTicks,barTicksOf,beatTicksOf,SECTION_COLORS,SECTION_PRESETS,PATTERNS,MIN_BPM,MAX_BPM,
   newSong,demoSong,newSection,newChord,cloneSection,timeline,placedChords,placeChord,removeChord,resizeChord,
-  setSectionBars,insertBars,setMark,rangeTicks,copyRange,pasteAt,renderSong,buildSmf,safeFileName,
+  setSectionBars,insertBars,stretchChord,insertProgression,setMark,rangeTicks,copyRange,pasteAt,renderSong,buildSmf,safeFileName,
   songTonic,songFlat,nameOf,tempoAt,voicingOf} from './song.js';
 import * as player from './player.js';
 
 /* ---------- 状態 ---------- */
 const STORE='chordsketch.v1';
-const UI_DEFAULT={snap:'beat',perRow:4,insLen:'bar',dia:'7',timbre:'piano',metro:'click',countIn:false,loop:false,keepNames:false,step:false,theme:'light'};
+const UI_DEFAULT={snap:'beat',perRow:4,insLen:'bar',dia:'7',timbre:'piano',metro:'click',countIn:false,loop:false,keepNames:false,step:false,theme:'light',prog:{major:0,minor:13},progVar:0};
 let song, ui={...UI_DEFAULT};
 let tl;                     // timeline(song) のキャッシュ（changed() で更新）
 let sel=null;               // 選択中のコード {si,id}
@@ -72,6 +72,9 @@ function fmtPos(gi,pos){
   const bt=beatTicksOf(b.meter), k=pos/bt;
   return `${gi+1}小節 ${Math.floor(k)+1}拍目${k%1>.01?'の裏':''}`;
 }
+// コードの長さの上限：始まる小節の拍子で2小節
+const MAX_BARS=2;
+function maxLenAt(abs){const b=tl.bars.find(x=>abs>=x.start&&abs<x.start+x.ticks);return MAX_BARS*barTicksOf(b?b.meter:song.meter);}
 function insLenTicks(meter){
   const B=barTicksOf(meter),b=beatTicksOf(meter);
   return {'2bar':B*2,bar:B,'2beat':b*2,beat:b,half:b/2}[ui.insLen]||B;
@@ -176,14 +179,14 @@ function renderPalette(){
   // コードを作る：ルート・ベースの選択肢は今のキーの音名で
   for(const id of ['bRoot','bBass']){
     const s=$(id), v=s.value;s.innerHTML='';
-    if(id==='bBass')s.appendChild(Object.assign(h('option','','ベースなし'),{value:''}));
+    if(id==='bBass')s.appendChild(Object.assign(h('option','','ベース'),{value:''}));
     for(let off=0;off<12;off++)s.appendChild(Object.assign(h('option','',noteName(mod12(tonic()+off),flat())),{value:off}));
     s.value=v||(id==='bRoot'?'0':'');
   }
   const c=$('custom');c.innerHTML='';c.appendChild(paletteChip(customItem()));
   document.querySelectorAll('#diaSeg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.v===ui.dia));
 }
-for(const q of QUALITIES)$('bQ').appendChild(Object.assign(h('option','',q===''?'（メジャー）':CHORD[q].s),{value:q}));
+for(const q of QUALITIES)$('bQ').appendChild(Object.assign(h('option','',q===''?'maj':CHORD[q].s),{value:q}));
 for(const id of ['bRoot','bQ','bBass'])$(id).addEventListener('change',()=>{renderPalette();previewItem(customItem());});
 document.querySelectorAll('#diaSeg button').forEach(b=>b.addEventListener('click',()=>{ui.dia=b.dataset.v;renderPalette();persist();}));
 
@@ -203,6 +206,54 @@ function advanceCursor(abs){
   cursor=b?{gi:b.gi,pos:abs-b.start}:{gi:Math.max(0,tl.bars.length-1),pos:0};
   scrollToBar(cursor.gi);
 }
+
+/* ---------- 定番コード進行（ChordNavi の PROGRESSIONS） ---------- */
+const progSel=$('progSel'), progVar=$('progVar');
+const curProg=()=>{const p=PROGRESSIONS[ui.prog[song.key.mode]];return p&&p.mode===song.key.mode?p:PROGRESSIONS.find(x=>x.mode===song.key.mode);};
+const curBars=()=>{const v=variantsOf(curProg());return (v[ui.progVar]||v[0]).c;};
+function renderProg(){
+  const mode=song.key.mode, p=curProg();
+  progSel.innerHTML='';
+  for(const [extra,label] of [[false,'定番'],[true,'その他']]){
+    const g=h('optgroup');g.label=label;
+    PROGRESSIONS.forEach((x,i)=>{if(x.mode===mode&&!!x.extra===extra)g.appendChild(Object.assign(h('option','',x.name),{value:i}));});
+    progSel.appendChild(g);
+  }
+  progSel.value=PROGRESSIONS.indexOf(p);
+  progVar.innerHTML='';
+  variantsOf(p).forEach((v,i)=>progVar.appendChild(Object.assign(h('option','',v.name),{value:i})));
+  if(ui.progVar>=variantsOf(p).length)ui.progVar=0;
+  progVar.value=ui.progVar;
+  const bars=curBars(), names=$('progNames');
+  names.textContent=bars.map(bar=>(Array.isArray(bar[0])?bar:[bar]).map(([off,q,boff])=>nameOfItem({off,q,boff})).join('・')).join(' – ');
+  names.title=progressionDegrees(bars);
+  $('progPlay').textContent=progPreview&&player.isPlaying()?'停止':'試聴';
+  $('progIns').title=`${fmtPos(cursor.gi,0).split(' ')[0]}から${bars.length}小節を上書きで入れる（1コード＝1小節）`;
+}
+progSel.addEventListener('change',()=>{ui.prog[song.key.mode]=+progSel.value;ui.progVar=0;stopProgPreview();renderProg();persist();});
+progVar.addEventListener('change',()=>{ui.progVar=+progVar.value;stopProgPreview();renderProg();persist();});
+// 試聴：曲の設定（パターン・オクターブ・音色）で、カーソル位置のテンポ・拍子で鳴らす
+let progPreview=false;
+function stopProgPreview(){if(progPreview){player.stop();progPreview=false;render();}}
+$('progPlay').onclick=()=>{
+  if(progPreview&&player.isPlaying()){stopProgPreview();return;}
+  const b=tl.bars[cursor.gi], bars=curBars();
+  const tmp={...structuredClone(song),bpm:Math.round(tempoAt(tl.tempos,b?b.start:0)),meter:b?b.meter:song.meter,sections:[newSection('p',0,bars.length)]};
+  insertProgression(tmp,0,bars);
+  playTick=null;playingId=null;progPreview=true;
+  player.play({render:()=>renderSong(tmp),loop:()=>false,countIn:false,metronome:()=>'off',timbre:()=>ui.timbre,
+    onPos:()=>{},onEnd:()=>{progPreview=false;render();}});
+  render();
+};
+$('progIns').onclick=()=>{
+  stopProgPreview();
+  const gi=cursor.gi;let r;
+  commit(()=>{r=insertProgression(song,gi,curBars());});
+  if(!r)return;
+  sel=null;range=r;cursor={gi:Math.min(r.to,tl.bars.length-1),pos:0};
+  if(r.to>=tl.bars.length)cursor={gi:r.from,pos:0};
+  render();scrollToBar(r.from);
+};
 
 /* ---------- パレットからのドラッグ ---------- */
 const ghost=$('ghost');
@@ -348,8 +399,8 @@ function barCell(b,rowEnd,songEnd){
 }
 function sectionHead(s,si){
   const head=h('div','sec-head');
-  const sw=h('button','sec-sw');sw.title='色を変える';
-  sw.onclick=()=>commit(()=>{s.color=(s.color+1)%SECTION_COLORS.length;});
+  const sw=h('button','sec-sw');sw.title='色を選ぶ';sw.setAttribute('aria-label','セクションの色を選ぶ');
+  sw.onclick=()=>openColorPop(si,sw);
   const name=h('input','sec-name');name.value=s.name;name.setAttribute('list','secNames');name.setAttribute('aria-label','セクション名');
   name.addEventListener('change',()=>commit(()=>{
     s.name=name.value.trim()||'セクション';
@@ -426,6 +477,8 @@ function startBlockDrag(e,blkEl){
   sel={si,id};range=null;cursor={gi:tl.bars.find(b=>p.start>=b.start&&p.start<b.start+b.ticks).gi,pos:0};
   cursor.pos=p.start-tl.bars[cursor.gi].start;
   render();
+  // 長さの変更：伸ばした先のコードは上書きするので、動かすたびにドラッグ前の状態からやり直す（縮め直すと戻る）
+  const base=resizing?JSON.stringify(song):null, maxLen=maxLenAt(p.start);
   if(resizing)snapshot();
   const move=ev=>{
     if(!moved&&Math.hypot(ev.clientX-x0,ev.clientY-y0)<4)return;
@@ -434,9 +487,8 @@ function startBlockDrag(e,blkEl){
     if(resizing){
       if(!hit)return;
       const st=snapOf(hit.b.meter), end=hit.b.start+Math.max(st,Math.round(hit.tick/st)*st);
-      const len=end-p.start;
-      const before=c.len;resizeChord(song,si,id,len,snapOf(hit.b.meter));
-      if(song.sections[si].chords.find(x=>x.id===id).len!==before){tl=timeline(song);render();}
+      song=JSON.parse(base);stretchChord(song,si,id,end-p.start,st,maxLen);
+      tl=timeline(song);render();
       return;
     }
     ghost.hidden=false;ghost.textContent=nameOf(song,c)+(ev.altKey?'（コピー）':'');
@@ -451,7 +503,7 @@ function startBlockDrag(e,blkEl){
   const up=()=>{
     removeEventListener('pointermove',move);removeEventListener('pointerup',up);
     ghost.hidden=true;showDrop(null);
-    if(resizing){if(moved)changed();else undoStack.pop();return;}
+    if(resizing){if(moved){changed();previewSel();}else undoStack.pop();return;}
     if(!moved){previewItem(c);return;}
     if(!target)return;
     const b=tl.bars[target.gi];
@@ -504,8 +556,27 @@ function openMarkPop(gi,pos,anchor){
   bpm.focus();
   pop.onkeydown=e=>{e.stopPropagation();if(e.key==='Enter')ok.click();if(e.key==='Escape')closePop();};
 }
+// セクションの色：パレットから選ぶ
+const COLOR_NAMES=['グレー','グリーン','ブルー','ローズ','イエロー','パープル','オレンジ','オリーブ'];
+function openColorPop(si,anchor){
+  const s=song.sections[si];
+  pop.innerHTML='';pop.appendChild(h('h4','',`「${s.name}」の色`));
+  const grid=h('div','swatches');
+  SECTION_COLORS.forEach((col,i)=>{
+    const b=h('button','');b.style.background=col;b.title=COLOR_NAMES[i];b.setAttribute('aria-label',COLOR_NAMES[i]);
+    b.setAttribute('aria-pressed',i===s.color%SECTION_COLORS.length);
+    b.onclick=()=>{pop.hidden=true;if(i!==s.color)commit(()=>{song.sections[si].color=i;});};
+    grid.appendChild(b);
+  });
+  pop.appendChild(grid);
+  pop.hidden=false;
+  const r=anchor.getBoundingClientRect();
+  pop.style.left=Math.min(innerWidth-pop.offsetWidth-8,r.left)+'px';pop.style.top=Math.min(innerHeight-pop.offsetHeight-8,r.bottom+4)+'px';
+  pop.onkeydown=e=>{e.stopPropagation();if(e.key==='Escape')closePop();};
+  grid.querySelector('[aria-pressed=true]')?.focus();
+}
 function closePop(){pop.hidden=true;sheet.focus({preventScroll:true});}
-addEventListener('pointerdown',e=>{if(!pop.hidden&&!pop.contains(e.target)&&!e.target.closest('.bar-no'))pop.hidden=true;},true);
+addEventListener('pointerdown',e=>{if(!pop.hidden&&!pop.contains(e.target)&&!e.target.closest('.bar-no,.sec-sw'))pop.hidden=true;},true);
 
 /* ---------- 下のバー ---------- */
 function renderFooter(){
@@ -524,8 +595,10 @@ function renderFooter(){
     bass.value=c.boff??'';bass.onchange=()=>{edit(cc=>{if(bass.value===''||+bass.value===cc.off)delete cc.boff;else cc.boff=+bass.value;});previewSel();};
     const st=snapOf(b.meter);
     const minus=h('button','','−'),plus=h('button','','＋');
-    minus.onclick=()=>commit(()=>resizeChord(song,sel.si,sel.id,c.len-st,st));
-    plus.onclick=()=>commit(()=>resizeChord(song,sel.si,sel.id,c.len+st,st));
+    const max=maxLenAt(p.start);
+    minus.onclick=()=>commit(()=>stretchChord(song,sel.si,sel.id,p.end-p.start-st,st,max));
+    plus.onclick=()=>commit(()=>stretchChord(song,sel.si,sel.id,p.end-p.start+st,st,max));
+    minus.disabled=p.end-p.start<=st;plus.disabled=p.end-p.start>=max;
     const dup=h('button','','複製');dup.onclick=duplicateSel;
     const del=h('button','','削除');del.onclick=deleteSel;
     f.append(h('b','who',nameOf(song,c)),h('span','',degOfItem(c)),h('span','sep'),'ルート',root,'種類',q,'ベース',bass,h('span','sep'),
@@ -627,7 +700,7 @@ function arrow(dir,shift){
   const st=snapOf(b.meter);
   if(sel){
     const p=placedChords(song,tl).find(x=>x.c.id===sel.id);if(!p)return;
-    if(shift){commit(()=>resizeChord(song,sel.si,sel.id,p.end-p.start+dir*st,st));return;}
+    if(shift){commit(()=>stretchChord(song,sel.si,sel.id,p.end-p.start+dir*st,st,maxLenAt(p.start)));return;}
     const abs=p.start+dir*st, nb=tl.bars.find(x=>abs>=x.start&&abs<x.start+x.ticks);
     if(!nb)return;
     const c=song.sections[sel.si].chords.find(x=>x.id===sel.id);
@@ -648,6 +721,7 @@ function playRange(){
 }
 function startPlay(){
   if(!tl.bars.length)return;
+  progPreview=false;
   const r=playRange();
   playFrom=rangeTicks(tl,r).from;
   player.play({
@@ -658,7 +732,7 @@ function startPlay(){
   });
   render();
 }
-function togglePlay(){if(player.isPlaying()){player.stop();playTick=null;playingId=null;render();}else startPlay();}
+function togglePlay(){if(player.isPlaying()){player.stop();progPreview=false;playTick=null;playingId=null;render();}else startPlay();}
 function onPos(abs,counting){
   const disp=$('posDisp');
   disp.classList.toggle('count',!!counting);
@@ -882,7 +956,7 @@ function render(){
   document.querySelectorAll('#snapSeg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.v===ui.snap));
   document.querySelectorAll('#rowSeg button').forEach(b=>b.setAttribute('aria-pressed',+b.dataset.v===ui.perRow));
   const playing=player.isPlaying(), pb=$('playBtn');
-  pb.textContent=playing?'■ 停止':'▶ 再生';pb.classList.toggle('on',playing);
+  pb.textContent=playing?'■':'▶';pb.setAttribute('aria-label',playing?'停止':'再生');pb.classList.toggle('on',playing);
   if(!playing){$('posDisp').textContent=`${cursor.gi+1} : ${Math.floor(cursor.pos/beatTicksOf(tl.bars[cursor.gi]?.meter||song.meter))+1}`;$('posDisp').classList.remove('count');lastPos='';}
   $('undo').disabled=!undoStack.length;$('redo').disabled=!redoStack.length;
   keySel.value=song.key.idx+':'+song.key.mode;
@@ -893,7 +967,7 @@ function render(){
   $('outInfo').textContent=over.length?`パターンを変えているセクション：${over.join('・')}`:'';
   const ex=currentExport();
   $('dragLabel').textContent=!range?'曲全体':ex.si>=0?`「${song.sections[ex.si].name}」`:rangeLabel(range);
-  renderPalette();renderSheet();renderFooter();
+  renderPalette();renderProg();renderSheet();renderFooter();
 }
 
 /* ---------- 画面の拡大縮小（スクロールなし、ChordNavi と同じ） ---------- */

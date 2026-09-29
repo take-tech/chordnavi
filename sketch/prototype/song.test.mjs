@@ -1,7 +1,7 @@
 // song.js の単体テスト：node sketch/prototype/song.test.mjs
 import assert from 'node:assert/strict';
 import {demoSong,newSong,newSection,newChord,timeline,placedChords,renderSong,buildSmf,placeChord,resizeChord,insertBars,
-  setMark,tickToSec,secToTick,copyRange,pasteAt,nameOf,rangeTicks,PPQ,safeFileName} from './song.js';
+  setMark,stretchChord,insertProgression,tickToSec,secToTick,copyRange,pasteAt,nameOf,rangeTicks,PPQ,safeFileName} from './song.js';
 
 const B=PPQ*4;
 let n=0;const test=(name,f)=>{f();n++;console.log('ok',name);};
@@ -33,6 +33,12 @@ test('長さの変更は次のコードまで',()=>{
   const a=placeChord(s,0,newChord(0,0,B,0,''));placeChord(s,0,newChord(2,0,B,7,''));
   resizeChord(s,0,a.id,B*5,PPQ/2);
   assert.equal(s.sections[0].chords.find(c=>c.id===a.id).len,B*2);
+});
+test('伸ばす：次のコードを上書きし、上限（2小節）で止まる',()=>{
+  const s=newSong();
+  const a=placeChord(s,0,newChord(0,0,B,0,''));placeChord(s,0,newChord(1,0,B,7,''));placeChord(s,0,newChord(2,0,B,9,'m'));
+  stretchChord(s,0,a.id,B*5,PPQ/2,B*2);
+  assert.deepEqual(placedChords(s).map(x=>[x.start,x.end,nameOf(s,x.c)]),[[0,B*2,'C'],[B*2,B*3,'Am']]);
 });
 test('小節の挿入と削除',()=>{
   const s=newSong();placeChord(s,0,newChord(3,0,B,7,''));
@@ -88,6 +94,22 @@ test('コピー＆貼り付け',()=>{
   placeChord(s,0,newChord(0,0,B,0,''));placeChord(s,0,newChord(1,0,B,7,''));
   pasteAt(s,timeline(s).bars[3].start,copyRange(s,{from:0,to:2}));   // A の4小節目から → B の頭にまたがる
   assert.deepEqual(placedChords(s).map(x=>[x.si,x.c.bar,nameOf(s,x.c)]),[[0,0,'C'],[0,1,'G'],[0,3,'C'],[1,0,'G']]);
+});
+test('途中から始まるコード：バラード・アルペジオ・4分刻みでもベースと和音を鳴らす',()=>{
+  for(const pat of ['ballad','arp','quarter','whole']){
+    const s=newSong();s.pattern=pat;s.sections=[newSection('A',1,1)];
+    placeChord(s,0,newChord(0,0,B/2,9,'m7'));placeChord(s,0,newChord(0,B/2,B/2,2,'m7'));   // Am7（2拍）→ Dm7（3拍目から）
+    const at3=renderSong(s).notes.filter(x=>x.t===B/2).map(x=>x.n);
+    assert.ok(at3.includes(38),pat+'：3拍目に D のベース');
+    assert.ok([50,53,57,60].every(n=>at3.includes(n))||pat==='arp',pat+'：3拍目に Dm7 の和音');
+    assert.ok(renderSong(s).notes.every(x=>x.t>=B/2||x.t+x.d<=B/2),pat+'：前のコードの音は3拍目で切れる');
+  }
+});
+test('定番進行を入れる：上書き・2コードの小節・足りない小節は増やす',()=>{
+  const s=newSong();s.sections=[newSection('A',1,4)];placeChord(s,0,newChord(2,0,B,4,'m'));
+  const r=insertProgression(s,2,[[5,'M7'],[[2,'m7'],[7,'7']],[0,'']]);
+  assert.deepEqual(r,{from:2,to:5});assert.equal(s.sections[0].bars,5);
+  assert.deepEqual(placedChords(s).map(x=>[x.start/PPQ,nameOf(s,x.c)]),[[8,'FM7'],[12,'Dm7'],[14,'G7'],[16,'C']]);
 });
 test('ファイル名',()=>{assert.equal(safeFileName('サビ F♯m7 B♭'),'F#m7_Bb');});
 console.log(`${n} tests passed`);
