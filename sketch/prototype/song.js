@@ -337,7 +337,8 @@ export const PATTERNS=[
     ...[720,1200,1680].map(t=>({t,d:220,part:'chord'})),{t:960,d:220,part:'chord'}]},
   {id:'sync',short:'シンコペ',name:'シンコペーション（3・3・2）',ev:each([[0,700],[720,700],[1440,460]],([t,d])=>[{t,d,part:'bass',acc:t===0},{t,d,part:'chord',acc:t===0}])},
   {id:'arp',short:'アルペ',name:'アルペジオ（8分）',ev:[{t:0,d:1900,part:'bass'},...[0,1,2,3,4,3,2,1].map((i,k)=>({t:k*240,d:230,part:'arp',i,acc:k===0}))]},
-  {id:'ballad',short:'バラード',name:'バラード（4分の分散）',ev:[{t:0,d:1900,part:'bass'},{t:0,d:1900,part:'chord',soft:true},...[1,2,3].map((i,k)=>({t:480*(k+1),d:460,part:'arp',i}))]}
+  // バラード：音の高さの順で 1・2・4・3（ベース → 上声の低い音 → 一番上 → 間の音）。g はギターのときの上の弦の番号（低い方から）
+  {id:'ballad',short:'バラード',name:'バラード（4分の分散）',ev:[{t:0,d:1900,part:'bass'},{t:0,d:1900,part:'chord',soft:true},...[[1,0],[3,2],[2,1]].map(([i,g],k)=>({t:480*(k+1),d:460,part:'arp',i,g}))]}
 ];
 export const patternById=id=>PATTERNS.find(p=>p.id===id)||PATTERNS[0];
 const VEL={bass:88,chord:80,arp:78}, ACC=12, SOFT=-26;
@@ -393,7 +394,7 @@ function chordNotes(song,tl,p,tie,voicing){
       const b=barAt(h.t), rel=h.t-b.start;
       if(rel%WHOLE===0)return false;
       const cyc=b.start+rel-rel%WHOLE, k=count.get(cyc)||0;count.set(cyc,k+1);
-      h.i=seq[k%seq.length];
+      h.i=h.g!=null?Math.min(h.g,upper.length-1):seq[k%seq.length];   // パターンが弦を決めていればそれ、なければ上って下る
       return true;
     });
   }

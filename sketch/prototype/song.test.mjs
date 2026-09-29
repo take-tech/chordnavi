@@ -217,5 +217,13 @@ test('ギターのアルペジオ：頭はベースだけ、上の弦を上っ�
   s.pattern='ballad';const b=renderSong(s).notes;
   assert.ok(b.every(n=>!b.some(m=>m!==n&&m.n===n.n&&m.t<n.t+n.d&&n.t<m.t+m.d)));
 });
+test('バラード：音の高さの順で 1・2・4・3（ピアノ・ギター）',()=>{
+  for(const v of ['piano','guitar']){
+    const s=newSong();s.voicing=v;s.pattern='ballad';s.sections=[newSection('A',1,1)];placeChord(s,0,newChord(0,0,B,0,''));
+    const r=renderSong(s).notes, at=t=>Math.max(...r.filter(n=>n.t>=t&&n.t<t+STRUM_TICKS*6&&(n.t>0||n.n===Math.min(...r.filter(m=>m.t===0).map(m=>m.n)))).map(n=>n.n));
+    const [a,b,c,d]=[0,PPQ,PPQ*2,PPQ*3].map(t=>t===0?Math.min(...r.filter(n=>n.t===0).map(n=>n.n)):at(t));
+    assert.ok(a<b&&b<d&&d<c,v+'：'+[a,b,c,d].join(','));
+  }
+});
 test('ファイル名',()=>{assert.equal(safeFileName('サビ F♯m7 B♭'),'F#m7_Bb');});
 console.log(`${n} tests passed`);
