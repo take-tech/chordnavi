@@ -132,7 +132,6 @@ h1{font-size:17px;font-weight:900;letter-spacing:.02em;margin:0 6px 0 0;white-sp
 #pattern{width:168px}
 .toolbar.out{padding:5px 12px;background:var(--grid2)}
 .lbl.strong{font-weight:700;color:var(--ink2)}
-#metro{width:120px}
 #areaSeg[hidden]{display:none}
 .title{width:100px!important}
 .timbre{margin-top:4px}
@@ -313,3 +312,13 @@ body.grabbing,body.grabbing *{cursor:grabbing!important}
 .pop .save-row{grid-column:1/-1;display:flex;align-items:center;gap:4px}
 .pop .save-name{width:220px;font-size:13px}
 .pop .save-row .ext{color:var(--muted);font-size:12px}
+
+/* メトロノーム（上）とカウントイン（下）：2段でアイコンの幅をそろえる */
+.clickgrp{display:grid;grid-template-columns:30px 14px;grid-template-rows:20px 20px;gap:2px}
+.clickgrp .ic2{display:flex;align-items:center;justify-content:center;padding:0;height:20px;width:100%}
+.clickgrp .menu{display:flex}
+.clickgrp .kind{font-size:10px;color:var(--muted);border-color:var(--line)}
+.clickgrp .wide{grid-column:1/-1}
+.metro-pop{left:0;right:auto;min-width:130px;top:24px}
+.metro-pop button[aria-checked=true]{font-weight:700;color:var(--live)}
+.metro-pop button[aria-checked=true]::after{content:' ✓'}

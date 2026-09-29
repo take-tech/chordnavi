@@ -23,8 +23,15 @@
       <span class="lcd-c l2"><button id="lcdMeter" title="拍子（押すと変更）">4/4</button><button id="lcdKey" title="キー">C</button></span>
       <span class="lcd-c r2 time" id="lcdTime" title="経過時間（分:秒）">0:00.0</span>
     </div>
-    <select id="metro" title="メトロノーム（試聴のみ）"></select>
-    <button id="countIn" class="tg" aria-pressed="false" title="再生の前に1小節クリック">カウント</button>
+    <!-- メトロノーム（上）とカウントイン（下）。アイコンでオン／オフ、種類は ▾ から -->
+    <div class="clickgrp">
+      <button id="metroBtn" class="tg ic2" aria-pressed="false" aria-label="メトロノーム" title="メトロノーム（試聴のみ）：オン／オフ"><svg viewBox="0 0 20 20" width="15" height="15" aria-hidden="true"><path d="M7.2 2.5h5.6l3.2 15H4z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M5.2 13.5h9.6" stroke="currentColor" stroke-width="1.4"/><path d="M10 13.5 14.8 4.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="13.3" cy="7.3" r="1.5" fill="currentColor"/></svg></button>
+      <div class="menu">
+        <button id="metroKind" class="ic2 kind" aria-haspopup="true" title="メトロノームの種類">▾</button>
+        <div class="menu-pop metro-pop" id="metroMenu" hidden></div>
+      </div>
+      <button id="countIn" class="tg ic2 wide" aria-pressed="false" aria-label="カウントイン" title="カウントイン：再生の前に1小節クリック"><svg viewBox="0 0 28 10" width="26" height="9" aria-hidden="true"><circle cx="4" cy="5" r="2.2" fill="currentColor"/><circle cx="10.7" cy="5" r="2.2" fill="currentColor"/><circle cx="17.3" cy="5" r="2.2" fill="currentColor"/><circle cx="24" cy="5" r="2.2" fill="currentColor"/></svg></button>
+    </div>
     <button id="muteBtn" class="tg" aria-pressed="false" title="ミュート：ChordSketch の音をすべて消す（表示は動いたまま。M キー）" aria-label="ミュート">M</button>
     <span class="spacer"></span>
     <button id="undo" class="ic" title="元に戻す（⌘Z）">↶</button><button id="redo" class="ic" title="やり直し（⇧⌘Z）">↷</button>

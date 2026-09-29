@@ -9,7 +9,7 @@ import * as player from './player.js';
 
 /* ---------- 状態 ---------- */
 const STORE='chordsketch.v1';
-const UI_DEFAULT={snap:'beat',perRow:4,insLen:'bar',dia:'7',timbre:'piano',metro:'click',countIn:false,loop:false,keepNames:false,step:false,theme:'light',prog:{major:0,minor:13},progVar:0};
+const UI_DEFAULT={snap:'beat',perRow:4,insLen:'bar',dia:'7',timbre:'piano',metro:'click',metroOn:true,countIn:false,loop:false,keepNames:false,step:false,theme:'light',prog:{major:0,minor:13},progVar:0};
 let song, ui={...UI_DEFAULT};
 let tl;                     // timeline(song) のキャッシュ（changed() で更新）
 let sel=null;               // 選択中のコード {si,id}
@@ -38,6 +38,8 @@ try{
   song=validSong(saved?.song);
   if(saved?.ui)for(const k in UI_DEFAULT)if(typeof saved.ui[k]===typeof UI_DEFAULT[k])ui[k]=saved.ui[k];
 }catch{}
+// 前の保存形式：metro が 'off' ならメトロノームはオフ（種類はクリック）
+if(ui.metro==='off'){ui.metro='click';ui.metroOn=false;}
 song=song||demoSong();
 tl=timeline(song);
 
@@ -926,7 +928,7 @@ function startPlay(){
   playFrom=rangeTicks(tl,r).from;
   player.play({
     render:()=>renderSong(song,rangeTicks(tl,r)),
-    loop:()=>ui.loop, countIn:ui.countIn, metronome:()=>ui.metro, timbre:()=>ui.timbre,
+    loop:()=>ui.loop, countIn:ui.countIn, metronome:()=>ui.metroOn?ui.metro:'off', timbre:()=>ui.timbre,
     onPos:(t,counting,cnt)=>onPos(t==null?null:playFrom+t,counting,cnt),
     onEnd:()=>{playTick=null;playingId=null;render();}
   });
@@ -1069,7 +1071,7 @@ function download(blob,name){
 
 /* ---------- ファイル ---------- */
 const fileMenu=$('fileMenu');
-$('fileBtn').onclick=e=>{e.stopPropagation();$('themeMenu').hidden=true;fileMenu.hidden=!fileMenu.hidden;};
+$('fileBtn').onclick=e=>{e.stopPropagation();$('themeMenu').hidden=true;$('metroMenu').hidden=true;fileMenu.hidden=!fileMenu.hidden;};
 addEventListener('click',()=>{fileMenu.hidden=true;});
 fileMenu.addEventListener('click',e=>{
   const act=e.target.dataset.act;if(!act)return;
@@ -1225,7 +1227,9 @@ function renderLive(){
 }
 
 /* ---------- 上部・ツールバーのコントロール ---------- */
-for(const m of player.METRONOMES)$('metro').appendChild(Object.assign(h('option','',m.name),{value:m.id}));
+// メトロノームの種類のメニュー（「なし」はアイコンのオフで）
+const metroMenu=$('metroMenu');
+for(const m of player.METRONOMES.filter(x=>x.id!=='off'))metroMenu.appendChild(Object.assign(h('button','',m.name.replace(/^♪\s*/,'')),{value:m.id,role:'menuitemradio'}));
 for(const t of player.TIMBRES)$('timbre').appendChild(Object.assign(h('option','',t.name),{value:t.id}));
 for(const p of PATTERNS)$('pattern').appendChild(Object.assign(h('option','',p.name),{value:p.id}));
 for(const [v,n] of INS_LENS)$('insLen').appendChild(Object.assign(h('option','',n),{value:v}));
@@ -1234,7 +1238,13 @@ $('title').addEventListener('change',e=>commit(()=>{song.title=e.target.value.tr
 $('title').addEventListener('keydown',e=>{if(e.key==='Enter')e.target.blur();});
 $('pattern').addEventListener('change',e=>commit(()=>{song.pattern=e.target.value;}));
 const uiSet=(k,v)=>{ui[k]=v;render();persist();};
-$('metro').addEventListener('change',e=>{uiSet('metro',e.target.value);player.refresh();});
+$('metroBtn').onclick=()=>{uiSet('metroOn',!ui.metroOn);player.refresh();};
+$('metroKind').onclick=e=>{e.stopPropagation();fileMenu.hidden=true;$('themeMenu').hidden=true;metroMenu.hidden=!metroMenu.hidden;};
+metroMenu.addEventListener('click',e=>{
+  const v=e.target.closest('button')?.value;if(!v)return;
+  ui.metroOn=true;uiSet('metro',v);player.refresh();metroMenu.hidden=true;   // 種類を選んだらオンにする
+});
+addEventListener('click',e=>{if(!e.target.closest('#metroMenu'))metroMenu.hidden=true;});
 $('timbre').addEventListener('change',e=>{uiSet('timbre',e.target.value);player.refresh();});
 $('insLen').addEventListener('change',e=>uiSet('insLen',e.target.value));
 $('countIn').onclick=()=>uiSet('countIn',!ui.countIn);
@@ -1274,7 +1284,7 @@ function applyTheme(){
 }
 // テーマはメニューから選ぶ（ライト／ダーク／自動）
 const themeMenu=$('themeMenu');
-$('themeBtn').onclick=e=>{e.stopPropagation();fileMenu.hidden=true;themeMenu.hidden=!themeMenu.hidden;};
+$('themeBtn').onclick=e=>{e.stopPropagation();fileMenu.hidden=true;$('metroMenu').hidden=true;themeMenu.hidden=!themeMenu.hidden;};
 themeMenu.addEventListener('click',e=>{
   // data-theme は使わない（[data-theme=dark] の配色がその要素に効いてしまう）
   const v=e.target.closest('[data-v]')?.dataset.v;if(!v)return;
@@ -1287,7 +1297,11 @@ dark.addEventListener('change',applyTheme);
 function render(){
   const pressed=(id,on)=>$(id).setAttribute('aria-pressed',!!on);
   $('title').value=song.title;
-  $('metro').value=ui.metro;$('timbre').value=ui.timbre;$('pattern').value=song.pattern;$('insLen').value=ui.insLen;
+  pressed('metroBtn',ui.metroOn);
+  const mk=player.METRONOMES.find(x=>x.id===ui.metro);
+  $('metroBtn').title=`メトロノーム（試聴のみ）：${ui.metroOn?'オン':'オフ'}・${mk?mk.name.replace(/^♪\s*/,''):''}（押してオン／オフ、種類は ▾）`;
+  metroMenu.querySelectorAll('button').forEach(b=>b.setAttribute('aria-checked',b.value===ui.metro));
+  $('timbre').value=ui.timbre;$('pattern').value=song.pattern;$('insLen').value=ui.insLen;
   pressed('countIn',ui.countIn);pressed('loopBtn',ui.loop);pressed('stepBtn',ui.step);pressed('keepNames',ui.keepNames);pressed('bassBtn',song.bass);
   document.querySelectorAll('#snapSeg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.v===ui.snap));
   document.querySelectorAll('#rowSeg button').forEach(b=>b.setAttribute('aria-pressed',+b.dataset.v===ui.perRow));
