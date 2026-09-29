@@ -1,6 +1,7 @@
 #include "SketchEditor.h"
 #include "WebResources.h"
 #include "WebViewZoom.h"
+#include "WebViewPrint.h"
 #include "MidiExport.h"
 #include "ChordSketchUIData.h"
 #include <cstring>
@@ -152,6 +153,12 @@ juce::WebBrowserComponent::Options SketchEditor::makeOptions()
                              {
                                  const auto text = args.isEmpty() ? juce::String() : args[0].toString();
                                  completion (juce::var (text.isNotEmpty() && writeTextSafely (sessionFile(), text)));
+                             })
+        .withNativeFunction ("printPage", [this] (const auto& args, auto completion)
+                             {
+                                 // コード譜の印刷（macOS の印刷画面。PDF もそこから）。Windows はまだ false
+                                 const auto title = args.isEmpty() ? juce::String() : args[0].getProperty ("title", "").toString();
+                                 completion (juce::var (WebViewPrint::run (*this, title.isEmpty() ? juce::String ("ChordSketch") : title)));
                              })
         .withNativeFunction ("songPlay", [this] (const auto& args, auto completion)
                              {

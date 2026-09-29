@@ -167,8 +167,8 @@ target_sources(ChordSketch PRIVATE
     sketch/Source/SketchStandaloneApp.cpp
 )
 if(APPLE)
-    # WebView のページのズーム（文字がにじまないように。GUI を使うのでテストの RanzeShared には入れない）
-    target_sources(ChordSketch PRIVATE shared/cpp/WebViewZoom.mm)
+    # WebView のページのズーム（文字がにじまないように）と印刷（GUI を使うのでテストの RanzeShared には入れない）
+    target_sources(ChordSketch PRIVATE shared/cpp/WebViewZoom.mm shared/cpp/WebViewPrint.mm)
 endif()
 
 if(WIN32)

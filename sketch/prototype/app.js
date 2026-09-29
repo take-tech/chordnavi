@@ -1419,7 +1419,12 @@ $('printBtn').onclick=()=>{buildPrint();$('printWrap').hidden=false;layoutPrint(
 $('prDeg').onchange=()=>{buildPrint();layoutPrint();};
 $('prClose').onclick=()=>{$('printWrap').hidden=true;};
 // PDF のファイル名は document.title になる
-$('prGo').onclick=()=>{const t=document.title;document.title=song.title||'ChordSketch';print();document.title=t;};
+// 印刷。JUCE 版の WebView は print() を扱わないので、C++ から OS の印刷画面を出す（PDF もそこから保存）
+const nativePrint=nativeFn('printPage');
+$('prGo').onclick=async()=>{
+  if(nativePrint){if(!await nativePrint({title:song.title||'ChordSketch'}).catch(()=>false))toast('印刷画面を出せませんでした');return;}
+  const t=document.title;document.title=song.title||'ChordSketch';print();document.title=t;
+};
 
 /* ---------- MIDI 鍵盤 ----------
    JUCE 版：C++ が鳴らし、押している鍵盤が "midiNotes" で届く（機器は「オプション → オーディオ／MIDI の設定」）。

@@ -54,7 +54,8 @@ private:
     void songOpen (juce::WebBrowserComponent::NativeFunctionCompletion completion);
     void songSaveAs (const juce::Array<juce::var>& args, juce::WebBrowserComponent::NativeFunctionCompletion completion);
 
-    std::unique_ptr<juce::FileChooser> fileChooser;
+    // JS: printPage({ title }) — コード譜を印刷（macOS の印刷画面。@media print の見た目）
+        std::unique_ptr<juce::FileChooser> fileChooser;
 
     // 試聴（JS の player.js から）：
     //   songPlay({ notes:[開始秒, 長さ秒, 音, 強さ0〜1, …], drums:[開始秒, 種類, …], length, leadIn, loop, timbre, session })
