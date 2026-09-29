@@ -9,7 +9,7 @@ import * as player from './player.js';
 
 /* ---------- 状態 ---------- */
 const STORE='chordsketch.v1';
-const UI_DEFAULT={snap:'beat',perRow:4,insLen:'bar',dia:'7',timbre:'piano',metro:'click',metroOn:true,countIn:false,countBars:1,loop:false,keepNames:false,step:false,theme:'light',prog:{major:0,minor:13},progVar:0};
+const UI_DEFAULT={snap:'beat',perRow:4,insLen:'bar',dia:'7',timbre:'piano',metro:'click',metroOn:true,countIn:false,countBars:1,songFile:'',loop:false,keepNames:false,step:false,theme:'light',prog:{major:0,minor:13},progVar:0};
 let song, ui={...UI_DEFAULT};
 let tl;                     // timeline(song) のキャッシュ（changed() で更新）
 let sel=null;               // 選択中のコード {si,id}
@@ -47,7 +47,7 @@ let saveTimer=0;
 function persist(){clearTimeout(saveTimer);saveTimer=setTimeout(()=>localStorage.setItem(STORE,JSON.stringify({song,ui})),300);}
 function snapshot(){undoStack.push(JSON.stringify(song));if(undoStack.length>300)undoStack.shift();redoStack.length=0;}
 function commit(mut){snapshot();mut();changed();}
-function changed(){tl=timeline(song);fixSelection();render();persist();player.refresh();}   // 再生中ならすぐ反映
+function changed(){tl=timeline(song);fixSelection();render();persist();player.refresh();markDirty();}   // 再生中ならすぐ反映
 function undo(){if(!undoStack.length)return;redoStack.push(JSON.stringify(song));song=JSON.parse(undoStack.pop());changed();}
 function redo(){if(!redoStack.length)return;undoStack.push(JSON.stringify(song));song=JSON.parse(redoStack.pop());changed();}
 function fixSelection(){
@@ -886,6 +886,11 @@ function deleteRangeBars(){
 
 /* ---------- キーボード ---------- */
 addEventListener('keydown',e=>{
+  if((e.metaKey||e.ctrlKey)&&(e.key.toLowerCase()==='s'||e.key.toLowerCase()==='o')){
+    e.preventDefault();
+    if(e.key.toLowerCase()==='o')openFile();else if(e.shiftKey)saveFileAs();else saveFile();
+    return;
+  }
   if(e.target.closest?.('input,select,textarea')&&e.key!=='Escape')return;
   const mod=e.metaKey||e.ctrlKey, k=e.key.toLowerCase();
   if(mod&&k==='z'){e.preventDefault();e.shiftKey?redo():undo();return;}
@@ -1129,22 +1134,64 @@ function download(blob,name){
 }
 
 /* ---------- ファイル ---------- */
+function markDirty(){dirty=true;renderFileState();}   // 保存していない変更あり
 const fileMenu=$('fileMenu');
 $('fileBtn').onclick=e=>{e.stopPropagation();$('themeMenu').hidden=true;$('metroMenu').hidden=true;fileMenu.hidden=!fileMenu.hidden;};
 addEventListener('click',()=>{fileMenu.hidden=true;});
 fileMenu.addEventListener('click',e=>{
-  const act=e.target.dataset.act;if(!act)return;
-  if(act==='new')replaceSong(newSong());
-  if(act==='demo')replaceSong(demoSong());
-  if(act==='open')$('fileInput').click();
-  if(act==='save')askFileName((song.title||'song')+'.chordsketch','.chordsketch',$('fileBtn')).then(name=>{
-    if(name)download(new Blob([JSON.stringify({app:'ChordSketch',v:1,song},null,1)],{type:'application/json'}),name);
-  });
+  const act=e.target.closest('[data-act]')?.dataset.act;if(!act)return;
+  fileMenu.hidden=true;
+  if(act==='new'){replaceSong(newSong());setFile('',null);}
+  if(act==='demo'){replaceSong(demoSong());setFile('',null);}
+  if(act==='open')openFile();
+  if(act==='save')saveFile();
+  if(act==='saveas')saveFileAs();
 });
+// 上書き保存・名前を付けて保存。ブラウザでは File System Access API（Chrome など）があれば同じファイルに書き込む。
+// 無ければ「名前を付けて保存」は名前を聞いてダウンロード、「上書き保存」は同じ名前でダウンロードし直す（JUCE 版はネイティブのファイルに書く）
+let fileHandle=null, songFile=ui.songFile||'', dirty=false;
+const SONG_EXT='.chordsketch', PICK_TYPES=[{description:'ChordSketch の曲',accept:{'application/json':[SONG_EXT]}}];
+const songJSON=()=>JSON.stringify({app:'ChordSketch',v:1,song},null,1);
+async function writeHandle(hd){const w=await hd.createWritable();await w.write(songJSON());await w.close();}
+function setFile(name,handle){songFile=name;fileHandle=handle||null;ui.songFile=name;dirty=false;persist();renderFileState();}
+function renderFileState(){
+  $('fileState').hidden=!dirty;
+  $('fileBtn').title=`ファイル：${songFile||'（まだ保存していない曲）'}${dirty?'・保存していない変更あり':''}`;
+}
+async function saveFileAs(){
+  const suggested=withExtension(songFile||song.title||'song',SONG_EXT);
+  if('showSaveFilePicker' in window){
+    try{
+      let hd=await showSaveFilePicker({suggestedName:suggested,types:PICK_TYPES});
+      // 拡張子を付けずに名前を入れたときは付け直す（できるブラウザだけ）
+      if(!hd.name.toLowerCase().endsWith(SONG_EXT)&&hd.move){try{await hd.move(withExtension(hd.name,SONG_EXT));}catch{}}
+      await writeHandle(hd);setFile(hd.name,hd);
+    }catch(e){if(e.name!=='AbortError'){console.error(e);alert('保存できませんでした。');}}
+    return;
+  }
+  const name=await askFileName(suggested,SONG_EXT,$('fileBtn'));if(!name)return;
+  download(new Blob([songJSON()],{type:'application/json'}),name);setFile(name,null);
+}
+async function saveFile(){
+  if(fileHandle){try{await writeHandle(fileHandle);setFile(songFile,fileHandle);return;}catch(e){console.error(e);}}
+  if(!songFile||'showSaveFilePicker' in window&&!fileHandle){await saveFileAs();return;}   // まだ保存していない、または書き込み先を忘れた
+  download(new Blob([songJSON()],{type:'application/json'}),songFile);setFile(songFile,null);
+}
+async function openFile(){
+  if('showOpenFilePicker' in window){
+    try{const [hd]=await showOpenFilePicker({types:PICK_TYPES,multiple:false});loadSongText(await (await hd.getFile()).text(),hd.name,hd);}
+    catch(e){if(e.name!=='AbortError')console.error(e);}
+    return;
+  }
+  $('fileInput').click();
+}
+function loadSongText(text,name,handle){
+  try{const s=validSong(JSON.parse(text).song);if(!s)throw 0;replaceSong(s);setFile(name,handle);}
+  catch{alert('ChordSketch の曲ファイルとして読み込めませんでした。');}
+}
 $('fileInput').addEventListener('change',async e=>{
   const f=e.target.files[0];e.target.value='';if(!f)return;
-  try{const s=validSong(JSON.parse(await f.text()).song);if(!s)throw 0;replaceSong(s);}
-  catch{alert('ChordSketch の曲ファイルとして読み込めませんでした。');}
+  loadSongText(await f.text(),f.name,null);
 });
 function replaceSong(s){
   player.stop();commit(()=>{song=s;});sel=null;range=null;cursor={gi:0,pos:0};rotateTo(curKey().idx,true);render();
@@ -1402,4 +1449,4 @@ function fit(){
   $('stage').style.transform=`translate(-50%,-50%) scale(${s})`;
 }
 addEventListener('resize',()=>{fit();renderSheet();});
-fit();applyTheme();rotateTo(curKey().idx,true);render();renderLive();
+fit();applyTheme();rotateTo(curKey().idx,true);render();renderLive();renderFileState();

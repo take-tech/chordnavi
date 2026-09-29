@@ -331,3 +331,8 @@ body.grabbing,body.grabbing *{cursor:grabbing!important}
 .metro-pop{left:0;right:auto;min-width:130px;top:24px}
 .metro-pop button[aria-checked=true]{font-weight:700;color:var(--live)}
 .metro-pop button[aria-checked=true]::after{content:' ✓'}
+
+/* ファイルのメニュー：右にキー操作 */
+.menu-pop button kbd{float:right;margin-left:16px;font:inherit;font-size:11px;color:var(--faint)}
+.file-state{color:var(--chord);font-size:10px;margin-left:-3px}
+.file-state[hidden]{display:none}
