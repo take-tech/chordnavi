@@ -22,6 +22,7 @@ sketch/prototype/
 
 - `song = {title, key:{idx,mode}, bpm, meter:[n,d], pattern, octave, bassOctave, bass, sections:[…]}`
 - `section = {id, name, color, bars, pattern|null, chords:[…], marks:[…]}`。セクションは小節の並びで、並べ替え・複製ができる。
+- セクションの名前は自由記述。追加はシート末尾の入力欄（名前＋小節数、Enter か「＋ 追加」。空欄では追加しない）。定番名（Intro・Aメロ・Bメロ・サビ・間奏・Cメロ・落ちサビ・Outro）のボタンは入力欄に入れるだけ。色は定番名ならその色、それ以外は直前のセクションの次の色。追加後も見出しの名前欄で変えられる。
 - `chord = {id, bar, pos, len, off, q, boff?}`：`bar` はセクション内の小節、`pos`・`len` は tick（4分音符＝480）。`off`・`boff` は主音からの半音数（ChordNavi の `chordAt` と同じ）なので、キーを変えると度数を保って移調する（「音名を保つ」オンなら度数を付け替えて音名を保つ）。長さは小節をまたげるが、セクションの終わりで切る。
 - `mark = {bar, pos, bpm}`（テンポ：任意の位置。半拍単位）／`{bar, pos:0, meter}`（拍子：小節の頭のみ）。変更はセクションの並び順に流れる。1小節目の値は `song.bpm`・`song.meter`。
 - 配置は上書き：重なった前のコードは切る（長いコードの途中なら前後に分ける）、後ろのコードは頭を削る、中に収まるコードは消す。長さの変更は次のコードの頭まで。

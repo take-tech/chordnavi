@@ -297,15 +297,35 @@ function renderSheet(){
   const cb=tl.bars[cursor.gi], cl=barEl(cursor.gi)?.querySelector('.lane');
   if(cb&&cl&&!player.isPlaying()){const c=h('div','cursor');c.style.left=cursor.pos/cb.ticks*100+'%';cl.appendChild(c);}
   placePlayhead();
-  // セクションの追加
-  const add=h('div','add-sec');add.appendChild(h('span','lbl','＋ セクションを追加'));
+  // セクションの追加：名前は自由に入力（定番名のボタンは入力欄に入れるだけ。候補は入力欄の一覧にも出る）
+  const add=h('div','add-sec');
+  const nm=h('input','add-name');nm.placeholder='セクション名（例：Aメロ、2番サビ、Solo）';nm.maxLength=30;
+  nm.setAttribute('list','secNames');nm.setAttribute('aria-label','追加するセクションの名前');
+  const bars=h('input','');bars.type='number';bars.min=1;bars.max=128;bars.value=8;bars.style.width='46px';bars.title='小節数';
+  const go=h('button','add-go','＋ 追加');
+  const addSection=()=>{
+    const name=nm.value.trim();
+    if(!name){nm.focus();return;}
+    const pr=SECTION_PRESETS.find(p=>p.name===name);
+    // 定番の名前ならその色、それ以外は直前のセクションの次の色
+    const color=pr?pr.color:((song.sections.at(-1)?.color??-1)+1)%SECTION_COLORS.length;
+    commit(()=>song.sections.push(newSection(name,color,Math.max(1,Math.min(128,Math.round(+bars.value)||8)))));
+    sheet.scrollTop=sheet.scrollHeight;
+    sheet.querySelector('.add-name')?.focus();
+  };
+  go.onclick=addSection;
+  nm.addEventListener('keydown',e=>{e.stopPropagation();if(e.key==='Enter')addSection();});
+  bars.addEventListener('keydown',e=>{e.stopPropagation();if(e.key==='Enter')addSection();});
+  add.append(h('span','lbl','セクションを追加'),nm,bars,h('span','lbl','小節'),go);
+  const presets=h('div','add-presets');
   for(const pr of SECTION_PRESETS){
-    const b=h('button','',pr.name);b.style.color=SECTION_COLORS[pr.color];
-    b.onclick=()=>commit(()=>song.sections.push(newSection(pr.name,pr.color,8)));
-    add.appendChild(b);
+    const b=h('button','',pr.name);b.style.color=SECTION_COLORS[pr.color];b.title='名前を入力欄に入れる';
+    b.onclick=()=>{nm.value=pr.name;nm.focus();};
+    presets.appendChild(b);
   }
+  add.appendChild(presets);
   sheet.appendChild(add);
-  if(!song.sections.length)sheet.prepend(h('div','empty','セクションがありません。下のボタンから追加してください。'));
+  if(!song.sections.length)sheet.prepend(h('div','empty','セクションがありません。下の欄に名前を入れて追加してください。'));
   sheet.scrollTop=scroll;
 }
 function barCell(b,rowEnd,songEnd){

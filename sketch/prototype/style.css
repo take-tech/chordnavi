@@ -154,7 +154,10 @@ h1{font-size:19px;font-weight:900;letter-spacing:.02em;margin:0 6px 0 0;white-sp
 .drop{position:absolute;top:3px;bottom:3px;border:2px dashed var(--chord);border-radius:4px;background:rgba(196,69,106,.08);pointer-events:none;z-index:2}
 .add-sec{margin:14px 0 0 12px;display:flex;gap:4px;flex-wrap:wrap;align-items:center}
 .add-sec .lbl{margin-right:4px}
-.add-sec button{font-size:11px;border-style:dashed;padding:1px 8px}
+.add-sec input.add-name{width:260px;font-size:12px}
+.add-sec .add-go{font-weight:700;border-color:var(--ink2)}
+.add-presets{display:flex;gap:4px;flex-wrap:wrap;width:100%;padding-left:98px}
+.add-presets button{font-size:11px;border-style:dashed;padding:0 8px}
 .empty{padding:40px;text-align:center;color:var(--muted)}
 
 /* 下のバー（選択中のコード・範囲・カーソル） */
