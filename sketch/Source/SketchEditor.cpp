@@ -1,5 +1,6 @@
 #include "SketchEditor.h"
 #include "WebResources.h"
+#include "WebViewZoom.h"
 #include "ChordSketchUIData.h"
 
 namespace
@@ -43,4 +44,14 @@ SketchEditor::SketchEditor (SketchProcessor& p)
 void SketchEditor::resized()
 {
     webView.setBounds (getLocalBounds());
+    updateZoom();
+}
+
+void SketchEditor::updateZoom()
+{
+    const auto zoom = juce::jmin (getWidth() / (double) baseWidth, getHeight() / (double) baseHeight);
+    WebViewZoom::apply (*this, zoom);
+    // 画面に出た直後は WKWebView がまだできていないことがあるので、少し後にもう一度
+    juce::Component::SafePointer<SketchEditor> self (this);
+    juce::Timer::callAfterDelay (200, [self, zoom] { if (self != nullptr) WebViewZoom::apply (*self, zoom); });
 }

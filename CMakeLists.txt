@@ -164,6 +164,10 @@ target_sources(ChordSketch PRIVATE
     sketch/Source/SketchEditor.cpp
     sketch/Source/SketchStandaloneApp.cpp
 )
+if(APPLE)
+    # WebView のページのズーム（文字がにじまないように。GUI を使うのでテストの RanzeShared には入れない）
+    target_sources(ChordSketch PRIVATE shared/cpp/WebViewZoom.mm)
+endif()
 
 if(WIN32)
     target_compile_definitions(ChordSketch PUBLIC JUCE_USE_WIN_WEBVIEW2_WITH_STATIC_LINKING=1)

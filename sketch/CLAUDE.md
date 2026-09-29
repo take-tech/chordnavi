@@ -14,6 +14,7 @@
 - CMake のターゲット `ChordSketch`（`ChordSketch_Standalone`）。プラグインのコード `Cdsk`（メーカー `Rnze`）、表示名「ChordSketch」、バンドル ID `com.ranze.chordsketch`、バージョン 0.1.0。設定ファイルは `~/Library/Application Support/ChordSketch.settings`、Windows の WebView2 のデータは AppData の `ChordSketch/WebView2`。
 - UI は `sketch/prototype/` の html・js・css をそのまま埋め込む（`ChordSketchUIData`。共通の `shared/ui/` と JUCE の JS も）。プロトタイプを正とするのでコピーしない。
 - C++ は `sketch/Source/`：`SketchProcessor`（今は無音。画面の状態 JSON を `PluginState` で預かる）、`SketchEditor`（WebView。`WebResources` で配信）、`SketchStandaloneApp`（ChordNavi と同じネイティブのタイトルバー、メニュー「オプション → オーディオ／MIDI の設定…」）。
+- 拡大縮小：macOS では WKWebView のページのズーム（`shared/cpp/WebViewZoom.mm`）をウィンドウの大きさ÷1280×780 にして、画面側からはいつも基準の大きさに見せる（CSS の拡大縮小は倍率 1 のままなので文字がにじまない。座標の計算も変わらない）。Windows は画面側の CSS の拡大縮小（`fit()`：倍率が 1 にほぼ等しければ 1、位置は整数ピクセル）。
 - ビルド：`cmake --build build --target ChordSketch_Standalone`。`build/ChordSketch_artefacts/<構成>/Standalone/ChordSketch.app`。配布用のスクリプト・CI はまだ ChordNavi だけ。
 
 ## ファイル

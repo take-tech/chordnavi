@@ -28,8 +28,12 @@ public:
     ~SketchEditor() override = default;
 
     void resized() override;
+    void parentHierarchyChanged() override { updateZoom(); }
 
 private:
+    // WebView のページのズームをウィンドウの大きさに合わせる（macOS。文字がにじまないように）
+    void updateZoom();
+
     SketchProcessor& processorRef;
     SketchWebView webView;
 
