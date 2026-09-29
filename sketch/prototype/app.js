@@ -609,6 +609,21 @@ function moveSectionToTab(si,ti,copy){
   persist();
   toast(`「${name}」を「${d.song.title}」の最後に${copy?'コピー':'移動'}しました`);
 }
+// 画面の中の確認ダイアログ（choices：[{id,label,primary?,danger?}]）。選んだ id を返す（Esc・外を押したら 'cancel'）
+function askDialog(message,choices){
+  return new Promise(resolve=>{
+    const wrap=h('div','dialog-wrap'), box=h('div','dialog');
+    box.setAttribute('role','alertdialog');box.appendChild(h('p','dialog-msg',message));
+    const row=h('div','dialog-btns');
+    const done=v=>{wrap.remove();removeEventListener('keydown',key,true);resolve(v);};
+    for(const c of choices){const b=h('button',(c.primary?'primary':'')+(c.danger?' danger':''),c.label);b.onclick=()=>done(c.id);row.appendChild(b);}
+    box.appendChild(row);wrap.appendChild(box);document.body.appendChild(wrap);
+    wrap.addEventListener('pointerdown',e=>{if(e.target===wrap)done('cancel');});
+    const key=e=>{e.stopPropagation();if(e.key==='Escape'){e.preventDefault();done('cancel');}};
+    addEventListener('keydown',key,true);
+    (row.querySelector('.primary')||row.firstChild).focus();
+  });
+}
 function toast(msg){
   let t=$('toast');if(!t){t=h('div','toast');t.id='toast';document.body.appendChild(t);}
   t.textContent=msg;t.classList.add('on');clearTimeout(t._timer);t._timer=setTimeout(()=>t.classList.remove('on'),2600);
@@ -1192,7 +1207,7 @@ async function saveFileAs(){
       // 拡張子を付けずに名前を入れたときは付け直す（できるブラウザだけ）
       if(!hd.name.toLowerCase().endsWith(SONG_EXT)&&hd.move){try{await hd.move(withExtension(hd.name,SONG_EXT));}catch{}}
       await writeHandle(hd);setFile(hd.name,hd);
-    }catch(e){if(e.name!=='AbortError'){console.error(e);alert('保存できませんでした。');}}
+    }catch(e){if(e.name!=='AbortError'){console.error(e);toast('保存できませんでした');}}
     return;
   }
   const name=await askFileName(suggested,SONG_EXT,$('fileBtn'));if(!name)return;
@@ -1213,7 +1228,7 @@ async function openFile(){
 }
 function loadSongText(text,name,handle){
   try{const s=validSong(JSON.parse(text).song);if(!s)throw 0;openInTab(s,name,handle);}
-  catch{alert('ChordSketch の曲ファイルとして読み込めませんでした。');}
+  catch{toast('ChordSketch の曲ファイルとして読み込めませんでした');}
 }
 $('fileInput').addEventListener('change',async e=>{
   const f=e.target.files[0];e.target.value='';if(!f)return;
@@ -1241,9 +1256,18 @@ function openInTab(s,name='',handle=null){
   docs[active]={song:s,file:name,handle,undo:[],redo:[],dirty:false};
   loadDoc(active);persist();
 }
-function closeTab(i){
+// 保存していない変更があれば、そのタブに切り替えてから「保存して閉じる／保存しないで閉じる／キャンセル」を聞く
+// （JUCE の WebView は confirm() を出せないので、画面の中のダイアログにする）
+async function closeTab(i){
   const d=i===active?{song,dirty}:docs[i];
-  if(d.dirty&&!confirm(`「${d.song.title}」の変更を保存していません。閉じますか？`))return;
+  if(d.dirty){
+    if(i!==active)switchTab(i);
+    const choice=await askDialog(`「${song.title}」の変更を保存していません。`,[
+      {id:'save',label:'保存して閉じる',primary:true},{id:'discard',label:'保存しないで閉じる',danger:true},{id:'cancel',label:'キャンセル'}]);
+    if(choice==='cancel'||!choice)return;
+    if(choice==='save'){await saveFile();if(dirty)return;}   // 保存を取り消したら閉じない
+    i=active;
+  }
   if(i===active)stashDoc();
   docs.splice(i,1);
   if(!docs.length)docs=[{song:newSong(),undo:[],redo:[]}];

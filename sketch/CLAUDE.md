@@ -16,6 +16,9 @@
 - C++ は `sketch/Source/`：`SketchProcessor`（今は無音。画面の状態 JSON を `PluginState` で預かる）、`SketchEditor`（WebView。`WebResources` で配信）、`SketchStandaloneApp`（ChordNavi と同じネイティブのタイトルバー、メニュー「オプション → オーディオ／MIDI の設定…」）。
 - 拡大縮小：macOS では WKWebView のページのズーム（`shared/cpp/WebViewZoom.mm`）をウィンドウの大きさ÷1280×780 にして、画面側からはいつも基準の大きさに見せる（CSS の拡大縮小は倍率 1 のままなので文字がにじまない。座標の計算も変わらない）。Windows は画面側の CSS の拡大縮小（`fit()`：倍率が 1 にほぼ等しければ 1、位置は整数ピクセル）。
 - ネイティブ関数（`SketchEditor`）：`startMidiDragBytes({name,data})`（data は JS の `buildSmf` の SMF を base64。一時フォルダの `ChordSketch/` に書いて OS のファイルドラッグ）、`saveMidiBytes({name,data})`（保存ダイアログ。拡張子 .mid が無ければ付ける）。JS は `shared/ui/juce-bridge.js` があるとき（JUCE 版）だけ使い、MIDI のドラッグは押して 4px 動かしたら始める（WebView では HTML のドラッグを使わない）。ブラウザでは Chrome の `DownloadURL` とダウンロード。
+- 試聴（JUCE 版）：`SketchProcessor` が `PreviewSynth`（単発のコード・MIDI 鍵盤）と `SongPlayer`（曲）を鳴らす。`player.js` は曲全体の予定表（秒。ノート [開始, 長さ, 音, 強さ]、ドラム [開始, 種類]、カウントインは負の時刻のクリック）を `songPlay` で渡し、再生中の変更・ループの切り替えは `songUpdate`、止めるのは `songStop`。位置は 30Hz の `songPos`（あいだは経過時間で補う）。音色は C++ の 6 種類（ブラウザは WebAudio の 4 種類）。単発は `previewNotes`、ミュートは `setMute`、MIDI 鍵盤の音色は `setTimbre`。
+- MIDI 鍵盤（JUCE 版）：C++ が鳴らし（サステインペダル対応）、押している鍵盤（ペダルで伸ばしている音は含めない）を 30Hz の `midiNotes` で送る。コード判別・ステップ入力は JS（ブラウザは Web MIDI）。
+- JUCE の WebView（macOS）は `alert()`・`confirm()` を出せないので使わない：確認は画面の中のダイアログ（`askDialog`）、知らせはトースト。
 - ビルド：`cmake --build build --target ChordSketch_Standalone`。`build/ChordSketch_artefacts/<構成>/Standalone/ChordSketch.app`。配布用のスクリプト・CI はまだ ChordNavi だけ。
 
 ## ファイル
