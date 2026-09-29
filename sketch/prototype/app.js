@@ -150,7 +150,7 @@ function rotateTo(idx,instant){
   anim=requestAnimationFrame(step);
 }
 // キーの変更：カーソルのある範囲（曲の頭または途中のキーの変更点〜次の変更点）のキーを変える。
-// 既定は度数を保って移調。「音名を保つ」なら、その範囲のコードの度数を付け替えてコード名（鳴る音）を変えない
+// 既定は度数を保って移調。「コード固定」なら、その範囲のコードの度数を付け替えてコード名（鳴る音）を変えない
 function setKey(idx,mode){
   const k=curKey();
   if(idx===k.idx&&mode===k.mode)return;
