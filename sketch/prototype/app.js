@@ -935,19 +935,31 @@ function startPlay(){
   render();
 }
 function togglePlay(){if(player.isPlaying()){player.stop();progPreview=false;playTick=null;playingId=null;render();}else startPlay();}
+// カウントインの「•」：大きな拍（6/8 なら付点4分）で数える。8つを超えるなら今の小節の分だけ並べ、前に「2/2」のように小節を出す
+function renderCountDots(disp,cnt,m){
+  const {P,size}=player.pulsesOf(m);
+  const n=cnt?.n??m[0], bars=Math.max(1,Math.round(n/m[0])), total=P*bars;
+  const k=cnt&&cnt.beat>=0?Math.floor(cnt.beat/size):-1;
+  const perBar=total>8, cur=perBar?Math.max(0,Math.floor(k/P)):0;
+  const dots=perBar?P:total, lit=perBar?k-cur*P:k;
+  const key='count:'+m.join('/')+':'+total+':'+k;
+  if(lastPos===key)return;
+  disp.innerHTML='';disp.classList.toggle('many',dots>4);disp.classList.toggle('tiny',perBar&&dots>5);   // 「2/2」＋6つ以上はさらに小さく
+  if(perBar)disp.appendChild(h('span','cbar',`${cur+1}/${bars}`));
+  for(let i=0;i<dots;i++)disp.appendChild(h('span','cdot'+(i<=lit?' on':''),'•'));
+  lastPos=key;
+}
+// 開発用：拍子を変えずにカウントの表示を確かめる（例：__countDots({beat:5,n:12},[6,8])）
+window.__countDots=(cnt,m)=>{const d=$('posDisp');d.classList.add('count');lastPos='';renderCountDots(d,cnt,m);return d;};
 function onPos(abs,counting,cnt){
   const disp=$('posDisp');
   disp.classList.toggle('count',!!counting);
   // カウントイン：拍の数だけ「・」を並べ、鳴った拍まで赤くする
-  if(abs==null){
-    const n=cnt?.n??4, k=cnt?.beat??-1, key='count:'+n+':'+k;
-    if(lastPos!==key){disp.innerHTML='';disp.classList.toggle('many',n>4);for(let i=0;i<n;i++)disp.appendChild(h('span','cdot'+(i<=k?' on':''),'•'));lastPos=key;}
-    return;
-  }
+  if(abs==null){renderCountDots(disp,cnt,meterAt(tl.meters,playFrom));return;}
   playTick=abs;
   const b=tl.bars.find(x=>abs>=x.start&&abs<x.start+x.ticks)||tl.bars.at(-1);
   const s=fmtPos(b.gi,Math.floor((abs-b.start)/SIXTEENTH)*SIXTEENTH);
-  if(s!==lastPos){disp.textContent=s;disp.classList.remove('many');lastPos=s;scrollToBar(b.gi);}
+  if(s!==lastPos){disp.textContent=s;disp.classList.remove('many','tiny');lastPos=s;scrollToBar(b.gi);}
   renderLcd(abs);
   const p=placedChords(song,tl).find(x=>abs>=x.start&&abs<x.end);
   const id=p?.c.id??null;

@@ -74,6 +74,10 @@ h1{font-size:17px;font-weight:900;letter-spacing:.02em;margin:0 6px 0 0;white-sp
 .lcd .pos.count{gap:5px}
 .lcd .pos.count.many{gap:1px}
 .lcd .pos.many .cdot{font-size:12px}
+.lcd .cbar{font-size:10px;color:var(--lcd-lo);margin-right:3px}
+.lcd .pos.tiny .cdot{font-size:9px}
+.lcd .pos.tiny .cbar{font-size:9px;margin-right:1px}
+.lcd .lcd-c{overflow:hidden}   /* 数字・「•」が隣の欄にはみ出さない */
 .lcd .cdot{color:var(--lcd-dim);font-size:16px;line-height:1;transition:color .05s}
 .lcd .cdot.on{color:#FF5C7A}   /* カウントイン：鳴った拍 */
 .loop svg{display:block}
