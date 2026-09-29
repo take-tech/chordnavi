@@ -202,5 +202,20 @@ test('途中のキー変更：度数はその位置のキーが基準、コー�
   setKeyMark(s,1,0,null,true);assert.deepEqual(s.sections[1].chords.map(c=>c.off),[5,7]);
   s.sections[1].marks.push({bar:0,pos:0,key:{idx:0,mode:'major'}});pruneMarks(s);assert.equal(s.sections[1].marks.length,0);
 });
+test('ギターのアルペジオ：頭はベースだけ、上の弦を上って下る、弦は鳴らしたまま',()=>{
+  const s=newSong();s.voicing='guitar';s.pattern='arp';s.sections=[newSection('A',1,1)];placeChord(s,0,newChord(0,0,B,0,''));
+  const form=voicingOf(s,{root:0,q:''}).form, [low,...up]=form.notes, r=renderSong(s).notes;
+  assert.deepEqual(r.filter(n=>n.t===0).map(n=>n.n),[low]);                       // 1拍目はベースだけ
+  const arp=r.filter(n=>n.t>0).sort((a,b)=>a.t-b.t);
+  assert.equal(arp.length,7);
+  const seq=[...up.keys(),...[...up.keys()].slice(1,-1).reverse()];
+  assert.deepEqual(arp.map(n=>n.n),[...seq,...seq].slice(0,7).map(i=>up[i]));      // 上って下る
+  assert.ok(arp.every(n=>form.notes.includes(n.n)));                               // フォームの外の音は無い
+  assert.ok(arp[0].d>PPQ);                                                          // 鳴らしたまま（8分より長い）
+  for(const n of arp){const nx=arp.find(m=>m.n===n.n&&m.t>n.t);assert.ok(n.t+n.d<=(nx?nx.t:B));}   // 同じ弦を弾き直す前に止める
+  // バラード：伸ばす和音は外す（同じ音が重ならない）
+  s.pattern='ballad';const b=renderSong(s).notes;
+  assert.ok(b.every(n=>!b.some(m=>m!==n&&m.n===n.n&&m.t<n.t+n.d&&n.t<m.t+m.d)));
+});
 test('ファイル名',()=>{assert.equal(safeFileName('サビ F♯m7 B♭'),'F#m7_Bb');});
 console.log(`${n} tests passed`);

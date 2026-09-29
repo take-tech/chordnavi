@@ -361,6 +361,8 @@ export function voicingOf(song,ch,prev=null){
   const up=CHORD[ch.q].iv.map(i=>48+ch.root+i+12*song.octave);
   return {bass:36+(ch.bass??ch.root)+12*song.bassOctave,upper:up,form:null};
 }
+// 上って下る順番（4本なら 0,1,2,3,2,1）
+const bounce=n=>n<=1?[0]:[...Array(n).keys(),...[...Array(n-2).keys()].map(k=>n-2-k)];
 const arpNote=(upper,i)=>upper[i%upper.length]+12*Math.floor(i/upper.length);
 
 // 1つのコード（p.start〜p.end）のノート。
@@ -379,6 +381,21 @@ function chordNotes(song,tl,p,tie,voicing){
       if(cyc+ev.t>=b.ticks||t<s||t>=e)continue;
       hits.push({...ev,t,d:Math.min(ev.d,b.start+b.ticks-t)});
     }
+  }
+  // ギターのアルペジオ：1拍目（小節の頭）はベースだけ、あとは上の弦を低い方から上って下る（フォームの外の音は足さない）。
+  // バラードの伸ばす和音は、同じ弦をアルペジオでも弾くので外す
+  const guitar=song.voicing==='guitar'&&!!voicing.form;
+  if(guitar&&hits.some(h=>h.part==='arp')){
+    const seq=bounce(upper.length), count=new Map();
+    hits=hits.filter(h=>{
+      if(h.part==='chord'&&h.soft)return false;
+      if(h.part!=='arp')return true;
+      const b=barAt(h.t), rel=h.t-b.start;
+      if(rel%WHOLE===0)return false;
+      const cyc=b.start+rel-rel%WHOLE, k=count.get(cyc)||0;count.set(cyc,k+1);
+      h.i=seq[k%seq.length];
+      return true;
+    });
   }
   const emit=h=>{
     const v=VEL[h.part]+(h.acc?ACC:0)+(h.soft?SOFT:0);
@@ -420,7 +437,14 @@ function chordNotes(song,tl,p,tie,voicing){
     }
   }
   hits.forEach(emit);
-  if(song.voicing==='guitar')strum(out,tl);
+  if(guitar){
+    // 弾いた弦は、次に同じ弦（同じ音）を弾くまで鳴らしたまま（コードの終わりまで）
+    for(const n of out)if(n.part==='arp'){
+      const next=out.filter(m=>m!==n&&m.n===n.n&&m.t>n.t).reduce((a,m)=>Math.min(a,m.t),e);
+      n.d=Math.max(n.d,next-n.t);
+    }
+    strum(out,tl);
+  }
   // 小節線の1拍以内前から始まって小節線で終わるコード：次の同じコードへタイでつなぐ
   const tail=forced&&!exact.length&&bs&&e===bs.start+bs.ticks&&e-s<=beatTicksOf(bs.meter)?forced:null;
   return {notes:out,tail};

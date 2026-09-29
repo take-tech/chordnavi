@@ -149,7 +149,7 @@ body.grabbing,body.grabbing *{cursor:grabbing!important}
 .mark.meter{background:var(--root);color:#fff}
 .mark.key{background:var(--pick);color:#fff}
 .pop .chk{grid-column:1/-1;display:flex;align-items:center;gap:5px;font-size:11.5px;color:var(--ink2);cursor:pointer}
-.lane{position:relative;height:50px;background:var(--card);border-top:1px solid var(--grid);border-bottom:1px solid var(--grid);cursor:crosshair}
+.lane{position:relative;height:55px;background:var(--card);border-top:1px solid var(--grid);border-bottom:1px solid var(--grid);cursor:crosshair}
 .lane .beat{position:absolute;top:0;bottom:0;width:0;border-left:1px solid var(--grid)}
 .lane .half{position:absolute;top:28px;bottom:0;width:0;border-left:1px dotted var(--grid)}
 .bar.insel .lane{background:linear-gradient(var(--sel),var(--sel)),var(--card)}
@@ -157,8 +157,8 @@ body.grabbing,body.grabbing *{cursor:grabbing!important}
 .bar.play .bar-no{color:var(--chord);font-weight:700}
 .blk{position:absolute;top:3px;bottom:14px;border-radius:4px;background:var(--panel);border:1px solid var(--ink2);
   padding:1px 6px 0 5px;overflow:hidden;cursor:grab;touch-action:none;min-width:6px}
-.blk .n{display:block;font-weight:700;font-size:15px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.blk .d{display:block;font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.blk .n{display:block;font-weight:700;font-size:15px;line-height:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.blk .d{display:block;font-size:10px;line-height:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .blk.cont{border-left-style:dashed;border-top-left-radius:0;border-bottom-left-radius:0;background:var(--grid2)}
 .blk.cont .n{color:var(--faint);font-weight:500;font-size:12px}
 .blk.more{border-top-right-radius:0;border-bottom-right-radius:0;border-right-style:dashed}
