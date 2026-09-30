@@ -245,7 +245,8 @@ export function createRoll(root,ctx){
     };
     drag(move,up);
   }
-  // 音を押す：選ぶ（⇧で追加・外す）、ドラッグで動かす（右端は長さ）、ダブルクリックで消す
+  // 音を押す：選ぶ（⇧で追加・外す）、ドラッグで動かす（右端は長さ）、ダブルクリックで消す。
+  // ⌘（Ctrl）を押しながらドラッグ：複製を動かす（元の音は残す。選んでいる音をまとめて）
   function grabNote(e,el,p0){
     const id=el.dataset.id, now=performance.now();
     // ダブルクリック：前に同じ音を「動かさずに」押して離してから 350ms 以内（動かした直後に押しても消さない）
@@ -255,15 +256,18 @@ export function createRoll(root,ctx){
     if(!nsel.has(id))nsel=new Set([id]);
     const all=noteData(), me=all.find(x=>x.m.id===id);if(!me)return;
     ctx.preview(me.midi);
-    const r=el.getBoundingClientRect(), resize=e.clientX>r.right-6;
+    const r=el.getBoundingClientRect(), resize=e.clientX>r.right-6, copy=!resize&&(e.metaKey||e.ctrlKey);
     const picked=all.filter(x=>nsel.has(x.m.id));
-    const els=[...grid.querySelectorAll('.note')].filter(n=>nsel.has(n.dataset.id));
+    let els=[...grid.querySelectorAll('.note')].filter(n=>nsel.has(n.dataset.id));
     els.forEach(n=>n.classList.add('sel'));
+    // 複製：動かしているあいだは写しを出して、元の音はそのまま見せる（動かし始めてから作る）
+    const startCopy=()=>{els=els.map(n=>{const c=n.cloneNode(true);c.classList.add('copy');grid.appendChild(c);n.classList.remove('sel');return c;});};
     const st=snapT(), total=ctx.tl().total;
     let dt=0, dp=0, dl=0, moved=false, lastMidi=me.midi;
     const move=ev=>{
       const p=hit(ev);
       if(!moved&&Math.hypot((p.abs-p0.abs)*ppt(),(p.midi-p0.midi)*ROW)<4)return;
+      if(!moved&&copy)startCopy();
       moved=true;
       if(resize){
         dl=Math.max(st,snapRound(me.end+(p.abs-p0.abs))-me.start)-(me.end-me.start);
@@ -279,11 +283,17 @@ export function createRoll(root,ctx){
     const up=()=>{
       removeEventListener('pointermove',move);removeEventListener('pointerup',up);
       if(!moved){lastClick={id,t:now};ctx.changed(false);return;}
+      if(copy&&!dt&&!dp){ctx.changed(false);return;}   // 同じ場所に落としたら複製しない
+      const ids=[];
       ctx.commit(()=>{
         const song=ctx.song(), tl=ctx.tl();
-        removeNotes(song,new Set(picked.map(x=>x.m.id)));
-        for(const x of picked)addNote(song,tl,x.start+dt,resize?Math.max(st,x.end-x.start+dl):x.end-x.start,x.midi+dp,{v:x.m.v,id:x.m.id});
+        if(!copy)removeNotes(song,new Set(picked.map(x=>x.m.id)));
+        for(const x of picked){
+          const n=addNote(song,tl,x.start+dt,resize?Math.max(st,x.end-x.start+dl):x.end-x.start,x.midi+dp,{v:x.m.v,...(copy?{}:{id:x.m.id})});
+          if(n)ids.push(n.id);
+        }
       });
+      if(copy)nsel=new Set(ids);   // 複製したほうを選ぶ
       ctx.changed();
     };
     drag(move,up);

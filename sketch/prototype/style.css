@@ -409,6 +409,7 @@ body.grabbing,body.grabbing *{cursor:grabbing!important}
 .roll .note.sel{background:#C4456A;border-color:#8E2E4B}
 .roll .note.playing{box-shadow:0 0 0 2px var(--root)}
 .roll .note.drawing{opacity:.7}
+.roll .note.copy{opacity:.85;z-index:3}
 .roll .rcursor{background:var(--live);opacity:.7;pointer-events:none;z-index:3}
 .roll .rplay{background:var(--chord);pointer-events:none;z-index:3}
 .roll .rplay[hidden]{display:none}
