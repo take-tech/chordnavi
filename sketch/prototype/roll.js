@@ -17,6 +17,8 @@ export const M_LENS=[{id:'1',name:'全音符',t:1920},{id:'2',name:'2分',t:960}
 export const M_ZOOMS=[22,34,52];   // 4分音符あたりの横幅（px）
 const ROW=14, KEYW=46, HEAD=62, LOW=MELODY_LOW, HIGH=MELODY_HIGH, ROWS=HIGH-LOW+1;
 const BLACK=new Set([1,3,6,8,10]);
+// コードの構成音の、ルートからの度数の書き方（半音の数 → 表記）。分数コードのベースは B
+const TONE_LABEL=['R','♭9','9','♭3','3','11','♭5','5','♯5','6','♭7','7'];
 
 // ctx：song()・tl()・ui・commit(fn)・changed()・preview(midi)・cursorAbs()・setCursorAbs(abs)・isPlaying()・fmtPos(abs)
 export function createRoll(root,ctx){
@@ -86,25 +88,34 @@ export function createRoll(root,ctx){
 
     /* ピアノロール */
     grid=h('div','rg');grid.style.width=W+'px';grid.style.height=H+'px';
-    for(let m=HIGH;m>=LOW;m--)grid.appendChild(box('rrow'+(BLACK.has(m%12)?' black':''),0,y(m),W,ROW));
-    // ガイド：スケールの音（キーが続く範囲ごと）
-    if(ctx.ui.guideScale){
+    // 行：スケールのガイドがオフなら黒鍵の行を少し暗く。オンならスケールの外の行を灰色にする（スケールの音の行は白いまま）
+    const gs=ctx.ui.guideScale;
+    for(let m=HIGH;m>=LOW;m--)grid.appendChild(box('rrow'+(!gs&&BLACK.has(m%12)?' black':''),0,y(m),W,ROW));
+    if(gs){
       let i=0;
-      while(i<tl.bars.length){
+      while(i<tl.bars.length){   // キーが続く範囲ごと
         const k=tl.bars[i].key;let j=i+1;
         while(j<tl.bars.length&&tl.bars[j].key===k)j++;
         const t=tonicOf(k.idx,k.mode), iv=new Set(scaleById(keyScale(k)).iv.map(x=>mod12(t+x)));
         const x0=tl.bars[i].start*px, x1=(tl.bars[j-1].start+tl.bars[j-1].ticks)*px;
-        for(let m=LOW;m<=HIGH;m++)if(iv.has(m%12))grid.appendChild(box('gscale'+(m%12===t?' tonic':''),x0,y(m),x1-x0,ROW));
+        for(let m=LOW;m<=HIGH;m++){
+          if(!iv.has(m%12))grid.appendChild(box('gout',x0,y(m),x1-x0,ROW));
+          else if(m%12===t)grid.appendChild(box('gtonic',x0,y(m),x1-x0,ROW));
+        }
         i=j;
       }
     }
-    // ガイド：そこで鳴っているコードの構成音（ルートは濃く）
+    // ガイド：そこで鳴っているコードの構成音（ルートは濃く）。コードの頭に、ルートからの度数（R・3・5・♭7…）を書く
     if(ctx.ui.guideChord)for(const p of pcs){
-      const ch=p.ch, tones=new Set((CHORD[ch.q]?.iv||[]).map(x=>mod12(ch.root+x)));
-      if(ch.bass!=null)tones.add(ch.bass);
+      const ch=p.ch, tones=new Map((CHORD[ch.q]?.iv||[]).map(x=>[mod12(ch.root+x),TONE_LABEL[mod12(x)]]));
+      if(ch.bass!=null&&!tones.has(ch.bass))tones.set(ch.bass,'B');
       const x0=p.start*px, w=(p.end-p.start)*px;
-      for(let m=LOW;m<=HIGH;m++)if(tones.has(m%12))grid.appendChild(box('gtone'+(m%12===ch.root?' root':''),x0,y(m),w,ROW));
+      for(let m=LOW;m<=HIGH;m++){
+        const lb=tones.get(m%12);if(lb==null)continue;
+        const e=box('gtone'+(m%12===ch.root?' root':''),x0,y(m),w,ROW);
+        if(w>=22)e.append(h('span','',lb));
+        grid.appendChild(e);
+      }
     }
     // 小節線・拍の線
     for(const b of tl.bars){

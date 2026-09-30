@@ -398,10 +398,11 @@ body.grabbing,body.grabbing *{cursor:grabbing!important}
 .roll .rg>div{position:absolute}
 .roll .rrow{background:var(--card);border-bottom:1px solid var(--grid2)}
 .roll .rrow.black{background:var(--grid2)}
-.roll .gscale{background:rgba(46,140,128,.07)}
-.roll .gscale.tonic{background:rgba(46,140,128,.14)}
-.roll .gtone{background:rgba(227,162,26,.16);border-left:1px solid rgba(227,162,26,.35)}
-.roll .gtone.root{background:rgba(227,162,26,.32)}
+.roll .gout{background:rgba(30,39,66,.11)}
+.roll .gtonic{background:rgba(46,140,128,.16)}
+.roll .gtone{background:rgba(227,162,26,.30);box-shadow:inset 0 1px 0 rgba(227,162,26,.5)}
+.roll .gtone.root{background:rgba(227,162,26,.55)}
+.roll .gtone span{position:absolute;left:3px;top:0;font-size:9px;line-height:13px;font-weight:700;color:#8A5A00;pointer-events:none}
 .roll .gbar{border-left:1px solid var(--line);pointer-events:none;
   background-image:repeating-linear-gradient(to right,transparent 0 calc(var(--beat) - 1px),var(--grid) calc(var(--beat) - 1px) var(--beat))}
 .roll .note{background:#3D7CC9;border:1px solid #2A5C9E;border-radius:3px;color:#fff;font-size:9px;line-height:11px;padding-left:3px;overflow:hidden;white-space:nowrap;cursor:grab;z-index:2}
@@ -414,5 +415,8 @@ body.grabbing,body.grabbing *{cursor:grabbing!important}
 .roll .rplay{background:var(--chord);pointer-events:none;z-index:3}
 .roll .rplay[hidden]{display:none}
 .roll .rband{border:1px dashed var(--live);background:var(--sel);z-index:4;pointer-events:none}
-:root[data-theme=dark] .roll .gtone{background:rgba(227,162,26,.13)}
-:root[data-theme=dark] .roll .gtone.root{background:rgba(227,162,26,.26)}
+:root[data-theme=dark] .roll .gout{background:rgba(0,0,0,.32)}
+:root[data-theme=dark] .roll .gtonic{background:rgba(46,140,128,.25)}
+:root[data-theme=dark] .roll .gtone{background:rgba(227,162,26,.22);box-shadow:inset 0 1px 0 rgba(227,162,26,.35)}
+:root[data-theme=dark] .roll .gtone.root{background:rgba(227,162,26,.42)}
+:root[data-theme=dark] .roll .gtone span{color:#F0C060}
