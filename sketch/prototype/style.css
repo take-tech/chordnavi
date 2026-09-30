@@ -415,7 +415,14 @@ body.grabbing,body.grabbing *{cursor:grabbing!important}
 .roll .rplay{background:var(--chord);pointer-events:none;z-index:3}
 .roll .rplay[hidden]{display:none}
 .roll .rband{border:1px dashed var(--live);background:var(--sel);z-index:4;pointer-events:none}
-:root[data-theme=dark] .roll .gout{background:rgba(0,0,0,.32)}
+/* ダーク：ライトの見た目を反転させずに暗くする（白鍵・スケールの中の行は明るめ、黒鍵・スケールの外の行は暗め） */
+:root[data-theme=dark] .roll .rkey{background:#B4BAC7;border-bottom-color:#8F97A8}
+:root[data-theme=dark] .roll .rkey.black{background:#1A1F2C;border-bottom-color:#1A1F2C}
+:root[data-theme=dark] .roll .rkey span{color:#3A4258}
+:root[data-theme=dark] .roll .rrow{background:#353C51;border-bottom-color:#2D3346}
+:root[data-theme=dark] .roll .rrow.black{background:#2B3144}
+:root[data-theme=dark] .roll .gbar{border-left-color:#4A5270;background-image:repeating-linear-gradient(to right,transparent 0 calc(var(--beat) - 1px),#2E3448 calc(var(--beat) - 1px) var(--beat))}
+:root[data-theme=dark] .roll .gout{background:rgba(10,12,20,.38)}
 :root[data-theme=dark] .roll .gtonic{background:rgba(46,140,128,.25)}
 :root[data-theme=dark] .roll .gtone{background:rgba(227,162,26,.22);box-shadow:inset 0 1px 0 rgba(227,162,26,.35)}
 :root[data-theme=dark] .roll .gtone.root{background:rgba(227,162,26,.42)}
