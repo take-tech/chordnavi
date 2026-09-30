@@ -861,11 +861,11 @@ function renderFooter(){
       btn('↓','半音下げる（↓、⇧↓でオクターブ）',()=>roll.onKey(new KeyboardEvent('keydown',{key:'ArrowDown'}))),
       btn(range?'範囲の音を消す':'消す','選んだ音をまとめて消す（⌫）',()=>roll.deleteSelection()),
       ...(s.count>=2?[btn('結合','選んだ音を1つにする（いちばん前の音の高さで、最初から最後まで）',()=>roll.joinSelection())]:[]),
-      btn('分割','選んだ音を2つに分ける（カーソルが音の中ならカーソルで、外なら真ん中で。⌥＋クリックでその位置）',()=>roll.splitSelection()),
+      btn('分割','選んだ音を2つに分ける（カーソルが音の中ならカーソルで、外なら真ん中で。⌘＋クリックでその位置）',()=>roll.splitSelection()),
       btn('選択を外す','（Esc）',()=>roll.onKey(new KeyboardEvent('keydown',{key:'Escape'})))));
     f.appendChild(h('span','fhint',ui.mTool==='select'
-      ?'ドラッグで囲んで選ぶ（⇧で追加）・⌘ドラッグで音を置く・小節番号を横にドラッグで範囲'
-      :'クリックで音を置く（右へ引くと長さ）・⌘ドラッグで囲んで選ぶ・ダブルクリックで消す・⌥クリックで分割'));
+      ?'ドラッグで囲んで選ぶ（⇧で追加）・⌘ドラッグで音を置く・⌥ドラッグで複製・⌘クリックで分割'
+      :'クリックで音を置く（右へ引くと長さ）・⌘ドラッグで囲んで選ぶ・⌥ドラッグで複製・⌘クリックで分割'));
     return;
   }
   if(range){

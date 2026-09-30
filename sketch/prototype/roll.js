@@ -3,7 +3,8 @@
    行にはカーソルの位置のキーのスケールの音と、そこで鳴っているコードの構成音を色で出す（ガイド）。
    道具（ui.mTool）：「描く」は何もないところを押す→音を置く（横に引くと長さ）、⇧＋ドラッグ→囲んで選ぶ。
    「選ぶ」は何もないところをドラッグ→囲んで選ぶ（⇧で追加）、押すだけ→選択を外してカーソル。
-   ⌘（Windows は Ctrl）を押している間は、描く⇔選ぶが入れ替わる。⌥＋クリックで音をそこで分ける。
+   ⌘（Windows は Ctrl）を押している間は、何もないところでは描く⇔選ぶが入れ替わり、音の上ではクリックでそこで分ける。
+   ⌥（Alt）を押しながら音をドラッグすると複製を動かす。
    ドラッグ中にスクロールの端に近づくと自動でスクロールする（drag）。
    どちらでも：音をドラッグ→動かす（右端は長さ）、音をダブルクリック→消す、鍵盤を押す→試聴、
    小節番号を横にドラッグ→小節の範囲を選ぶ（範囲の中で始まる音も選ぶ）。キーは onKey（Delete・矢印・⌘A/C/X/V/D・Esc） */
@@ -180,7 +181,7 @@ export function createRoll(root,ctx){
     if(e.button!==0)return;
     e.preventDefault();ctx.focus();
     const el=e.target.closest('.note'), p0=hit(e);
-    if(el)return e.altKey?splitNotes(new Set([el.dataset.id]),snapRound(p0.abs)):grabNote(e,el,p0);
+    if(el)return e.metaKey||e.ctrlKey?splitNotes(new Set([el.dataset.id]),snapRound(p0.abs)):grabNote(e,el,p0);   // ⌘＋クリック：そこで分ける
     if(e.shiftKey||toolOf(e)==='select')return rubberBand(e,p0);
     drawNote(e,p0);
   }
@@ -257,7 +258,7 @@ export function createRoll(root,ctx){
     drag(move,up);
   }
   // 音を押す：選ぶ（⇧で追加・外す）、ドラッグで動かす（右端は長さ）、ダブルクリックで消す。
-  // ⌘（Ctrl）を押しながらドラッグ：複製を動かす（元の音は残す。選んでいる音をまとめて）
+  // ⌥（Alt）を押しながらドラッグ：複製を動かす（元の音は残す。選んでいる音をまとめて）
   function grabNote(e,el,p0){
     const id=el.dataset.id, now=performance.now();
     // ダブルクリック：前に同じ音を「動かさずに」押して離してから 350ms 以内（動かした直後に押しても消さない）
@@ -267,7 +268,7 @@ export function createRoll(root,ctx){
     if(!nsel.has(id))nsel=new Set([id]);
     const all=noteData(), me=all.find(x=>x.m.id===id);if(!me)return;
     ctx.preview(me.midi);
-    const r=el.getBoundingClientRect(), resize=e.clientX>r.right-6, copy=!resize&&(e.metaKey||e.ctrlKey);
+    const r=el.getBoundingClientRect(), resize=e.clientX>r.right-6, copy=!resize&&e.altKey;
     const picked=all.filter(x=>nsel.has(x.m.id));
     let els=[...grid.querySelectorAll('.note')].filter(n=>nsel.has(n.dataset.id));
     els.forEach(n=>n.classList.add('sel'));
