@@ -3,6 +3,8 @@
    行にはカーソルの位置のキーのスケールの音と、そこで鳴っているコードの構成音を色で出す（ガイド）。
    道具（ui.mTool）：「描く」は何もないところを押す→音を置く（横に引くと長さ）、⇧＋ドラッグ→囲んで選ぶ。
    「選ぶ」は何もないところをドラッグ→囲んで選ぶ（⇧で追加）、押すだけ→選択を外してカーソル。
+   ⌘（Windows は Ctrl）を押している間は、描く⇔選ぶが入れ替わる。⌥＋クリックで音をそこで分ける。
+   ドラッグ中にスクロールの端に近づくと自動でスクロールする（drag）。
    どちらでも：音をドラッグ→動かす（右端は長さ）、音をダブルクリック→消す、鍵盤を押す→試聴、
    小節番号を横にドラッグ→小節の範囲を選ぶ（範囲の中で始まる音も選ぶ）。キーは onKey（Delete・矢印・⌘A/C/X/V/D・Esc） */
 import {PPQ,SECTION_COLORS,placedChords,placedNotes,addNote,removeNotes,newNote,MELODY_LOW,MELODY_HIGH,keyScale} from './song.js';
@@ -126,6 +128,7 @@ export function createRoll(root,ctx){
     playhead=box('rplay',0,0,2,H);playhead.hidden=true;grid.appendChild(playhead);
     inner.appendChild(grid);
     grid.addEventListener('pointerdown',onDown);
+    grid.addEventListener('contextmenu',e=>e.preventDefault());   // macOS の Ctrl＋クリック
 
     scroller.scrollLeft=scrollX;scroller.scrollTop=scrollY;
     if(first){first=false;scroller.scrollTop=scrollY;}
@@ -139,13 +142,35 @@ export function createRoll(root,ctx){
     return {abs:Math.max(0,Math.min(ctx.tl().total-1,abs)),midi:Math.max(LOW,Math.min(HIGH,HIGH-row)),k};
   }
   const noteData=()=>placedNotes(ctx.song(),ctx.tl());
+  // ドラッグの共通：move・up を登録し、ポインタがスクロールの端（上の帯・左の鍵盤の内側）に近いあいだは自動でスクロールして move を呼び直す
+  function drag(move,up){
+    let last=null;
+    const mv=ev=>{last=ev;move(ev);};
+    const timer=setInterval(()=>{
+      if(!last||!scroller)return;
+      const r=scroller.getBoundingClientRect(), k=r.width/(scroller.offsetWidth||1), edge=28*k;
+      const L=r.left+KEYW*k, T=r.top+HEAD*k, R=r.right-10*k, B=r.bottom-10*k;
+      const speed=d=>Math.sign(d)*Math.min(40,6+Math.abs(d)/k*.6);
+      let dx=0,dy=0;
+      if(last.clientX>R-edge)dx=speed(last.clientX-(R-edge));else if(last.clientX<L+edge)dx=speed(last.clientX-(L+edge));
+      if(last.clientY>B-edge)dy=speed(last.clientY-(B-edge));else if(last.clientY<T+edge)dy=speed(last.clientY-(T+edge));
+      if(!dx&&!dy)return;
+      const x0=scroller.scrollLeft, y0=scroller.scrollTop;
+      scroller.scrollLeft+=dx;scroller.scrollTop+=dy;
+      if(scroller.scrollLeft!==x0||scroller.scrollTop!==y0)move(last);
+    },30);
+    const u=ev=>{clearInterval(timer);removeEventListener('pointermove',mv);removeEventListener('pointerup',u);up(ev);};
+    addEventListener('pointermove',mv);addEventListener('pointerup',u);
+  }
+  // 今の道具（⌘・Ctrl を押しているあいだは入れ替わる）
+  const toolOf=e=>{const t=ctx.ui.mTool==='select'?'select':'draw';return e&&(e.metaKey||e.ctrlKey)?(t==='draw'?'select':'draw'):t;};
 
   function onDown(e){
     if(e.button!==0)return;
     e.preventDefault();ctx.focus();
     const el=e.target.closest('.note'), p0=hit(e);
-    if(el)return grabNote(e,el,p0);
-    if(e.shiftKey||ctx.ui.mTool==='select')return rubberBand(e,p0);
+    if(el)return e.altKey?splitNotes(new Set([el.dataset.id]),snapRound(p0.abs)):grabNote(e,el,p0);
+    if(e.shiftKey||toolOf(e)==='select')return rubberBand(e,p0);
     drawNote(e,p0);
   }
   // 小節番号を横にドラッグ：小節の範囲を選ぶ（押しただけならカーソル）。範囲の中で始まる音も選ぶ
@@ -165,7 +190,7 @@ export function createRoll(root,ctx){
       removeEventListener('pointermove',move);removeEventListener('pointerup',up);
       if(!moved)ctx.setCursorAbs(Math.max(0,Math.min(tl.total-1,snapFloor(abs0))));
     };
-    addEventListener('pointermove',move);addEventListener('pointerup',up);
+    drag(move,up);
   }
   function selectRange(r){
     const tl=ctx.tl(), lo=tl.bars[r.from].start, hi=r.to>=tl.bars.length?tl.total:tl.bars[r.to].start;
@@ -194,7 +219,7 @@ export function createRoll(root,ctx){
       ctx.setCursorAbs(Math.min(tl.total-1,start+len),false);
       ctx.changed();
     };
-    addEventListener('pointermove',move);addEventListener('pointerup',up);
+    drag(move,up);
   }
   // ⇧＋ドラッグ：囲んだ音を選ぶ
   function rubberBand(e,p0){
@@ -218,7 +243,7 @@ export function createRoll(root,ctx){
       if(!moved&&!e.shiftKey){nsel=new Set();ctx.setCursorAbs(snapFloor(p0.abs));return;}   // 押しただけ：選択を外してカーソル
       ctx.changed(false);
     };
-    addEventListener('pointermove',move);addEventListener('pointerup',up);
+    drag(move,up);
   }
   // 音を押す：選ぶ（⇧で追加・外す）、ドラッグで動かす（右端は長さ）、ダブルクリックで消す
   function grabNote(e,el,p0){
@@ -261,7 +286,7 @@ export function createRoll(root,ctx){
       });
       ctx.changed();
     };
-    addEventListener('pointermove',move);addEventListener('pointerup',up);
+    drag(move,up);
   }
 
   // 選んでいる音を動かす・変える（矢印キー）。fn(x) → {start,len,midi}
@@ -355,6 +380,37 @@ export function createRoll(root,ctx){
   // 範囲の中の音の数と、選んでいる数
   const selection=()=>({count:nsel.size,notes:noteData().filter(x=>nsel.has(x.m.id))});
   const clearSelection=()=>{nsel=new Set();};
+  // 結合：選んだ音を1つにする（いちばん前の音の高さで、最初から最後まで。頭がそろっていれば高いほう）
+  function joinSelection(){
+    const picked=noteData().filter(x=>nsel.has(x.m.id));if(picked.length<2)return;
+    const first=[...picked].sort((a,b)=>a.start-b.start||b.midi-a.midi)[0], end=Math.max(...picked.map(x=>x.end));
+    ctx.commit(()=>{
+      removeNotes(ctx.song(),new Set(picked.map(x=>x.m.id)));
+      addNote(ctx.song(),ctx.tl(),first.start,end-first.start,first.midi,{v:first.m.v,id:first.m.id});
+    });
+    nsel=new Set([first.m.id]);ctx.preview(first.midi);ctx.changed();
+  }
+  // 分割：音を2つに分ける。at を省くと、カーソルが音の中ならカーソル、外なら真ん中（スナップに合わせる）
+  function splitNotes(ids,at=null){
+    const cur=ctx.cursorAbs();
+    const plan=noteData().filter(x=>ids.has(x.m.id)).map(x=>{
+      let a=at??(cur>x.start&&cur<x.end?cur:snapRound((x.start+x.end)/2));
+      if(!(a>x.start&&a<x.end))a=Math.round((x.start+x.end)/2);
+      return a>x.start&&a<x.end?{x,a}:null;
+    }).filter(Boolean);
+    if(!plan.length){ctx.toast?.('分けられる長さがありません');return;}
+    const ids2=[];
+    ctx.commit(()=>{
+      const song=ctx.song(), tl=ctx.tl();
+      removeNotes(song,new Set(plan.map(p=>p.x.m.id)));
+      for(const {x,a} of plan){
+        addNote(song,tl,x.start,a-x.start,x.midi,{v:x.m.v,id:x.m.id});ids2.push(x.m.id);
+        const b=addNote(song,tl,a,x.end-a,x.midi,{v:x.m.v});if(b)ids2.push(b.id);
+      }
+    });
+    nsel=new Set(ids2);ctx.changed();
+  }
+  const splitSelection=()=>splitNotes(new Set(nsel));
   // 選んでいる音を消す
   function deleteSelection(){if(!nsel.size)return;ctx.commit(()=>removeNotes(ctx.song(),nsel));nsel=new Set();ctx.changed();}
   // ステップ入力：カーソルの位置に音（和音なら全部）を置いて、入力の長さだけ進む
@@ -367,5 +423,5 @@ export function createRoll(root,ctx){
   // 休符：カーソルを入力の長さだけ進める
   function stepRest(){const tl=ctx.tl();ctx.setCursorAbs(Math.min(tl.total-1,ctx.cursorAbs()+lenT()));reveal(ctx.cursorAbs());}
 
-  return {render,onKey,setPlayhead,reveal,selection,clearSelection,deleteSelection,selectRange,stepInput,stepRest,newNote};
+  return {render,onKey,setPlayhead,reveal,selection,clearSelection,deleteSelection,selectRange,joinSelection,splitSelection,stepInput,stepRest,newNote};
 }

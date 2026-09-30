@@ -384,6 +384,8 @@ body.grabbing,body.grabbing *{cursor:grabbing!important}
 .roll .rbar.on{background:var(--sel);color:var(--live);font-weight:700}
 .roll .rrange{background:var(--sel);pointer-events:none;z-index:1;border-left:1px solid var(--live);border-right:1px solid var(--live)}
 .roll.select-tool .rg{cursor:default}
+.tool-seg button{padding:1px 7px;line-height:0}
+.tool-seg svg{vertical-align:middle}
 .roll .rchord{position:absolute;margin-left:1px;border:1px solid var(--line);border-radius:4px;background:var(--card);font-size:12px;font-weight:700;padding:0 5px;line-height:22px;overflow:hidden;white-space:nowrap}
 .roll .rchord.playing{border-color:var(--chord);background:var(--chord-tint)}
 .roll .rk{position:sticky;left:0;width:46px;z-index:4;background:var(--card);border-right:1px solid var(--line)}

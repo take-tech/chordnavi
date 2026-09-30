@@ -860,10 +860,12 @@ function renderFooter(){
       btn('↑','半音上げる（↑、⇧↑でオクターブ）',()=>roll.onKey(new KeyboardEvent('keydown',{key:'ArrowUp'}))),
       btn('↓','半音下げる（↓、⇧↓でオクターブ）',()=>roll.onKey(new KeyboardEvent('keydown',{key:'ArrowDown'}))),
       btn(range?'範囲の音を消す':'消す','選んだ音をまとめて消す（⌫）',()=>roll.deleteSelection()),
+      ...(s.count>=2?[btn('結合','選んだ音を1つにする（いちばん前の音の高さで、最初から最後まで）',()=>roll.joinSelection())]:[]),
+      btn('分割','選んだ音を2つに分ける（カーソルが音の中ならカーソルで、外なら真ん中で。⌥＋クリックでその位置）',()=>roll.splitSelection()),
       btn('選択を外す','（Esc）',()=>roll.onKey(new KeyboardEvent('keydown',{key:'Escape'})))));
     f.appendChild(h('span','fhint',ui.mTool==='select'
-      ?'ドラッグで囲んで選ぶ（⇧で追加）・小節番号を横にドラッグで範囲・⌘A ですべて'
-      :'クリックで音を置く（右へ引くと長さ）・⇧ドラッグで囲んで選ぶ・ダブルクリックで消す'));
+      ?'ドラッグで囲んで選ぶ（⇧で追加）・⌘ドラッグで音を置く・小節番号を横にドラッグで範囲'
+      :'クリックで音を置く（右へ引くと長さ）・⌘ドラッグで囲んで選ぶ・ダブルクリックで消す・⌥クリックで分割'));
     return;
   }
   if(range){
@@ -1574,6 +1576,7 @@ const roll=createRoll($('roll'),{
   // 小節の範囲を選ぶ（null で外す）。コードの画面と同じ range なので、再生・MIDI のドラッグにも使う
   setRange:r=>{range=r?{...r,anchor:r.from}:null;if(r)cursor={gi:r.from,pos:0};sel=null;render();},
   focus:()=>$('roll').focus({preventScroll:true}),
+  toast:m=>toast(m),
 });
 for(const x of M_SNAPS)$('mSnap').appendChild(Object.assign(h('option','',x.name),{value:x.id}));
 for(const x of M_LENS)$('mLen').appendChild(Object.assign(h('option','',x.name),{value:x.id}));
@@ -1592,6 +1595,17 @@ document.querySelectorAll('#viewSeg button').forEach(b=>b.onclick=()=>{
 for(const id of ['hearChords','hearMelody'])$(id).onclick=()=>{uiSet(id,!ui[id]);player.refresh();};
 for(const id of ['guideChord','guideScale'])$(id).onclick=()=>uiSet(id,!ui[id]);
 document.querySelectorAll('#toolSeg button').forEach(b=>b.onclick=()=>uiSet('mTool',b.dataset.v));
+// ⌘（Windows は Ctrl）を押しているあいだは、描く⇔選ぶを入れ替えて見せる（押したときの動きは roll.js の toolOf）
+let toolFlip=false;
+function renderTool(){
+  const t=toolFlip?(ui.mTool==='select'?'draw':'select'):ui.mTool;
+  document.querySelectorAll('#toolSeg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.v===t));
+  $('roll').classList.toggle('select-tool',t==='select');
+}
+const setToolFlip=on=>{if(toolFlip!==on){toolFlip=on;renderTool();}};
+addEventListener('keydown',e=>{if(e.key==='Meta'||e.key==='Control')setToolFlip(true);});
+addEventListener('keyup',e=>{if(e.key==='Meta'||e.key==='Control')setToolFlip(false);});
+addEventListener('blur',()=>setToolFlip(false));
 $('countIn').onclick=()=>uiSet('countIn',!ui.countIn);
 // ミュートは保存しない（開き直すと音が出る状態に戻る）
 let muted=false;
@@ -1680,8 +1694,7 @@ function render(){
   sheet.hidden=mel;$('roll').hidden=!mel;
   $('mSnap').value=ui.mSnap;$('mLen').value=ui.mLen;$('mTimbre').value=ui.mTimbre;$('midiParts').value=ui.midiParts;
   document.querySelectorAll('#zoomSeg button').forEach(b=>b.setAttribute('aria-pressed',+b.dataset.v===ui.mZoom));
-  document.querySelectorAll('#toolSeg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.v===ui.mTool));
-  $('roll').classList.toggle('select-tool',ui.mTool==='select');
+  renderTool();
   pressed('hearChords',ui.hearChords);pressed('hearMelody',ui.hearMelody);pressed('guideChord',ui.guideChord);pressed('guideScale',ui.guideScale);
   renderPalette();renderProg();
   if(mel)roll.render();else renderSheet();
