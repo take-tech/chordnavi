@@ -84,7 +84,8 @@ public:
                                      std::pair { Timbre::guitar, "guitar" },
                                      std::pair { Timbre::organ, "organ" },
                                      std::pair { Timbre::pad, "pad" },
-                                     std::pair { Timbre::lead, "lead" } })
+                                     std::pair { Timbre::lead, "lead" },
+                                     std::pair { Timbre::square, "square" } })
         {
             beginTest (juce::String ("Timbre ") + label + ": audible, bounded, released after duration");
             PreviewSynth synth;

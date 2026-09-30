@@ -132,27 +132,26 @@ export function placedChords(song,tl=timeline(song)){
 // キーの基準の音：主音のうち C4（60）に近いほう（F♯4 までは上、G から下の G3）。キーを変えても大きく跳ばないように
 export const melodyBase=key=>60+((keyTonic(key)+6)%12)-6;
 export const MELODY_LOW=36, MELODY_HIGH=96;   // ピアノロールの範囲（C2〜C7）
-// 曲の中のメロディーの音（位置は曲の先頭からの tick、midi は鳴る音）。セクションの終わりで切る
+// 曲の中のメロディーの音（位置は曲の先頭からの tick、midi は鳴る音）。
+// 音は始まるセクションに持たせるが、セクションの終わりでは切らない（弱起・境目をまたいで伸ばす音）。曲の終わりで切る
 export function placedNotes(song,tl=timeline(song)){
   const out=[];
   song.sections.forEach((s,si)=>{
     const {from,to}=tl.secRanges[si];if(from===to)return;
-    const secEnd=tl.bars[to-1].start+tl.bars[to-1].ticks;
     for(const m of s.melody||[]){
       if(m.bar>=s.bars)continue;
-      const b=tl.bars[from+m.bar], start=b.start+Math.min(m.pos,b.ticks-1), end=Math.min(start+m.len,secEnd);
+      const b=tl.bars[from+m.bar], start=b.start+Math.min(m.pos,b.ticks-1), end=Math.min(start+m.len,tl.total);
       const midi=melodyBase(b.key)+m.p;
       if(end>start&&midi>=0&&midi<128)out.push({m,si,start,end,key:b.key,midi});
     }
   });
   return out.sort((a,b)=>a.start-b.start||a.midi-b.midi);
 }
-// 曲の中の位置 abs（tick）に、長さ len・鳴る音 midi の音を置く（入るセクションの小節に。セクションの終わりで切る）。
+// 曲の中の位置 abs（tick）に、長さ len・鳴る音 midi の音を置く（始まる位置のセクションの小節に。曲の終わりで切る）。
 // id を渡すとその id で置く（動かしたときに選択を保つ）。置いた音を返す
 export function addNote(song,tl,abs,len,midi,{v=100,id}={}){
   const b=tl.bars.find(x=>abs>=x.start&&abs<x.start+x.ticks);if(!b)return null;
-  const {to}=tl.secRanges[b.si], secEnd=tl.bars[to-1].start+tl.bars[to-1].ticks;
-  const n={...newNote(b.bar,abs-b.start,Math.max(1,Math.min(len,secEnd-abs)),midi-melodyBase(b.key),v),...(id?{id}:{})};
+  const n={...newNote(b.bar,abs-b.start,Math.max(1,Math.min(len,tl.total-abs)),midi-melodyBase(b.key),v),...(id?{id}:{})};
   song.sections[b.si].melody.push(n);
   return n;
 }
@@ -259,13 +258,9 @@ export function splitSection(song,si,bar){
     b.chords.push({...c,id:uid(),bar:0,pos:0,len:e0-cut});
   }
   a.chords=keep;
-  // メロディーは始まる位置で分ける。分け目をまたぐ音は分け目で切る
-  const mk=[];
-  for(const x of a.melody){
-    const s0=g.toLocal(x.bar,x.pos);
-    if(s0>=cut)b.melody.push({...x,bar:x.bar-bar});else mk.push(s0+x.len>cut?{...x,len:cut-s0}:x);
-  }
-  a.melody=mk;
+  // メロディーは始まる位置で分ける（分け目をまたぐ音は前のセクションのまま、後ろへ伸びる）
+  b.melody=a.melody.filter(x=>g.toLocal(x.bar,x.pos)>=cut).map(x=>({...x,bar:x.bar-bar}));
+  a.melody=a.melody.filter(x=>g.toLocal(x.bar,x.pos)<cut);
   b.marks=a.marks.filter(m=>m.bar>=bar).map(m=>({...m,bar:m.bar-bar}));
   a.marks=a.marks.filter(m=>m.bar<bar);
   a.bars=bar;

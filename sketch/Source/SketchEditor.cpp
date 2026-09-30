@@ -35,6 +35,7 @@ namespace
         if (name == "organ")         return PreviewSynth::Timbre::organ;
         if (name == "pad")           return PreviewSynth::Timbre::pad;
         if (name == "lead")          return PreviewSynth::Timbre::lead;
+        if (name == "square")        return PreviewSynth::Timbre::square;
         return PreviewSynth::Timbre::triangle;
     }
 
@@ -59,7 +60,7 @@ namespace
         song.leadIn  = juce::jlimit (0.0, 30.0, (double) o.getProperty ("leadIn", 0.0));
         song.loop    = (bool) o.getProperty ("loop", false);
         song.timbre  = timbreFromName (o.getProperty ("timbre", "piano").toString());
-        song.melodyTimbre = timbreFromName (o.getProperty ("melodyTimbre", "lead").toString());
+        song.melodyTimbre = timbreFromName (o.getProperty ("melodyTimbre", "square").toString());
         song.session = (int) o.getProperty ("session", -1);
         return song;
     }

@@ -4,13 +4,13 @@
 import {tickToSec,secToTick,meterAt,barTicksOf,beatTicksOf,tempoAt} from './song.js';
 import {hasNative,nativeFn,onNative} from '../../shared/ui/juce-bridge.js';
 
-// 音色：JUCE 版は C++ の 7 種類（ChordNavi の 6 種類＋リード）、ブラウザは WebAudio の 5 種類。
-// リードはメロディー向け（コードにも選べる）
+// 音色：JUCE 版は C++ の 8 種類（ChordNavi の 6 種類＋矩形波・リード）、ブラウザは WebAudio の 6 種類。
+// 矩形波・リードはメロディー向け（コードにも選べる）
 export const TIMBRES=hasNative?[
   {id:'piano',name:'ピアノ'},{id:'electricPiano',name:'エレピ'},{id:'guitar',name:'ギター'},
-  {id:'organ',name:'オルガン'},{id:'pad',name:'パッド'},{id:'lead',name:'リード'},{id:'triangle',name:'シンプル（三角波）'}
+  {id:'organ',name:'オルガン'},{id:'pad',name:'パッド'},{id:'square',name:'矩形波'},{id:'lead',name:'リード'},{id:'triangle',name:'シンプル（三角波）'}
 ]:[
-  {id:'piano',name:'ピアノ'},{id:'lead',name:'リード'},{id:'triangle',name:'シンプル（三角波）'},{id:'organ',name:'オルガン'},{id:'pad',name:'パッド'}
+  {id:'piano',name:'ピアノ'},{id:'square',name:'矩形波'},{id:'lead',name:'リード'},{id:'triangle',name:'シンプル（三角波）'},{id:'organ',name:'オルガン'},{id:'pad',name:'パッド'}
 ];
 const nSongPlay=nativeFn('songPlay'), nSongUpdate=nativeFn('songUpdate'), nSongStop=nativeFn('songStop');
 const nPreview=nativeFn('previewNotes'), nMute=nativeFn('setMute'), nTimbre=nativeFn('setTimbre');
@@ -46,6 +46,11 @@ function voice(n,v,when,dur,timbre,dest=master){
   }else if(timbre==='organ'){
     osc('sine',hz(n),.8);osc('sine',hz(n)*2,.5);osc('sine',hz(n)*4,.15);osc('sine',hz(n)/2,.3);
     g.gain.setValueAtTime(0,when);g.gain.linearRampToValueAtTime(amp*.7,when+.01);release=.04;
+  }else if(timbre==='square'){
+    // 矩形波：伸ばしている間は減らさず、離したら少しだけ余韻（release）
+    osc('square',hz(n),.5);
+    const lp=a.createBiquadFilter();lp.type='lowpass';lp.frequency.value=6000;g.connect(lp);out=lp;
+    g.gain.setValueAtTime(0,when);g.gain.linearRampToValueAtTime(amp*.55,when+.003);release=.12;
   }else if(timbre==='lead'){
     // のこぎり波2本（少しずらす）＋ローパス。立ち上がりは速く、伸ばしている間はあまり減らない
     osc('sawtooth',hz(n),.45,-5);osc('sawtooth',hz(n),.45,5);osc('square',hz(n)/2,.12);

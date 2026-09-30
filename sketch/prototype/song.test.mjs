@@ -319,9 +319,12 @@ test('メロディー：基準の音は主音のうち C4 に近いほう',()=>{
 test('メロディー：置く・キーを変えると一緒に移調・コード固定なら鳴る音を保つ',()=>{
   const s=newSong();s.sections=[newSection('A',1,2),newSection('B',2,2)];
   let tl=timeline(s);
-  const a=addNote(s,tl,PPQ,PPQ,64), b=addNote(s,tl,B*2+PPQ*2,B*4,67);   // E4、G4（長い音はセクションの終わりで切る）
+  const a=addNote(s,tl,PPQ,PPQ,64), b=addNote(s,tl,B*2+PPQ*2,B*4,67);   // E4、G4（長い音は曲の終わりで切る）
   assert.deepEqual([a.bar,a.pos,a.p],[0,PPQ,4]);
   assert.equal(s.sections[1].melody[0].len,B*2-PPQ*2);
+  const x=addNote(s,tl,B*2-PPQ,PPQ*3,62);                                  // セクションをまたぐ音（前のセクションに入り、後ろへ伸びる）
+  assert.deepEqual([s.sections[0].melody.includes(x),placedNotes(s).find(n=>n.m===x).end],[true,B*2+PPQ*2]);
+  removeNotes(s,new Set([x.id]));
   assert.deepEqual(placedNotes(s).map(x=>x.midi),[64,67]);
   s.key={idx:1,mode:'major'};                                              // G に：度数を保って移調（E4→B3）
   assert.deepEqual(placedNotes(s).map(x=>x.midi),[59,62]);
@@ -337,7 +340,7 @@ test('メロディー：セクションの分割・結合・小節の挿入・�
   const tl=timeline(s);
   addNote(s,tl,0,PPQ,60);addNote(s,tl,B*2-PPQ,PPQ*2,62);addNote(s,tl,B*3,PPQ,64);
   splitSection(s,0,2);
-  assert.deepEqual(s.sections.map(x=>x.melody.map(m=>[m.bar,m.len])),[[[0,PPQ],[1,PPQ]],[[1,PPQ]]]);   // またぐ音は分け目で切る
+  assert.deepEqual(s.sections.map(x=>x.melody.map(m=>[m.bar,m.len])),[[[0,PPQ],[1,PPQ*2]],[[1,PPQ]]]);   // またぐ音は前のセクションのまま
   mergeSections(s,0);
   assert.deepEqual(placedNotes(s).map(x=>x.start),[0,B*2-PPQ,B*3]);
   insertBars(s,0,1,1);assert.deepEqual(placedNotes(s).map(x=>x.start),[0,B*3-PPQ,B*4]);

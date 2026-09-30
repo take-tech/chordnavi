@@ -25,7 +25,7 @@ public:
         double leadIn = 0;             // カウントインの長さ（秒。play() のときだけ使う）
         bool loop = false;
         PreviewSynth::Timbre timbre = PreviewSynth::Timbre::piano;         // コード
-        PreviewSynth::Timbre melodyTimbre = PreviewSynth::Timbre::lead;    // メロディー（Note::melody）
+        PreviewSynth::Timbre melodyTimbre = PreviewSynth::Timbre::square;    // メロディー（Note::melody）
         int session = -1;              // JS が付ける番号（位置の報告に付けて返す）
     };
 

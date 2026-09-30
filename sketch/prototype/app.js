@@ -14,7 +14,7 @@ import {hasNative,nativeFn,onNative} from '../../shared/ui/juce-bridge.js';
 const STORE='chordsketch.v1';
 const UI_DEFAULT={snap:'beat',perRow:4,insLen:'bar',dia:'7',timbre:'piano',metro:'click',metroOn:true,countIn:false,countBars:1,loop:false,keepNames:false,step:false,theme:'light',prog:{major:0,minor:13},progVar:0,
   // メロディー（ピアノロール）：表示・スナップ・入力の長さ・横の拡大・音色・鳴らすもの・ガイド、MIDI に入れるもの
-  view:'chords',mSnap:'8',mLen:'8',mZoom:1,mTimbre:'lead',hearChords:true,hearMelody:true,guideChord:true,guideScale:true,midiParts:'both'};
+  view:'chords',mSnap:'8',mLen:'8',mZoom:1,mTimbre:'square',hearChords:true,hearMelody:true,guideChord:true,guideScale:true,midiParts:'both',mTimbreSet:false};
 let song, ui={...UI_DEFAULT};
 let tl;                     // timeline(song) のキャッシュ（changed() で更新）
 let sel=null;               // 選択中のコード {si,id}
@@ -61,6 +61,8 @@ try{
 }catch{}
 // 前の保存形式：metro が 'off' ならメトロノームはオフ（種類はクリック）
 if(ui.metro==='off'){ui.metro='click';ui.metroOn=false;}
+// メロディーの既定の音色をリードから矩形波に変えた（2026-10-01）。前の既定のままなら矩形波にする（一度だけ）
+if(!ui.mTimbreSet){if(ui.mTimbre==='lead')ui.mTimbre='square';ui.mTimbreSet=true;}
 song=song||demoSong();
 if(!docs.length)docs=[{song,file:''}];
 docs[active].song=song;
@@ -1568,7 +1570,7 @@ const roll=createRoll($('roll'),{
 for(const x of M_SNAPS)$('mSnap').appendChild(Object.assign(h('option','',x.name),{value:x.id}));
 for(const x of M_LENS)$('mLen').appendChild(Object.assign(h('option','',x.name),{value:x.id}));
 for(const t of player.TIMBRES)$('mTimbre').appendChild(Object.assign(h('option','',t.name),{value:t.id}));
-if(!player.TIMBRES.some(t=>t.id===ui.mTimbre))ui.mTimbre='lead';
+if(!player.TIMBRES.some(t=>t.id===ui.mTimbre))ui.mTimbre='square';
 $('mSnap').addEventListener('change',e=>uiSet('mSnap',e.target.value));
 $('mLen').addEventListener('change',e=>uiSet('mLen',e.target.value));
 $('mTimbre').addEventListener('change',e=>{uiSet('mTimbre',e.target.value);player.refresh();player.playNotes([melodyBase(curKey())+7],ui.mTimbre,.5);});
