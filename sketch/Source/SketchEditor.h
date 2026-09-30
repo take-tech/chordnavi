@@ -58,7 +58,7 @@ private:
         std::unique_ptr<juce::FileChooser> fileChooser;
 
     // 試聴（JS の player.js から）：
-    //   songPlay({ notes:[開始秒, 長さ秒, 音, 強さ0〜1, …], drums:[開始秒, 種類, …], length, leadIn, loop, timbre, session })
+    //   songPlay({ notes:[開始秒, 長さ秒, 音, 強さ0〜1, …], melody:[同じ], drums:[開始秒, 種類, …], length, leadIn, loop, timbre, melodyTimbre, session })
     //   songUpdate({ …同じ（leadIn は使わない）})・songStop()・previewNotes({ notes, dur, timbre })・setMute(bool)・setTimbre(name)
     // 再生位置は "songPos" { session, seconds, playing }、押している鍵盤は "midiNotes" { notes } で 30Hz で JS に送る
     void timerCallback() override;

@@ -34,6 +34,7 @@ namespace
         if (name == "guitar")        return PreviewSynth::Timbre::guitar;
         if (name == "organ")         return PreviewSynth::Timbre::organ;
         if (name == "pad")           return PreviewSynth::Timbre::pad;
+        if (name == "lead")          return PreviewSynth::Timbre::lead;
         return PreviewSynth::Timbre::triangle;
     }
 
@@ -41,10 +42,13 @@ namespace
     SongPlayer::Song parseSong (const juce::var& o)
     {
         SongPlayer::Song song;
-        if (auto* n = o.getProperty ("notes", {}).getArray())
-            for (int i = 0; i + 3 < n->size(); i += 4)
-                song.notes.push_back ({ juce::jmax (0.0, (double) (*n)[i]), juce::jlimit (0.001, 600.0, (double) (*n)[i + 1]),
-                                        juce::jlimit (0, 127, (int) (*n)[i + 2]), juce::jlimit (0.0f, 1.0f, (float) (double) (*n)[i + 3]) });
+        // notes はコード、melody はメロディー（どちらも [開始秒, 長さ秒, 音, 強さ0〜1, …]）。1つの一覧にまとめ、メロディーには印を付ける
+        for (const auto* key : { "notes", "melody" })
+            if (auto* n = o.getProperty (key, {}).getArray())
+                for (int i = 0; i + 3 < n->size(); i += 4)
+                    song.notes.push_back ({ juce::jmax (0.0, (double) (*n)[i]), juce::jlimit (0.001, 600.0, (double) (*n)[i + 1]),
+                                            juce::jlimit (0, 127, (int) (*n)[i + 2]), juce::jlimit (0.0f, 1.0f, (float) (double) (*n)[i + 3]),
+                                            juce::String (key) == "melody" });
         if (auto* d = o.getProperty ("drums", {}).getArray())
             for (int i = 0; i + 1 < d->size(); i += 2)
                 song.drums.push_back ({ (double) (*d)[i], (SongPlayer::Drum) juce::jlimit (0, 5, (int) (*d)[i + 1]) });
@@ -55,6 +59,7 @@ namespace
         song.leadIn  = juce::jlimit (0.0, 30.0, (double) o.getProperty ("leadIn", 0.0));
         song.loop    = (bool) o.getProperty ("loop", false);
         song.timbre  = timbreFromName (o.getProperty ("timbre", "piano").toString());
+        song.melodyTimbre = timbreFromName (o.getProperty ("melodyTimbre", "lead").toString());
         song.session = (int) o.getProperty ("session", -1);
         return song;
     }

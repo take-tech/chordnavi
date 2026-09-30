@@ -347,6 +347,20 @@ void PreviewSynth::startVoice (Voice& v, int note, juce::int64 startIn, juce::in
             break;
         }
 
+        case Timbre::lead:
+        {
+            // メロディー向け：少しずらした2本のノコギリ波を、パッドより明るいローパスで。立ち上がりは速く、離したら短く切る
+            constexpr double detuneCents = 5.0;
+            v.phaseInc  = freq * std::pow (2.0,  detuneCents / 1200.0) / sampleRate;
+            v.phaseInc2 = freq * std::pow (2.0, -detuneCents / 1200.0) / sampleRate;
+            v.phase2    = 0.21;
+            v.lpCoeff   = (float) (1.0 - std::exp (-twoPi * 3200.0 / sampleRate));
+            v.gain      = peakGain * 0.85f;
+            v.attackSamples = (juce::int64) (0.006 * sampleRate);
+            v.releaseRate   = decayPerSample (0.07, sampleRate);
+            break;
+        }
+
         case Timbre::guitar:
         {
             // Karplus-Strong：ノイズで弾いた遅延線を平均化フィルタで回す
@@ -412,6 +426,7 @@ float PreviewSynth::renderSample (Voice& v)
         }
 
         case Timbre::pad:
+        case Timbre::lead:
         {
             const auto saw = 0.5f * (polyBlepSaw (v.phase, v.phaseInc) + polyBlepSaw (v.phase2, v.phaseInc2));
             v.lpState += v.lpCoeff * (saw - v.lpState);

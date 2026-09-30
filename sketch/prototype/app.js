@@ -5,13 +5,16 @@ import {createWheel} from '../../shared/ui/wheel.js';
 import {PPQ,METERS,SNAPS,snapTicks,barTicksOf,beatTicksOf,SECTION_COLORS,SECTION_PRESETS,PATTERNS,MIN_BPM,MAX_BPM,
   newSong,demoSong,newSection,newChord,cloneSection,timeline,placedChords,placeChord,removeChord,resizeChord,
   setSectionBars,insertBars,appendSectionFrom,stretchChord,stretchChordStart,pruneMarks,mergeSections,splitSection,insertProgression,setMark,rangeTicks,copyRange,pasteAt,renderSong,buildSmf,safeFileName,
-  songTonic,songFlat,nameOf,tempoAt,PATTERN_GROUPS,NEW_TITLE,SKETCH_SCALES,keyScale,defaultScale,meterAt,tickToSec,withExtension,keyTonic,sameKey,setKeyMark,keyRegion,transposeBars,voicingOf,patternById,VOICINGS,GUITAR_AREAS} from './song.js';
+  songTonic,songFlat,nameOf,tempoAt,PATTERN_GROUPS,NEW_TITLE,SKETCH_SCALES,keyScale,defaultScale,meterAt,tickToSec,withExtension,keyTonic,sameKey,setKeyMark,keyRegion,transposeBars,voicingOf,patternById,VOICINGS,GUITAR_AREAS,melodyBase} from './song.js';
+import {createRoll,M_SNAPS,M_LENS} from './roll.js';
 import * as player from './player.js';
 import {hasNative,nativeFn,onNative} from '../../shared/ui/juce-bridge.js';
 
 /* ---------- 状態 ---------- */
 const STORE='chordsketch.v1';
-const UI_DEFAULT={snap:'beat',perRow:4,insLen:'bar',dia:'7',timbre:'piano',metro:'click',metroOn:true,countIn:false,countBars:1,loop:false,keepNames:false,step:false,theme:'light',prog:{major:0,minor:13},progVar:0};
+const UI_DEFAULT={snap:'beat',perRow:4,insLen:'bar',dia:'7',timbre:'piano',metro:'click',metroOn:true,countIn:false,countBars:1,loop:false,keepNames:false,step:false,theme:'light',prog:{major:0,minor:13},progVar:0,
+  // メロディー（ピアノロール）：表示・スナップ・入力の長さ・横の拡大・音色・鳴らすもの・ガイド、MIDI に入れるもの
+  view:'chords',mSnap:'8',mLen:'8',mZoom:1,mTimbre:'lead',hearChords:true,hearMelody:true,guideChord:true,guideScale:true,midiParts:'both'};
 let song, ui={...UI_DEFAULT};
 let tl;                     // timeline(song) のキャッシュ（changed() で更新）
 let sel=null;               // 選択中のコード {si,id}
@@ -36,7 +39,8 @@ function validSong(x){
   if(!VOICINGS.some(v=>v.id===s.voicing))s.voicing='piano';
   if(!GUITAR_AREAS.some(v=>v.id===s.guitarArea))s.guitarArea='low';
   s.octave=Math.max(-2,Math.min(2,s.octave|0));s.bassOctave=Math.max(-2,Math.min(2,s.bassOctave|0));
-  s.sections=s.sections.filter(c=>c&&c.bars>0).map(c=>({...newSection(),...c,chords:(c.chords||[]).filter(ch=>ch&&CHORD[ch.q]&&ch.len>0),marks:(c.marks||[]).filter(m=>!m.key||(m.key.idx>=0&&m.key.idx<12&&['major','minor'].includes(m.key.mode)))}));
+  s.sections=s.sections.filter(c=>c&&c.bars>0).map(c=>({...newSection(),...c,chords:(c.chords||[]).filter(ch=>ch&&CHORD[ch.q]&&ch.len>0),
+    melody:(c.melody||[]).filter(n=>n&&n.len>0&&Number.isFinite(n.p)&&n.bar>=0).map(n=>({...n,v:Math.max(1,Math.min(127,n.v|0||100))})),marks:(c.marks||[]).filter(m=>!m.key||(m.key.idx>=0&&m.key.idx<12&&['major','minor'].includes(m.key.mode)))}));
   return s;
 }
 // 自動保存の読み書き。JUCE 版はネイティブのファイル（Application Support の ChordSketch/session.json）、ブラウザは localStorage
@@ -150,7 +154,7 @@ function setKey(idx,mode){
     const nk={idx,mode,...(mode===k.mode&&k.scale?{scale:k.scale}:{})};   // モードを変えたら既定のスケールに戻す（ChordNavi と同じ）
     if(r.mark){const m=song.sections[r.mark.si].marks.find(x=>x.bar===r.mark.bar&&x.key);m.key=nk;}
     else song.key=nk;
-    if(ui.keepNames)transposeBars(song,tl,r.from,r.to,mod12(before-tonicOf(idx,mode)));
+    if(ui.keepNames)transposeBars(song,tl,r.from,r.to,mod12(before-tonicOf(idx,mode)),melodyBase(k)-melodyBase({idx,mode}));
     pruneMarks(song);
   });
   rotateTo(idx);
@@ -844,6 +848,17 @@ function renderFooter(){
   const f=$('footer');f.innerHTML='';
   const group=(label,...items)=>{const g=h('div','fgroup');if(label)g.appendChild(h('span','flbl',label));g.append(...items);return g;};
   const btn=(text,title,fn)=>{const b=h('button','',text);b.title=title;b.onclick=fn;return b;};
+  if(ui.view==='melody'){
+    const b=tl.bars[cursor.gi], s=roll.selection();
+    f.append(group(null,h('span','flbl','カーソル'),h('b','pos',b?fmtPos(cursor.gi,cursor.pos):'—')),
+      group('ステップ入力',btn('休符','カーソルを入力の長さだけ進める（ステップ入力の休み）',()=>roll.stepRest())));
+    if(s.count)f.append(group(null,h('span','fsub',`${s.count}音を選択`),
+      btn('↑','半音上げる（↑、⇧↑でオクターブ）',()=>roll.onKey(new KeyboardEvent('keydown',{key:'ArrowUp'}))),
+      btn('↓','半音下げる（↓、⇧↓でオクターブ）',()=>roll.onKey(new KeyboardEvent('keydown',{key:'ArrowDown'}))),
+      btn('消す','選んだ音を消す（⌫）',()=>roll.onKey(new KeyboardEvent('keydown',{key:'Delete'})))));
+    f.appendChild(h('span','fhint','クリックで音を置く（右へ引くと長さ）・⇧ドラッグで囲んで選ぶ・ダブルクリックで消す'));
+    return;
+  }
   if(range){
     const n=range.to-range.from;
     f.append(group(null,h('b','',rangeLabel(range)),h('span','fsub',`${n}小節を選択`)),
@@ -920,6 +935,15 @@ addEventListener('keydown',e=>{
   const mod=e.metaKey||e.ctrlKey, k=e.key.toLowerCase();
   if(mod&&k==='z'){e.preventDefault();e.shiftKey?redo():undo();return;}
   if(mod&&k==='y'){e.preventDefault();redo();return;}
+  // メロディーの画面：音の操作（選択・移動・コピーなど）を先に。コードの操作（数字キー・コードの選択）はしない
+  if(ui.view==='melody'&&$('printWrap').hidden){
+    if(roll.onKey(e))return;
+    if(mod)return;
+    if(e.key===' '){e.preventDefault();togglePlay();return;}
+    if(k==='m'){e.preventDefault();toggleMute();return;}
+    if(e.key==='Home'){cursor={gi:0,pos:0};render();roll.reveal(0);return;}
+    return;
+  }
   if(mod&&k==='a'){e.preventDefault();range={from:0,to:tl.bars.length,anchor:0};sel=null;render();return;}
   if(mod&&k==='c'){e.preventDefault();copySel();return;}
   if(mod&&k==='x'){e.preventDefault();copySel();deleteSel();return;}
@@ -965,6 +989,11 @@ function arrow(dir,shift,alt){
 
 /* ---------- 再生 ---------- */
 let playFrom=0, playingId=null, playTick=null, lastPos='';
+// メロディーの画面では「鳴らす」のオン／オフに従う（コードの画面ではいつも両方）
+function audible(r){
+  if(ui.view==='melody'){if(!ui.hearChords)r.notes=[];if(!ui.hearMelody)r.melody=[];}
+  return r;
+}
 function playRange(){
   if(range)return range;
   return {from:cursor.gi,to:tl.bars.length};
@@ -975,8 +1004,8 @@ function startPlay(){
   const r=playRange();
   playFrom=rangeTicks(tl,r).from;
   player.play({
-    render:()=>renderSong(song,rangeTicks(tl,r)),
-    loop:()=>ui.loop, countIn:ui.countIn?ui.countBars:0, metronome:()=>ui.metroOn?ui.metro:'off', timbre:()=>ui.timbre,
+    render:()=>audible(renderSong(song,rangeTicks(tl,r))),
+    loop:()=>ui.loop, countIn:ui.countIn?ui.countBars:0, metronome:()=>ui.metroOn?ui.metro:'off', timbre:()=>ui.timbre,melodyTimbre:()=>ui.mTimbre,
     onPos:(t,counting,cnt)=>onPos(t==null?null:playFrom+t,counting,cnt),
     onEnd:()=>{playTick=null;playingId=null;render();}
   });
@@ -1017,6 +1046,7 @@ function onPos(abs,counting,cnt){
     if(id)sheet.querySelectorAll(`.blk[data-id="${id}"]`).forEach(x=>x.classList.add('playing'));
   }
   placePlayhead();
+  if(ui.view==='melody')roll.setPlayhead(abs);
 }
 /* ---------- 位置の表示（テンポ・拍子・キー・位置・経過時間） ---------- */
 // 再生中は再生位置、止まっているときはカーソル位置の値
@@ -1099,8 +1129,10 @@ const ascii=s=>{const t=safeFileName(s);return t==='ChordSketch'&&!/ChordSketch/
 function sectionFileLabel(s,si){return SECTION_FILE[s.name]||ascii(s.name)||`Section${si+1}`;}
 function fileName(label){
   const key=safeFileName(songKeyLabel().split('/')[0]), title=ascii(song.title);
-  return [key,title,label].filter(Boolean).join('_')+'.mid';
+  const part=ui.midiParts==='melody'?'Melody':ui.midiParts==='chords'&&hasMelody()?'Chords':'';   // メロディーがある曲でコードだけなら Chords
+  return [key,title,label,part].filter(Boolean).join('_')+'.mid';
 }
+const hasMelody=()=>song.sections.some(s=>s.melody.length);
 function currentExport(){
   if(range){
     const si=song.sections.findIndex((s,i)=>tl.secRanges[i].from===range.from&&tl.secRanges[i].to===range.to);
@@ -1108,7 +1140,7 @@ function currentExport(){
   }
   return {r:{from:0,to:tl.bars.length},si:-1,label:'Song'};
 }
-function smfFor(r,label){return buildSmf(renderSong(song,rangeTicks(tl,r)),`${song.title} ${label}`);}
+function smfFor(r,label){return buildSmf(renderSong(song,rangeTicks(tl,r)),`${song.title} ${label}`,ui.midiParts);}
 const b64=bytes=>{let s='';for(const x of bytes)s+=String.fromCharCode(x);return btoa(s);};
 // MIDI を DAW・デスクトップへドラッグする。SMF はここ（song.js）で作る。
 // JUCE 版：押して少し動かしたら C++ の startMidiDragBytes（一時ファイルに書いて OS のファイルドラッグ）。WebView では HTML のドラッグは使えない
@@ -1447,7 +1479,8 @@ function setMidiStatus(s,on){const e=$('midiSt');e.textContent=s;e.classList.tog
 function heldChanged(){
   if(held.size>=peak.length)peak=[...held];
   if(!held.size){
-    if(ui.step&&peak.length>=2){const d=detectChords(peak,1)[0];if(d)insertAtCursor({off:mod12(d.root-tonic()),q:d.q,...(d.bass!=null?{boff:mod12(d.bass-tonic())}:{})});}
+    if(ui.step&&ui.view==='melody'&&peak.length)roll.stepInput([...peak].sort((a,b)=>a-b));   // メロディー：弾いた音（和音なら全部）
+    else if(ui.step&&peak.length>=2){const d=detectChords(peak,1)[0];if(d)insertAtCursor({off:mod12(d.root-tonic()),q:d.q,...(d.bass!=null?{boff:mod12(d.bass-tonic())}:{})});}
     peak=[];
   }
   renderLive();
@@ -1519,6 +1552,35 @@ countMenu.addEventListener('click',e=>{const v=+e.target.closest('button')?.valu
 addEventListener('click',e=>{if(!e.target.closest('#countMenu'))countMenu.hidden=true;});
 $('timbre').addEventListener('change',e=>{uiSet('timbre',e.target.value);player.setLiveTimbre(ui.timbre);player.refresh();});
 $('insLen').addEventListener('change',e=>uiSet('insLen',e.target.value));
+/* ---------- メロディー（ピアノロール） ---------- */
+const roll=createRoll($('roll'),{
+  song:()=>song, tl:()=>tl, ui,
+  commit, changed:()=>render(),
+  preview:m=>player.playNotes([m],ui.mTimbre,.45),
+  chordName:p=>nameOf(song,p.c,p.key),
+  cursorAbs:()=>(tl.bars[cursor.gi]?.start??0)+cursor.pos,
+  // abs（曲の頭からの tick）にカーソルを置く。redraw=false なら描き直さない（呼んだ側が描く）
+  setCursorAbs:(abs,redraw=true)=>{const b=tl.bars.find(x=>abs>=x.start&&abs<x.start+x.ticks)||tl.bars.at(-1);cursor={gi:b.gi,pos:Math.max(0,abs-b.start)};range=null;sel=null;if(redraw)render();},
+  fmtPos:abs=>{const b=tl.bars.find(x=>abs>=x.start&&abs<x.start+x.ticks);return b?fmtPos(b.gi,abs-b.start):'';},
+  playingChord:()=>playingId,
+  focus:()=>$('roll').focus({preventScroll:true}),
+});
+for(const x of M_SNAPS)$('mSnap').appendChild(Object.assign(h('option','',x.name),{value:x.id}));
+for(const x of M_LENS)$('mLen').appendChild(Object.assign(h('option','',x.name),{value:x.id}));
+for(const t of player.TIMBRES)$('mTimbre').appendChild(Object.assign(h('option','',t.name),{value:t.id}));
+if(!player.TIMBRES.some(t=>t.id===ui.mTimbre))ui.mTimbre='lead';
+$('mSnap').addEventListener('change',e=>uiSet('mSnap',e.target.value));
+$('mLen').addEventListener('change',e=>uiSet('mLen',e.target.value));
+$('mTimbre').addEventListener('change',e=>{uiSet('mTimbre',e.target.value);player.refresh();player.playNotes([melodyBase(curKey())+7],ui.mTimbre,.5);});
+$('midiParts').addEventListener('change',e=>uiSet('midiParts',e.target.value));
+document.querySelectorAll('#zoomSeg button').forEach(b=>b.onclick=()=>uiSet('mZoom',+b.dataset.v));
+document.querySelectorAll('#viewSeg button').forEach(b=>b.onclick=()=>{
+  if(ui.view===b.dataset.v)return;
+  roll.clearSelection();editOpen=false;uiSet('view',b.dataset.v);player.refresh();
+  if(ui.view==='melody'){roll.reveal(roll?(tl.bars[cursor.gi]?.start??0)+cursor.pos:0);$('roll').focus({preventScroll:true});}else sheet.focus({preventScroll:true});
+});
+for(const id of ['hearChords','hearMelody'])$(id).onclick=()=>{uiSet(id,!ui[id]);player.refresh();};
+for(const id of ['guideChord','guideScale'])$(id).onclick=()=>uiSet(id,!ui[id]);
 $('countIn').onclick=()=>uiSet('countIn',!ui.countIn);
 // ミュートは保存しない（開き直すと音が出る状態に戻る）
 let muted=false;
@@ -1601,7 +1663,16 @@ function render(){
   renderOctUp();renderOctBass();
   const ex=currentExport();
   $('dragLabel').textContent=!range?'曲全体':ex.si>=0?`「${song.sections[ex.si].name}」`:rangeLabel(range);
-  renderPalette();renderProg();renderSheet();renderFooter();renderTabs();
+  const mel=ui.view==='melody';
+  $('stage').querySelector('.main').classList.toggle('melody',mel);
+  document.querySelectorAll('#viewSeg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.v===ui.view));
+  sheet.hidden=mel;$('roll').hidden=!mel;
+  $('mSnap').value=ui.mSnap;$('mLen').value=ui.mLen;$('mTimbre').value=ui.mTimbre;$('midiParts').value=ui.midiParts;
+  document.querySelectorAll('#zoomSeg button').forEach(b=>b.setAttribute('aria-pressed',+b.dataset.v===ui.mZoom));
+  pressed('hearChords',ui.hearChords);pressed('hearMelody',ui.hearMelody);pressed('guideChord',ui.guideChord);pressed('guideScale',ui.guideScale);
+  renderPalette();renderProg();
+  if(mel)roll.render();else renderSheet();
+  renderFooter();renderTabs();
 }
 
 /* ---------- 画面の拡大縮小（スクロールなし、ChordNavi と同じ） ---------- */
@@ -1619,5 +1690,5 @@ function fit(){
   st.style.height=h+'px';
   st.style.transform=`translate(${Math.max(0,x)}px,${Math.max(0,y)}px) scale(${s})`;
 }
-addEventListener('resize',()=>{fit();renderSheet();});
+addEventListener('resize',()=>{fit();if(ui.view==='melody')roll.render();else renderSheet();});
 fit();applyTheme();rotateTo(curKey().idx,true);render();renderLive();renderFileState();

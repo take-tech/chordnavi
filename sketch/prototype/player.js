@@ -4,12 +4,13 @@
 import {tickToSec,secToTick,meterAt,barTicksOf,beatTicksOf,tempoAt} from './song.js';
 import {hasNative,nativeFn,onNative} from '../../shared/ui/juce-bridge.js';
 
-// 音色：JUCE 版は ChordNavi と同じ C++ の 6 種類、ブラウザは WebAudio の 4 種類
+// 音色：JUCE 版は C++ の 7 種類（ChordNavi の 6 種類＋リード）、ブラウザは WebAudio の 5 種類。
+// リードはメロディー向け（コードにも選べる）
 export const TIMBRES=hasNative?[
   {id:'piano',name:'ピアノ'},{id:'electricPiano',name:'エレピ'},{id:'guitar',name:'ギター'},
-  {id:'organ',name:'オルガン'},{id:'pad',name:'パッド'},{id:'triangle',name:'シンプル（三角波）'}
+  {id:'organ',name:'オルガン'},{id:'pad',name:'パッド'},{id:'lead',name:'リード'},{id:'triangle',name:'シンプル（三角波）'}
 ]:[
-  {id:'piano',name:'ピアノ'},{id:'triangle',name:'シンプル（三角波）'},{id:'organ',name:'オルガン'},{id:'pad',name:'パッド'}
+  {id:'piano',name:'ピアノ'},{id:'lead',name:'リード'},{id:'triangle',name:'シンプル（三角波）'},{id:'organ',name:'オルガン'},{id:'pad',name:'パッド'}
 ];
 const nSongPlay=nativeFn('songPlay'), nSongUpdate=nativeFn('songUpdate'), nSongStop=nativeFn('songStop');
 const nPreview=nativeFn('previewNotes'), nMute=nativeFn('setMute'), nTimbre=nativeFn('setTimbre');
@@ -45,6 +46,13 @@ function voice(n,v,when,dur,timbre,dest=master){
   }else if(timbre==='organ'){
     osc('sine',hz(n),.8);osc('sine',hz(n)*2,.5);osc('sine',hz(n)*4,.15);osc('sine',hz(n)/2,.3);
     g.gain.setValueAtTime(0,when);g.gain.linearRampToValueAtTime(amp*.7,when+.01);release=.04;
+  }else if(timbre==='lead'){
+    // のこぎり波2本（少しずらす）＋ローパス。立ち上がりは速く、伸ばしている間はあまり減らない
+    osc('sawtooth',hz(n),.45,-5);osc('sawtooth',hz(n),.45,5);osc('square',hz(n)/2,.12);
+    const lp=a.createBiquadFilter();lp.type='lowpass';lp.Q.value=2;
+    lp.frequency.setValueAtTime(900,when);lp.frequency.linearRampToValueAtTime(3200,when+.03);lp.frequency.setTargetAtTime(1800,when+.03,.25);
+    g.connect(lp);out=lp;
+    g.gain.setValueAtTime(0,when);g.gain.linearRampToValueAtTime(amp*.75,when+.008);g.gain.setTargetAtTime(amp*.6,when+.008,.3);release=.07;
   }else if(timbre==='pad'){
     osc('sawtooth',hz(n),.35,-7);osc('sawtooth',hz(n),.35,7);
     const lp=a.createBiquadFilter();lp.type='lowpass';lp.frequency.value=1400;g.connect(lp);out=lp;
@@ -159,8 +167,14 @@ function nativePayload(r,opts){
     const s=tickToSec(r.tempos,n.t), e=tickToSec(r.tempos,n.t+n.d);
     notes.push(+s.toFixed(5),+(e-s).toFixed(5),n.n,+(n.v/127).toFixed(3));
   }
+  const melody=[];
+  for(const n of r.melody||[]){
+    const s=tickToSec(r.tempos,n.t), e=tickToSec(r.tempos,n.t+n.d);
+    melody.push(+s.toFixed(5),+(e-s).toFixed(5),n.n,+(n.v/127).toFixed(3));
+  }
   for(const h of drumHits(opts.metronome(),r))drums.push(+tickToSec(r.tempos,h.t).toFixed(5),DRUM_ID[h.drum]);
-  return {notes,drums,length:tickToSec(r.tempos,r.length),loop:!!opts.loop(),timbre:opts.timbre(),session:run.session};
+  return {notes,melody,drums,length:tickToSec(r.tempos,r.length),loop:!!opts.loop(),timbre:opts.timbre(),
+          melodyTimbre:(opts.melodyTimbre||opts.timbre)(),session:run.session};
 }
 function playNative(opts){
   const r=opts.render();
@@ -184,7 +198,7 @@ onNative('songPos',p=>{
 });
 
 /* ---------- 再生 ---------- */
-// opts：render()→{notes,tempos,meters,length}（範囲の頭が 0）、loop、countIn、metronome()、timbre()、onPos(tick|null, countIn?)、onEnd()
+// opts：render()→{notes,melody,tempos,meters,length}（範囲の頭が 0）、loop、countIn、metronome()、timbre()、melodyTimbre()、onPos(tick|null, countIn?)、onEnd()
 let run=null;
 export const isPlaying=()=>!!run;
 export function play(opts){
@@ -208,6 +222,7 @@ export function play(opts){
 }
 function load(r){
   const events=[...r.notes.map(n=>({...n,sec:tickToSec(r.tempos,n.t),end:tickToSec(r.tempos,n.t+n.d)})),
+    ...(r.melody||[]).map(n=>({...n,mel:true,sec:tickToSec(r.tempos,n.t),end:tickToSec(r.tempos,n.t+n.d)})),
     ...drumHits(run.opts.metronome(),r).map(h=>({...h,sec:tickToSec(r.tempos,h.t)}))].sort((x,y)=>x.sec-y.sec);
   run.data={r,events,dur:tickToSec(r.tempos,r.length)};run.idx=0;
 }
@@ -229,7 +244,8 @@ function tick(){
 }
 // 予約した音は止められるように覚えておく（再生中の変更で差し替えるため）
 function startVoice(e,when,end){
-  const v={end,stop:voice(e.n,e.v,when,end-when,run.opts.timbre(),run.bus)};
+  const tim=e.mel?(run.opts.melodyTimbre||run.opts.timbre)():run.opts.timbre();
+  const v={end,stop:voice(e.n,e.v,when,end-when,tim,run.bus)};
   run.voices.add(v);
 }
 /* 再生中の変更（音色・メトロノーム・パターン・コードの編集など）をすぐ反映する。

@@ -90,18 +90,24 @@
   <main class="main panel">
     <div class="tabs" id="tabs" role="tablist" aria-label="開いている曲"></div>
     <div class="toolbar">
+      <div class="seg view-seg" id="viewSeg" role="tablist" aria-label="表示"><button data-v="chords" title="コードのシート">コード</button><button data-v="melody" title="メロディーのピアノロール">メロディー</button></div>
       <span class="lbl">スナップ</span>
-      <div class="seg small" id="snapSeg"><button data-v="bar">1小節</button><button data-v="beat">1拍</button><button data-v="half" title="シンコペーション・食いのコード用">半拍</button></div>
-      <label class="fld" title="パレット・数字キー・MIDI 鍵盤で入れるコードの長さ">入力の長さ <select id="insLen"></select></label>
+      <div class="seg small only-chords" id="snapSeg"><button data-v="bar">1小節</button><button data-v="beat">1拍</button><button data-v="half" title="シンコペーション・食いのコード用">半拍</button></div>
+      <select id="mSnap" class="only-melody" aria-label="メロディーのスナップ" title="音を置く・動かす位置の単位"></select>
+      <label class="fld only-chords" title="パレット・数字キー・MIDI 鍵盤で入れるコードの長さ">長さ <select id="insLen"></select></label>
+      <label class="fld only-melody" title="クリック・MIDI 鍵盤のステップ入力で置く音の長さ">長さ <select id="mLen"></select></label>
       <span class="lbl" title="1行に並べる小節の数">表示</span>
-      <div class="seg small" id="rowSeg" title="1行に並べる小節の数"><button data-v="4" title="1行に4小節">4</button><button data-v="8" title="1行に8小節">8</button></div>
-      <span class="sep"></span>
-      <label class="fld" title="試聴の音色（MIDI には影響しない）">音色 <select id="timbre"></select></label>
+      <div class="seg small only-chords" id="rowSeg" title="1行に並べる小節の数"><button data-v="4" title="1行に4小節">4</button><button data-v="8" title="1行に8小節">8</button></div>
+      <div class="seg small only-melody" id="zoomSeg" title="横の拡大"><button data-v="0" title="縮小">小</button><button data-v="1">中</button><button data-v="2" title="拡大">大</button></div>
       <span class="spacer"></span>
+      <select id="midiParts" aria-label="MIDI に入れるもの" title="MIDI のドラッグ・保存に入れるもの（両方なら、コードとメロディーの2トラック）">
+        <option value="both">コード＋メロ</option><option value="chords">コードのみ</option><option value="melody">メロのみ</option></select>
       <button class="handle" id="dragSel" title="選択範囲（なければ曲全体）を DAW へドラッグ">⠿ <span id="dragLabel">曲全体</span>をドラッグ</button>
       <button id="saveMidi">MIDI保存</button>
     </div>
-    <div class="toolbar out">
+    <div class="toolbar out only-chords">
+      <label class="fld" title="コードの試聴の音色（MIDI には影響しない）">音色 <select id="timbre"></select></label>
+      <span class="sep"></span>
       <span class="lbl strong">MIDI 出力</span>
       <label class="fld" title="曲全体のパターン（セクションごとに変えられます）">パターン <select id="pattern"></select></label>
       <span class="sep"></span>
@@ -112,7 +118,19 @@
       <span class="lbl">ベース</span><div class="oct" id="octBass"></div>
       <button id="bassBtn" class="tg small" aria-pressed="true" title="ベース音を出す／出さない">ベース</button>
     </div>
+    <div class="toolbar out only-melody">
+      <label class="fld" title="メロディーの試聴の音色（MIDI には影響しない）">音色 <select id="mTimbre"></select></label>
+      <span class="sep"></span>
+      <span class="lbl">鳴らす</span>
+      <button id="hearChords" class="tg small" aria-pressed="true" title="メロディーの画面で再生するとき、コード（伴奏）も鳴らす">コード</button>
+      <button id="hearMelody" class="tg small" aria-pressed="true" title="メロディーの画面で再生するとき、メロディーも鳴らす（オフにすると伴奏だけで歌える）">メロディー</button>
+      <span class="sep"></span>
+      <span class="lbl" title="ピアノロールの行に色を付ける">ガイド</span>
+      <button id="guideChord" class="tg small" aria-pressed="true" title="そこで鳴っているコードの構成音の行に色を付ける（ルートは濃く）">コードの音</button>
+      <button id="guideScale" class="tg small" aria-pressed="true" title="キーのスケールの音の行に色を付ける">スケール</button>
+    </div>
     <div class="sheet" id="sheet" tabindex="0" aria-label="コード譜"></div>
+    <div class="roll" id="roll" tabindex="0" aria-label="メロディーのピアノロール" hidden></div>
     <div class="footer" id="footer"></div>
   </main>
 </div>

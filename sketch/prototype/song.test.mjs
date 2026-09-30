@@ -1,7 +1,8 @@
 // song.js の単体テスト：node sketch/prototype/song.test.mjs
 import assert from 'node:assert/strict';
 import {demoSong,newSong,newSection,newChord,timeline,placedChords,renderSong,buildSmf,placeChord,resizeChord,insertBars,
-  setMark,pruneMarks,setKeyMark,appendSectionFrom,stretchChordStart,keyRegion,mergeSections,splitSection,cloneSection,stretchChord,insertProgression,tickToSec,secToTick,copyRange,pasteAt,nameOf,rangeTicks,PPQ,safeFileName,voicingOf,STRUM_TICKS,withExtension,keyScale,sameKey,PATTERNS,PATTERN_GROUPS} from './song.js';
+  setMark,pruneMarks,setKeyMark,appendSectionFrom,stretchChordStart,keyRegion,mergeSections,splitSection,cloneSection,stretchChord,insertProgression,tickToSec,secToTick,copyRange,pasteAt,nameOf,rangeTicks,PPQ,safeFileName,voicingOf,STRUM_TICKS,withExtension,keyScale,sameKey,PATTERNS,PATTERN_GROUPS,
+  melodyBase,placedNotes,addNote,removeNotes,transposeBars} from './song.js';
 import {diatonicOf,conformBars,chordDeg} from '../../shared/ui/theory.js';
 import {barDrums,pulsesOf,backbeat} from './player.js';
 
@@ -308,4 +309,59 @@ test('パターンを増やす：バンド・EDM、すべて小節の中に収�
   assert.deepEqual([...new Set(renderSong(s).notes.map(n=>n.t))],[0,PPQ,PPQ*2]);   // ワルツ：1拍目ベース、2・3拍目和音
 });
 test('ファイル名',()=>{assert.equal(safeFileName('サビ F♯m7 B♭'),'F#m7_Bb');});
+/* ---------- メロディー ---------- */
+test('メロディー：基準の音は主音のうち C4 に近いほう',()=>{
+  assert.equal(melodyBase({idx:0,mode:'major'}),60);   // C
+  assert.equal(melodyBase({idx:1,mode:'major'}),55);   // G → G3
+  assert.equal(melodyBase({idx:11,mode:'major'}),65);  // F
+  assert.equal(melodyBase({idx:0,mode:'minor'}),57);   // Am → A3
+});
+test('メロディー：置く・キーを変えると一緒に移調・コード固定なら鳴る音を保つ',()=>{
+  const s=newSong();s.sections=[newSection('A',1,2),newSection('B',2,2)];
+  let tl=timeline(s);
+  const a=addNote(s,tl,PPQ,PPQ,64), b=addNote(s,tl,B*2+PPQ*2,B*4,67);   // E4、G4（長い音はセクションの終わりで切る）
+  assert.deepEqual([a.bar,a.pos,a.p],[0,PPQ,4]);
+  assert.equal(s.sections[1].melody[0].len,B*2-PPQ*2);
+  assert.deepEqual(placedNotes(s).map(x=>x.midi),[64,67]);
+  s.key={idx:1,mode:'major'};                                              // G に：度数を保って移調（E4→B3）
+  assert.deepEqual(placedNotes(s).map(x=>x.midi),[59,62]);
+  s.key={idx:0,mode:'major'};tl=timeline(s);
+  setKeyMark(s,1,0,{idx:2,mode:'major'},true);                             // B から D、鳴る音は保つ
+  assert.deepEqual(placedNotes(s).map(x=>x.midi),[64,67]);
+  transposeBars(s,timeline(s),0,1,2);                                      // 1小節目だけ2半音上げ
+  assert.deepEqual(placedNotes(s).map(x=>x.midi),[66,67]);
+  removeNotes(s,new Set([a.id]));assert.equal(placedNotes(s).length,1);
+});
+test('メロディー：セクションの分割・結合・小節の挿入・削除についてくる',()=>{
+  const s=newSong();s.sections=[newSection('A',1,4)];
+  const tl=timeline(s);
+  addNote(s,tl,0,PPQ,60);addNote(s,tl,B*2-PPQ,PPQ*2,62);addNote(s,tl,B*3,PPQ,64);
+  splitSection(s,0,2);
+  assert.deepEqual(s.sections.map(x=>x.melody.map(m=>[m.bar,m.len])),[[[0,PPQ],[1,PPQ]],[[1,PPQ]]]);   // またぐ音は分け目で切る
+  mergeSections(s,0);
+  assert.deepEqual(placedNotes(s).map(x=>x.start),[0,B*2-PPQ,B*3]);
+  insertBars(s,0,1,1);assert.deepEqual(placedNotes(s).map(x=>x.start),[0,B*3-PPQ,B*4]);
+  insertBars(s,0,1,-1);assert.deepEqual(placedNotes(s).map(x=>x.start),[0,B*2-PPQ,B*3]);
+  const c=cloneSection(s.sections[0]);assert.notEqual(c.melody[0].id,s.sections[0].melody[0].id);
+});
+test('メロディー：範囲のコピーと貼り付け、MIDI（2トラック）',()=>{
+  const s=newSong();s.sections=[newSection('A',1,4)];placeChord(s,0,newChord(0,0,B,0,''));
+  addNote(s,timeline(s),PPQ,PPQ,72,{v:90});
+  const clip=copyRange(s,{from:0,to:1});
+  assert.deepEqual(clip.melody,[{at:PPQ,len:PPQ,p:12,v:90}]);
+  pasteAt(s,B*2,clip);
+  assert.deepEqual(placedNotes(s).map(x=>[x.start,x.midi]),[[PPQ,72],[B*2+PPQ,72]]);
+  const r=renderSong(s,{from:B*2,to:B*3});
+  assert.deepEqual(r.melody,[{t:PPQ,d:PPQ,n:72,v:90}]);
+  const whole=renderSong(s);
+  const both=buildSmf(whole,'x','both'), only=buildSmf(whole,'x','chords'), mel=buildSmf(whole,'x','melody');
+  assert.equal(both[9],1);assert.equal(both[11],2);                        // フォーマット1・2トラック
+  assert.equal(only[9],0);assert.equal(only[11],1);
+  assert.deepEqual(only,buildSmf(whole,'x'));                             // 既定はコードだけ（今までと同じ）
+  const str=[...both].map(x=>String.fromCharCode(x)).join('');
+  assert.ok(str.includes('Melody')&&str.split('MTrk').length===3);
+  assert.ok([...mel].some((x,i)=>x===0x90&&mel[i+1]===72));               // メロディーだけならチャンネル1
+  const s2=newSong();s2.sections=[newSection('A',1,1)];placeChord(s2,0,newChord(0,0,B,0,''));
+  assert.equal(buildSmf(renderSong(s2),'x','both')[9],0);                 // メロディーが無ければ1トラック
+});
 console.log(`${n} tests passed`);

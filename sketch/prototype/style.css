@@ -365,3 +365,48 @@ body.grabbing,body.grabbing *{cursor:grabbing!important}
 .dialog-btns button{font-size:13px;padding:5px 14px}
 .dialog-btns .primary{background:var(--pressed-bg);border-color:var(--pressed-bg);color:var(--pressed-fg);font-weight:700}
 .dialog-btns .danger{color:var(--chord)}
+
+/* メロディー（ピアノロール）。.main.melody のときだけ .only-melody を出し、.only-chords を隠す */
+.main:not(.melody) .only-melody,.main.melody .only-chords{display:none!important}
+.view-seg button{font-weight:700;padding:2px 12px}
+#mSnap{width:78px}#mLen{width:86px}#midiParts{width:108px}
+.roll{flex:1;min-height:0;position:relative;outline:none;overflow:hidden}
+.roll[hidden]{display:none}
+.roll .rs{position:absolute;inset:0;overflow:auto}
+.roll .rs::-webkit-scrollbar{width:8px;height:8px}.roll .rs::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px}
+.roll .ri{position:relative}
+.roll .rh{position:sticky;top:0;height:62px;z-index:5;background:var(--panel);border-bottom:1px solid var(--line)}
+.roll .rc{position:sticky;left:0;width:46px;height:62px;z-index:6;background:var(--panel);border-right:1px solid var(--line)}
+.roll .rhg{position:absolute;left:46px;top:0;height:62px}
+.roll .rsec{position:absolute;border-left:4px solid var(--c);background:color-mix(in srgb,var(--c) 14%,transparent);font-size:11px;font-weight:700;padding-left:5px;line-height:18px;overflow:hidden;white-space:nowrap}
+.roll .rbar{position:absolute;border-left:1px solid var(--line);font-size:10px;color:var(--muted);padding-left:3px;line-height:16px;cursor:pointer}
+.roll .rbar:hover{background:var(--sel)}
+.roll .rchord{position:absolute;margin-left:1px;border:1px solid var(--line);border-radius:4px;background:var(--card);font-size:12px;font-weight:700;padding:0 5px;line-height:22px;overflow:hidden;white-space:nowrap}
+.roll .rchord.playing{border-color:var(--chord);background:var(--chord-tint)}
+.roll .rk{position:sticky;left:0;width:46px;z-index:4;background:var(--card);border-right:1px solid var(--line)}
+.roll .rkey{position:absolute;background:var(--card);border-bottom:1px solid var(--grid);cursor:pointer}
+.roll .rkey.black{background:var(--ink2);width:30px!important;border-bottom-color:var(--ink2)}
+.roll .rkey.c{border-bottom-color:var(--line)}
+.roll .rkey span{position:absolute;right:3px;top:0;font-size:9px;line-height:13px;color:var(--muted)}
+.roll .rkey:active{background:var(--root)}
+.roll .rg{position:absolute;left:46px;top:62px;cursor:crosshair}
+.roll .rg>div{position:absolute}
+.roll .rrow{background:var(--card);border-bottom:1px solid var(--grid2)}
+.roll .rrow.black{background:var(--grid2)}
+.roll .gscale{background:rgba(46,140,128,.07)}
+.roll .gscale.tonic{background:rgba(46,140,128,.14)}
+.roll .gtone{background:rgba(227,162,26,.16);border-left:1px solid rgba(227,162,26,.35)}
+.roll .gtone.root{background:rgba(227,162,26,.32)}
+.roll .gbar{border-left:1px solid var(--line);pointer-events:none;
+  background-image:repeating-linear-gradient(to right,transparent 0 calc(var(--beat) - 1px),var(--grid) calc(var(--beat) - 1px) var(--beat))}
+.roll .note{background:#3D7CC9;border:1px solid #2A5C9E;border-radius:3px;color:#fff;font-size:9px;line-height:11px;padding-left:3px;overflow:hidden;white-space:nowrap;cursor:grab;z-index:2}
+.roll .note::after{content:"";position:absolute;right:0;top:0;bottom:0;width:6px;cursor:ew-resize}
+.roll .note.sel{background:#C4456A;border-color:#8E2E4B}
+.roll .note.playing{box-shadow:0 0 0 2px var(--root)}
+.roll .note.drawing{opacity:.7}
+.roll .rcursor{background:var(--live);opacity:.7;pointer-events:none;z-index:3}
+.roll .rplay{background:var(--chord);pointer-events:none;z-index:3}
+.roll .rplay[hidden]{display:none}
+.roll .rband{border:1px dashed var(--live);background:var(--sel);z-index:4;pointer-events:none}
+:root[data-theme=dark] .roll .gtone{background:rgba(227,162,26,.13)}
+:root[data-theme=dark] .roll .gtone.root{background:rgba(227,162,26,.26)}

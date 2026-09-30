@@ -10,7 +10,8 @@
 class PreviewSynth
 {
 public:
-    enum class Timbre { triangle, piano, electricPiano, guitar, organ, pad };
+    // lead は ChordSketch のメロディー向け（最後に足したので、ほかの番号は変わらない）
+    enum class Timbre { triangle, piano, electricPiano, guitar, organ, pad, lead };
 
     static constexpr int maxNotesPerChord = 8;
     static constexpr int maxVoices        = 64;

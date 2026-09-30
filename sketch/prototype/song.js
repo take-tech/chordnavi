@@ -20,9 +20,11 @@ export const SECTION_PRESETS=[
   {name:'間奏',color:4},{name:'Cメロ',color:5},{name:'落ちサビ',color:6},{name:'Outro',color:7}
 ];
 const uid=()=>Math.random().toString(36).slice(2,10);
-export const newSection=(name='Aメロ',color=1,bars=8)=>({id:uid(),name,color,bars,pattern:null,chords:[],marks:[]});
+export const newSection=(name='Aメロ',color=1,bars=8)=>({id:uid(),name,color,bars,pattern:null,chords:[],melody:[],marks:[]});
 export const newChord=(bar,pos,len,off,q,boff)=>({id:uid(),bar,pos,len,off,q,...(boff!=null?{boff}:{})});
-export const cloneSection=s=>({...structuredClone(s),id:uid(),chords:s.chords.map(c=>({...c,id:uid()}))});
+// メロディーの音：p はその小節のキーの基準の音（melodyBase）からの半音数。度数と同じく、キーを変えると一緒に移調する
+export const newNote=(bar,pos,len,p,v=100)=>({id:uid(),bar,pos,len,p,v});
+export const cloneSection=s=>({...structuredClone(s),id:uid(),chords:s.chords.map(c=>({...c,id:uid()})),melody:(s.melody||[]).map(n=>({...n,id:uid()}))});
 
 // 新規で作る曲の名前
 export const NEW_TITLE='newsong';
@@ -126,6 +128,36 @@ export function placedChords(song,tl=timeline(song)){
   return out;
 }
 
+/* ---------- メロディー ---------- */
+// キーの基準の音：主音のうち C4（60）に近いほう（F♯4 までは上、G から下の G3）。キーを変えても大きく跳ばないように
+export const melodyBase=key=>60+((keyTonic(key)+6)%12)-6;
+export const MELODY_LOW=36, MELODY_HIGH=96;   // ピアノロールの範囲（C2〜C7）
+// 曲の中のメロディーの音（位置は曲の先頭からの tick、midi は鳴る音）。セクションの終わりで切る
+export function placedNotes(song,tl=timeline(song)){
+  const out=[];
+  song.sections.forEach((s,si)=>{
+    const {from,to}=tl.secRanges[si];if(from===to)return;
+    const secEnd=tl.bars[to-1].start+tl.bars[to-1].ticks;
+    for(const m of s.melody||[]){
+      if(m.bar>=s.bars)continue;
+      const b=tl.bars[from+m.bar], start=b.start+Math.min(m.pos,b.ticks-1), end=Math.min(start+m.len,secEnd);
+      const midi=melodyBase(b.key)+m.p;
+      if(end>start&&midi>=0&&midi<128)out.push({m,si,start,end,key:b.key,midi});
+    }
+  });
+  return out.sort((a,b)=>a.start-b.start||a.midi-b.midi);
+}
+// 曲の中の位置 abs（tick）に、長さ len・鳴る音 midi の音を置く（入るセクションの小節に。セクションの終わりで切る）。
+// id を渡すとその id で置く（動かしたときに選択を保つ）。置いた音を返す
+export function addNote(song,tl,abs,len,midi,{v=100,id}={}){
+  const b=tl.bars.find(x=>abs>=x.start&&abs<x.start+x.ticks);if(!b)return null;
+  const {to}=tl.secRanges[b.si], secEnd=tl.bars[to-1].start+tl.bars[to-1].ticks;
+  const n={...newNote(b.bar,abs-b.start,Math.max(1,Math.min(len,secEnd-abs)),midi-melodyBase(b.key),v),...(id?{id}:{})};
+  song.sections[b.si].melody.push(n);
+  return n;
+}
+export function removeNotes(song,ids){for(const s of song.sections)s.melody=s.melody.filter(x=>!ids.has(x.id));}
+
 // key を省くと曲の頭のキー。途中で転調しているときは、そのコードの位置のキー（placedChords の key、timeline の bars[].key）を渡す
 export const keyTonic=key=>tonicOf(key.idx,key.mode);
 export const songTonic=song=>keyTonic(song.key);
@@ -191,6 +223,7 @@ export function setSectionBars(song,si,n){
   const sec=song.sections[si];n=Math.max(1,Math.min(128,n));
   sec.bars=n;
   sec.chords=sec.chords.filter(c=>c.bar<n);
+  sec.melody=sec.melody.filter(x=>x.bar<n);
   sec.marks=sec.marks.filter(m=>m.bar<n);
 }
 // si と次のセクションを1つにする（名前・色・パターンは前のもの）。後ろのコード・変更点は小節をずらして引き継ぐ。
@@ -204,6 +237,7 @@ export function mergeSections(song,si){
     if(!cc.pattern&&pa!==pb)cc.pattern=pb;
     a.chords.push(cc);
   }
+  for(const x of b.melody)a.melody.push({...x,bar:x.bar+a.bars});
   for(const m of b.marks)a.marks.push({...m,bar:m.bar+a.bars});
   a.bars+=b.bars;
   song.sections.splice(si+1,1);
@@ -225,6 +259,13 @@ export function splitSection(song,si,bar){
     b.chords.push({...c,id:uid(),bar:0,pos:0,len:e0-cut});
   }
   a.chords=keep;
+  // メロディーは始まる位置で分ける。分け目をまたぐ音は分け目で切る
+  const mk=[];
+  for(const x of a.melody){
+    const s0=g.toLocal(x.bar,x.pos);
+    if(s0>=cut)b.melody.push({...x,bar:x.bar-bar});else mk.push(s0+x.len>cut?{...x,len:cut-s0}:x);
+  }
+  a.melody=mk;
   b.marks=a.marks.filter(m=>m.bar>=bar).map(m=>({...m,bar:m.bar-bar}));
   a.marks=a.marks.filter(m=>m.bar<bar);
   a.bars=bar;
@@ -252,13 +293,16 @@ export function insertBars(song,si,bar,count){
   if(count>0){
     sec.bars+=count;
     for(const c of sec.chords)if(c.bar>=bar)c.bar+=count;
+    for(const x of sec.melody)if(x.bar>=bar)x.bar+=count;
     for(const m of sec.marks)if(m.bar>=bar)m.bar+=count;
   }else if(count<0){
     const n=Math.min(-count,sec.bars-bar);if(n<=0||sec.bars-n<1)return;
     sec.bars-=n;
     sec.chords=sec.chords.filter(c=>c.bar<bar||c.bar>=bar+n);
+    sec.melody=sec.melody.filter(x=>x.bar<bar||x.bar>=bar+n);
     sec.marks=sec.marks.filter(m=>m.bar<bar||m.bar>=bar+n);
     for(const c of sec.chords)if(c.bar>=bar+n)c.bar-=n;
+    for(const x of sec.melody)if(x.bar>=bar+n)x.bar-=n;
     for(const m of sec.marks)if(m.bar>=bar+n)m.bar-=n;
   }
 }
@@ -281,7 +325,7 @@ export function setKeyMark(song,si,bar,key,keepSound){
   sec.marks=sec.marks.filter(m=>!(m.bar===bar&&m.key));
   if(key)sec.marks.push({bar,pos:0,key:{idx:key.idx,mode:key.mode,...(key.scale&&key.scale!==defaultScale(key.mode)?{scale:key.scale}:{})}});
   const tl=timeline(song), after=tl.bars[gi].key;
-  if(keepSound&&!sameKey(before,after)){const r=keyRegion(tl,gi);transposeBars(song,tl,r.from,r.to,mod12(keyTonic(before)-keyTonic(after)));}
+  if(keepSound&&!sameKey(before,after)){const r=keyRegion(tl,gi);transposeBars(song,tl,r.from,r.to,mod12(keyTonic(before)-keyTonic(after)),melodyBase(before)-melodyBase(after));}
 }
 // gi 小節目のキーが続く範囲（小節番号、to は含まない）と、その頭の変更点（曲の頭なら null）
 export function keyRegion(tl,gi){
@@ -290,15 +334,15 @@ export function keyRegion(tl,gi){
   const b=tl.bars[from];
   return {from,to,key:b?b.key:null,mark:b&&b.keyMark?{si:b.si,bar:b.bar}:null};
 }
-// 小節の範囲 [from, to) で始まるコードの度数を d 半音ずらす
-export function transposeBars(song,tl,from,to,d){
-  if(!mod12(d))return;
+// 小節の範囲 [from, to) で始まるコードの度数を d 半音ずらす。メロディーは md 半音（鳴る音を保つときは基準の音の差。省けば d を -6〜+5 にしたもの）
+export function transposeBars(song,tl,from,to,d,md=((mod12(d)+6)%12)-6){
   song.sections.forEach((s,si)=>{
     const base=tl.secRanges[si].from;
     for(const c of s.chords){
       const gi=base+c.bar;
-      if(gi>=from&&gi<to){c.off=mod12(c.off+d);if(c.boff!=null)c.boff=mod12(c.boff+d);delete c.deg;}
+      if(mod12(d)&&gi>=from&&gi<to){c.off=mod12(c.off+d);if(c.boff!=null)c.boff=mod12(c.boff+d);delete c.deg;}
     }
+    for(const x of s.melody){const gi=base+x.bar;if(md&&gi>=from&&gi<to)x.p+=md;}
   });
 }
 
@@ -331,7 +375,9 @@ export function copyRange(song,{from,to}){
   const tl=timeline(song), r=rangeTicks(tl,{from,to});
   return {len:r.to-r.from,chords:placedChords(song,tl).filter(p=>p.end>r.from&&p.start<r.to).map(p=>{
     const s=Math.max(p.start,r.from);return {at:s-r.from,len:Math.min(p.end,r.to)-s,off:p.c.off,q:p.c.q,boff:p.c.boff,pattern:p.c.pattern,deg:p.c.deg};
-  })};
+  }),
+  // メロディーは範囲の中で始まる音（度数と同じく、キーの基準からの半音で持つ）
+  melody:placedNotes(song,tl).filter(x=>x.start>=r.from&&x.start<r.to).map(x=>({at:x.start-r.from,len:Math.min(x.end,r.to)-x.start,p:x.m.p,v:x.m.v}))};
 }
 // 貼り付け：曲の中の origin（tick）から上書き（セクションをまたぐときはそれぞれのセクションに置く）
 export function pasteAt(song,origin,clip){
@@ -339,6 +385,10 @@ export function pasteAt(song,origin,clip){
     const tl=timeline(song), abs=origin+x.at, bar=tl.bars.find(b=>abs>=b.start&&abs<b.start+b.ticks);
     if(!bar)continue;
     placeChord(song,bar.si,{...newChord(bar.bar,abs-bar.start,x.len,x.off,x.q,x.boff),...(x.pattern?{pattern:x.pattern}:{}),...(x.deg!=null?{deg:x.deg}:{})});
+  }
+  for(const x of clip.melody||[]){
+    const tl=timeline(song), abs=origin+x.at, bar=tl.bars.find(b=>abs>=b.start&&abs<b.start+b.ticks);
+    if(bar)song.sections[bar.si].melody.push(newNote(bar.bar,abs-bar.start,x.len,x.p,x.v));
   }
 }
 
@@ -533,29 +583,48 @@ export function renderSong(song,range){
     t=Math.max(t,lo);end=Math.min(end,hi);    // 範囲の頭にかかる音は範囲の頭から鳴らし直す
     notes.push({t:t-lo,d:end-t,n:n.n,v:n.v});
   }
+  // メロディー（範囲の中で鳴っている音。範囲の頭にかかる音は頭から）
+  const melody=[];
+  for(const x of placedNotes(song,tl)){
+    if(x.end<=lo||x.start>=hi)continue;
+    const t=Math.max(x.start,lo), end=Math.min(x.end,hi);
+    melody.push({t:t-lo,d:end-t,n:x.midi,v:Math.max(1,Math.min(127,x.m.v|0))});
+  }
   const shift=(list,key)=>{
     const head={tick:0,[key]:key==='bpm'?tempoAt(tl.tempos,lo):meterAt(tl.meters,lo)};
     return [head,...list.filter(x=>x.tick>lo&&x.tick<hi).map(x=>({tick:x.tick-lo,[key]:x[key]}))];
   };
-  return {notes:notes.sort((a,b)=>a.t-b.t||a.n-b.n),tempos:shift(tl.tempos,'bpm'),meters:shift(tl.meters,'meter'),length:hi-lo};
+  return {notes:notes.sort((a,b)=>a.t-b.t||a.n-b.n),melody,tempos:shift(tl.tempos,'bpm'),meters:shift(tl.meters,'meter'),length:hi-lo};
 }
 
-/* ---------- SMF（フォーマット0、分解能480） ---------- */
+/* ---------- SMF（分解能480） ----------
+   parts：'chords'（コードだけ）／'melody'（メロディーだけ）／'both'（両方）。
+   1つだけ（または両方でも片方が空）ならフォーマット0の1トラック（今までと同じ）。
+   両方あるならフォーマット1：1トラック目がテンポ・拍子・曲名とコード（チャンネル1）、2トラック目がメロディー（チャンネル2）。
+   DAW に入れると、コードとメロディーが別のトラックになる */
 function vlq(n){const b=[n&0x7f];while((n>>=7))b.unshift((n&0x7f)|0x80);return b;}
-export function buildSmf({notes,tempos,meters,length},name=''){
-  const ev=[];   // [tick, 並び順（メタ0・オフ1・オン2）, バイト列]
-  const nameBytes=[...new TextEncoder().encode(name)];
-  if(nameBytes.length)ev.push([0,0,[0xff,0x03,...vlq(nameBytes.length),...nameBytes]]);
-  for(const x of tempos){const us=Math.round(60e6/x.bpm);ev.push([x.tick,0,[0xff,0x51,3,us>>16&255,us>>8&255,us&255]]);}
-  for(const x of meters)ev.push([x.tick,0,[0xff,0x58,4,x.meter[0],Math.log2(x.meter[1]),24,8]]);
-  for(const n of notes){ev.push([n.t,2,[0x90,n.n,n.v]]);ev.push([n.t+n.d,1,[0x80,n.n,0]]);}
+const metaText=(type,text)=>{const b=[...new TextEncoder().encode(text)];return b.length?[0xff,type,...vlq(b.length),...b]:null;};
+function smfTrack(ev,length){
   ev.sort((a,b)=>a[0]-b[0]||a[1]-b[1]);
   const trk=[];let prev=0;
   for(const [t,,bytes] of ev){trk.push(...vlq(t-prev),...bytes);prev=t;}
   trk.push(...vlq(Math.max(0,(length??prev)-prev)),0xff,0x2f,0);
   const len=trk.length;
-  return new Uint8Array([0x4d,0x54,0x68,0x64,0,0,0,6,0,0,0,1,PPQ>>8,PPQ&255,
-    0x4d,0x54,0x72,0x6b,len>>>24&255,len>>16&255,len>>8&255,len&255,...trk]);
+  return [0x4d,0x54,0x72,0x6b,len>>>24&255,len>>16&255,len>>8&255,len&255,...trk];
+}
+const noteEvents=(notes,ch)=>notes.flatMap(n=>[[n.t,2,[0x90|ch,n.n,n.v]],[n.t+n.d,1,[0x80|ch,n.n,0]]]);   // [tick, 並び順（メタ0・オフ1・オン2）, バイト列]
+export function buildSmf({notes,melody=[],tempos,meters,length},name='',parts='chords'){
+  const useChords=parts!=='melody', useMelody=parts!=='chords'&&melody.length>0;
+  const head=[];
+  const nm=metaText(0x03,name);if(nm)head.push([0,0,nm]);
+  for(const x of tempos){const us=Math.round(60e6/x.bpm);head.push([x.tick,0,[0xff,0x51,3,us>>16&255,us>>8&255,us&255]]);}
+  for(const x of meters)head.push([x.tick,0,[0xff,0x58,4,x.meter[0],Math.log2(x.meter[1]),24,8]]);
+  const hdr=(format,ntrk)=>[0x4d,0x54,0x68,0x64,0,0,0,6,0,format,0,ntrk,PPQ>>8,PPQ&255];
+  if(useChords&&useMelody){
+    const t2=[[0,0,metaText(0x03,'Melody')],...noteEvents(melody,1)];
+    return new Uint8Array([...hdr(1,2),...smfTrack([...head,...noteEvents(notes,0)],length),...smfTrack(t2,length)]);
+  }
+  return new Uint8Array([...hdr(0,1),...smfTrack([...head,...noteEvents(useChords?notes:melody,0)],length)]);
 }
 
 // ファイル名に日本語を使わない（ChordNavi と同じ規則：♯→#、♭→b、英数字と _ # - 以外は _）

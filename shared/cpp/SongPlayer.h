@@ -14,7 +14,7 @@ class SongPlayer
 public:
     enum class Drum { kick, snare, hat, hatAccent, click, clickHigh };
 
-    struct Note    { double start = 0, length = 0; int note = 60; float velocity = 0.8f; };
+    struct Note    { double start = 0, length = 0; int note = 60; float velocity = 0.8f; bool melody = false; };   // melody はメロディーの音色で鳴らす
     struct DrumHit { double start = 0; Drum kind = Drum::click; };
 
     struct Song
@@ -24,7 +24,8 @@ public:
         double length = 0;             // 1 周の長さ（秒）
         double leadIn = 0;             // カウントインの長さ（秒。play() のときだけ使う）
         bool loop = false;
-        PreviewSynth::Timbre timbre = PreviewSynth::Timbre::piano;
+        PreviewSynth::Timbre timbre = PreviewSynth::Timbre::piano;         // コード
+        PreviewSynth::Timbre melodyTimbre = PreviewSynth::Timbre::lead;    // メロディー（Note::melody）
         int session = -1;              // JS が付ける番号（位置の報告に付けて返す）
     };
 
