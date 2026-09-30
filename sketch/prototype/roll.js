@@ -1,8 +1,10 @@
 /* ChordSketch：メロディーのピアノロール（シートと切り替えて表示する）。
    横に流れるタイムラインの上にセクション・小節番号・コードの帯、その下にピアノロール。
    行にはカーソルの位置のキーのスケールの音と、そこで鳴っているコードの構成音を色で出す（ガイド）。
-   操作：何もないところを押す→音を置く（横に引くと長さ）、⇧＋ドラッグ→囲んで選ぶ、音をドラッグ→動かす（右端は長さ）、
-   音をダブルクリック→消す、鍵盤を押す→試聴。キーは onKey（Delete・矢印・⌘A/C/X/V/D・Esc） */
+   道具（ui.mTool）：「描く」は何もないところを押す→音を置く（横に引くと長さ）、⇧＋ドラッグ→囲んで選ぶ。
+   「選ぶ」は何もないところをドラッグ→囲んで選ぶ（⇧で追加）、押すだけ→選択を外してカーソル。
+   どちらでも：音をドラッグ→動かす（右端は長さ）、音をダブルクリック→消す、鍵盤を押す→試聴、
+   小節番号を横にドラッグ→小節の範囲を選ぶ（範囲の中で始まる音も選ぶ）。キーは onKey（Delete・矢印・⌘A/C/X/V/D・Esc） */
 import {PPQ,SECTION_COLORS,placedChords,placedNotes,addNote,removeNotes,newNote,MELODY_LOW,MELODY_HIGH,keyScale} from './song.js';
 import {CHORD,mod12,noteName,scaleById,tonicOf,isFlatKey} from '../../shared/ui/theory.js';
 
@@ -51,9 +53,11 @@ export function createRoll(root,ctx){
       const e=box('rsec',x0,0,x1-x0,18);e.style.setProperty('--c',SECTION_COLORS[s.color]||SECTION_COLORS[0]);
       e.append(h('span','',s.name));e.title=s.name;hg.appendChild(e);
     });
+    const rg0=ctx.range();
     for(const b of tl.bars){
-      const e=box('rbar',b.start*px,18,b.ticks*px,16);e.append(h('span','',String(b.gi+1)));
-      e.title='押すとカーソルをここに置く';hg.appendChild(e);
+      const on=rg0&&b.gi>=rg0.from&&b.gi<rg0.to;
+      const e=box('rbar'+(on?' on':''),b.start*px,18,b.ticks*px,16);e.append(h('span','',String(b.gi+1)));
+      e.dataset.gi=b.gi;e.title='押すとカーソルをここに置く・横にドラッグで小節の範囲を選ぶ';hg.appendChild(e);
     }
     const pcs=placedChords(song,tl);
     for(const p of pcs){
@@ -63,6 +67,7 @@ export function createRoll(root,ctx){
     hg.addEventListener('pointerdown',e=>{
       if(e.button!==0)return;
       const r=hg.getBoundingClientRect(), k=r.width/hg.offsetWidth, abs=(e.clientX-r.left)/k/px;
+      if(e.target.closest('.rbar'))return barRange(e,abs,k);
       ctx.setCursorAbs(Math.max(0,Math.min(tl.total-1,snapFloor(abs))));
     });
     head.append(corner,hg);inner.appendChild(head);
@@ -114,6 +119,8 @@ export function createRoll(root,ctx){
       e.title=`${midiName(x.midi,flat)}・${ctx.fmtPos(x.start)}`;
       grid.appendChild(e);
     }
+    // 選んでいる小節の範囲
+    if(rg0){const a=tl.bars[rg0.from], z=tl.bars[rg0.to-1];if(a&&z)grid.appendChild(box('rrange',a.start*px,0,(z.start+z.ticks-a.start)*px,H));}
     // カーソル
     const cur=box('rcursor',ctx.cursorAbs()*px,0,2,H);grid.appendChild(cur);
     playhead=box('rplay',0,0,2,H);playhead.hidden=true;grid.appendChild(playhead);
@@ -138,8 +145,32 @@ export function createRoll(root,ctx){
     e.preventDefault();ctx.focus();
     const el=e.target.closest('.note'), p0=hit(e);
     if(el)return grabNote(e,el,p0);
-    if(e.shiftKey)return rubberBand(e,p0);
+    if(e.shiftKey||ctx.ui.mTool==='select')return rubberBand(e,p0);
     drawNote(e,p0);
+  }
+  // 小節番号を横にドラッグ：小節の範囲を選ぶ（押しただけならカーソル）。範囲の中で始まる音も選ぶ
+  function barRange(e,abs0,k){
+    const tl=ctx.tl(), bar=a=>(tl.bars.find(b=>a>=b.start&&a<b.start+b.ticks)||tl.bars.at(-1)).gi;
+    const g0=bar(abs0), x0=e.clientX;let moved=false;
+    const hg=e.currentTarget||e.target.closest('.rhg');
+    const move=ev=>{
+      if(!moved&&Math.abs(ev.clientX-x0)<4)return;
+      moved=true;
+      const r=hg.getBoundingClientRect(), g=bar(Math.max(0,(ev.clientX-r.left)/k/ppt()));
+      const from=Math.min(g0,g), to=Math.max(g0,g)+1, cur=ctx.range();
+      if(cur&&cur.from===from&&cur.to===to)return;
+      selectRange({from,to});
+    };
+    const up=()=>{
+      removeEventListener('pointermove',move);removeEventListener('pointerup',up);
+      if(!moved)ctx.setCursorAbs(Math.max(0,Math.min(tl.total-1,snapFloor(abs0))));
+    };
+    addEventListener('pointermove',move);addEventListener('pointerup',up);
+  }
+  function selectRange(r){
+    const tl=ctx.tl(), lo=tl.bars[r.from].start, hi=r.to>=tl.bars.length?tl.total:tl.bars[r.to].start;
+    nsel=new Set(noteData().filter(x=>x.start>=lo&&x.start<hi).map(x=>x.m.id));
+    ctx.setRange(r);
   }
   // 何もないところ：音を置く。押したまま右へ引くと長さ（スナップ単位）
   function drawNote(e,p0){
@@ -169,8 +200,11 @@ export function createRoll(root,ctx){
   function rubberBand(e,p0){
     const band=box('rband',0,0,0,0);grid.appendChild(band);
     const x0=p0.abs*ppt(), y0=(HIGH-p0.midi)*ROW;
-    const base=new Set(nsel);
+    const base=e.shiftKey?new Set(nsel):new Set();
+    let moved=false;
     const move=ev=>{
+      if(!moved&&Math.abs(hit(ev).abs-p0.abs)*ppt()<4&&hit(ev).midi===p0.midi)return;
+      moved=true;
       const p=hit(ev), x1=p.abs*ppt(), y1=(HIGH-p.midi+1)*ROW;
       const l=Math.min(x0,x1), t=Math.min(y0,y1), w=Math.abs(x1-x0), hh=Math.abs(y1-y0)+ROW;
       band.style.cssText=`left:${l}px;top:${t}px;width:${w}px;height:${hh}px`;
@@ -179,7 +213,11 @@ export function createRoll(root,ctx){
       for(const x of noteData())if(x.end>lo&&x.start<hi&&x.midi>=mlo&&x.midi<=mhi)nsel.add(x.m.id);
       grid.querySelectorAll('.note').forEach(n=>n.classList.toggle('sel',nsel.has(n.dataset.id)));
     };
-    const up=()=>{removeEventListener('pointermove',move);removeEventListener('pointerup',up);band.remove();ctx.changed(false);};
+    const up=()=>{
+      removeEventListener('pointermove',move);removeEventListener('pointerup',up);band.remove();
+      if(!moved&&!e.shiftKey){nsel=new Set();ctx.setCursorAbs(snapFloor(p0.abs));return;}   // 押しただけ：選択を外してカーソル
+      ctx.changed(false);
+    };
     addEventListener('pointermove',move);addEventListener('pointerup',up);
   }
   // 音を押す：選ぶ（⇧で追加・外す）、ドラッグで動かす（右端は長さ）、ダブルクリックで消す
@@ -244,7 +282,7 @@ export function createRoll(root,ctx){
   // キー操作（メロディーの画面のとき）。扱ったら true
   function onKey(e){
     const mod=e.metaKey||e.ctrlKey, k=e.key.toLowerCase(), st=snapT();
-    if(mod&&k==='a'){e.preventDefault();nsel=new Set(noteData().map(x=>x.m.id));ctx.changed(false);return true;}
+    if(mod&&k==='a'){e.preventDefault();selectRange({from:0,to:ctx.tl().bars.length});return true;}
     if(mod&&(k==='c'||k==='x')){
       e.preventDefault();
       const picked=noteData().filter(x=>nsel.has(x.m.id));if(!picked.length)return true;
@@ -271,7 +309,7 @@ export function createRoll(root,ctx){
       return true;
     }
     if(mod)return false;
-    if(e.key==='Escape'&&nsel.size){nsel=new Set();ctx.changed(false);return true;}
+    if(e.key==='Escape'&&(nsel.size||ctx.range())){nsel=new Set();ctx.setRange(null);return true;}
     if((e.key==='Delete'||e.key==='Backspace')&&nsel.size){
       e.preventDefault();ctx.commit(()=>removeNotes(ctx.song(),nsel));nsel=new Set();ctx.changed();return true;
     }
@@ -317,6 +355,8 @@ export function createRoll(root,ctx){
   // 範囲の中の音の数と、選んでいる数
   const selection=()=>({count:nsel.size,notes:noteData().filter(x=>nsel.has(x.m.id))});
   const clearSelection=()=>{nsel=new Set();};
+  // 選んでいる音を消す
+  function deleteSelection(){if(!nsel.size)return;ctx.commit(()=>removeNotes(ctx.song(),nsel));nsel=new Set();ctx.changed();}
   // ステップ入力：カーソルの位置に音（和音なら全部）を置いて、入力の長さだけ進む
   function stepInput(midis){
     const tl=ctx.tl(), at=ctx.cursorAbs(), len=lenT(), ids=[];
@@ -327,5 +367,5 @@ export function createRoll(root,ctx){
   // 休符：カーソルを入力の長さだけ進める
   function stepRest(){const tl=ctx.tl();ctx.setCursorAbs(Math.min(tl.total-1,ctx.cursorAbs()+lenT()));reveal(ctx.cursorAbs());}
 
-  return {render,onKey,setPlayhead,reveal,selection,clearSelection,stepInput,stepRest,newNote};
+  return {render,onKey,setPlayhead,reveal,selection,clearSelection,deleteSelection,selectRange,stepInput,stepRest,newNote};
 }

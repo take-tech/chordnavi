@@ -14,7 +14,7 @@ import {hasNative,nativeFn,onNative} from '../../shared/ui/juce-bridge.js';
 const STORE='chordsketch.v1';
 const UI_DEFAULT={snap:'beat',perRow:4,insLen:'bar',dia:'7',timbre:'piano',metro:'click',metroOn:true,countIn:false,countBars:1,loop:false,keepNames:false,step:false,theme:'light',prog:{major:0,minor:13},progVar:0,
   // メロディー（ピアノロール）：表示・スナップ・入力の長さ・横の拡大・音色・鳴らすもの・ガイド、MIDI に入れるもの
-  view:'chords',mSnap:'8',mLen:'8',mZoom:1,mTimbre:'square',hearChords:true,hearMelody:true,guideChord:true,guideScale:true,midiParts:'both',mTimbreSet:false};
+  view:'chords',mSnap:'8',mLen:'8',mZoom:1,mTimbre:'square',hearChords:true,hearMelody:true,guideChord:true,guideScale:true,midiParts:'both',mTimbreSet:false,mTool:'draw'};
 let song, ui={...UI_DEFAULT};
 let tl;                     // timeline(song) のキャッシュ（changed() で更新）
 let sel=null;               // 選択中のコード {si,id}
@@ -852,13 +852,18 @@ function renderFooter(){
   const btn=(text,title,fn)=>{const b=h('button','',text);b.title=title;b.onclick=fn;return b;};
   if(ui.view==='melody'){
     const b=tl.bars[cursor.gi], s=roll.selection();
-    f.append(group(null,h('span','flbl','カーソル'),h('b','pos',b?fmtPos(cursor.gi,cursor.pos):'—')),
+    if(range)f.append(group(null,h('b','',rangeLabel(range)),h('span','fsub',`${range.to-range.from}小節を選択`)),
+      group('範囲',btn('▶ ループ再生','この範囲を繰り返し再生',()=>{ui.loop=true;render();startPlay();})));
+    else f.append(group(null,h('span','flbl','カーソル'),h('b','pos',b?fmtPos(cursor.gi,cursor.pos):'—')),
       group('ステップ入力',btn('休符','カーソルを入力の長さだけ進める（ステップ入力の休み）',()=>roll.stepRest())));
     if(s.count)f.append(group(null,h('span','fsub',`${s.count}音を選択`),
       btn('↑','半音上げる（↑、⇧↑でオクターブ）',()=>roll.onKey(new KeyboardEvent('keydown',{key:'ArrowUp'}))),
       btn('↓','半音下げる（↓、⇧↓でオクターブ）',()=>roll.onKey(new KeyboardEvent('keydown',{key:'ArrowDown'}))),
-      btn('消す','選んだ音を消す（⌫）',()=>roll.onKey(new KeyboardEvent('keydown',{key:'Delete'})))));
-    f.appendChild(h('span','fhint','クリックで音を置く（右へ引くと長さ）・⇧ドラッグで囲んで選ぶ・ダブルクリックで消す'));
+      btn(range?'範囲の音を消す':'消す','選んだ音をまとめて消す（⌫）',()=>roll.deleteSelection()),
+      btn('選択を外す','（Esc）',()=>roll.onKey(new KeyboardEvent('keydown',{key:'Escape'})))));
+    f.appendChild(h('span','fhint',ui.mTool==='select'
+      ?'ドラッグで囲んで選ぶ（⇧で追加）・小節番号を横にドラッグで範囲・⌘A ですべて'
+      :'クリックで音を置く（右へ引くと長さ）・⇧ドラッグで囲んで選ぶ・ダブルクリックで消す'));
     return;
   }
   if(range){
@@ -1565,6 +1570,9 @@ const roll=createRoll($('roll'),{
   setCursorAbs:(abs,redraw=true)=>{const b=tl.bars.find(x=>abs>=x.start&&abs<x.start+x.ticks)||tl.bars.at(-1);cursor={gi:b.gi,pos:Math.max(0,abs-b.start)};range=null;sel=null;if(redraw)render();},
   fmtPos:abs=>{const b=tl.bars.find(x=>abs>=x.start&&abs<x.start+x.ticks);return b?fmtPos(b.gi,abs-b.start):'';},
   playingChord:()=>playingId,
+  range:()=>range,
+  // 小節の範囲を選ぶ（null で外す）。コードの画面と同じ range なので、再生・MIDI のドラッグにも使う
+  setRange:r=>{range=r?{...r,anchor:r.from}:null;if(r)cursor={gi:r.from,pos:0};sel=null;render();},
   focus:()=>$('roll').focus({preventScroll:true}),
 });
 for(const x of M_SNAPS)$('mSnap').appendChild(Object.assign(h('option','',x.name),{value:x.id}));
@@ -1583,6 +1591,7 @@ document.querySelectorAll('#viewSeg button').forEach(b=>b.onclick=()=>{
 });
 for(const id of ['hearChords','hearMelody'])$(id).onclick=()=>{uiSet(id,!ui[id]);player.refresh();};
 for(const id of ['guideChord','guideScale'])$(id).onclick=()=>uiSet(id,!ui[id]);
+document.querySelectorAll('#toolSeg button').forEach(b=>b.onclick=()=>uiSet('mTool',b.dataset.v));
 $('countIn').onclick=()=>uiSet('countIn',!ui.countIn);
 // ミュートは保存しない（開き直すと音が出る状態に戻る）
 let muted=false;
@@ -1671,6 +1680,8 @@ function render(){
   sheet.hidden=mel;$('roll').hidden=!mel;
   $('mSnap').value=ui.mSnap;$('mLen').value=ui.mLen;$('mTimbre').value=ui.mTimbre;$('midiParts').value=ui.midiParts;
   document.querySelectorAll('#zoomSeg button').forEach(b=>b.setAttribute('aria-pressed',+b.dataset.v===ui.mZoom));
+  document.querySelectorAll('#toolSeg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.v===ui.mTool));
+  $('roll').classList.toggle('select-tool',ui.mTool==='select');
   pressed('hearChords',ui.hearChords);pressed('hearMelody',ui.hearMelody);pressed('guideChord',ui.guideChord);pressed('guideScale',ui.guideScale);
   renderPalette();renderProg();
   if(mel)roll.render();else renderSheet();

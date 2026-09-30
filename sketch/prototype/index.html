@@ -119,6 +119,10 @@
       <button id="bassBtn" class="tg small" aria-pressed="true" title="ベース音を出す／出さない">ベース</button>
     </div>
     <div class="toolbar out only-melody">
+      <div class="seg small" id="toolSeg" title="何もないところをドラッグしたときの動き">
+        <button data-v="draw" title="描く：何もないところを押して音を置く（右へ引くと長さ。⇧＋ドラッグで囲んで選ぶ）">✎ 描く</button>
+        <button data-v="select" title="選ぶ：何もないところをドラッグして囲んだ音を選ぶ（⇧で追加）。押すだけなら選択を外す">⬚ 選ぶ</button></div>
+      <span class="sep"></span>
       <label class="fld" title="メロディーの試聴の音色（MIDI には影響しない）">音色 <select id="mTimbre"></select></label>
       <span class="sep"></span>
       <span class="lbl">鳴らす</span>

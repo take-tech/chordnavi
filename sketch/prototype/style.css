@@ -381,6 +381,9 @@ body.grabbing,body.grabbing *{cursor:grabbing!important}
 .roll .rsec{position:absolute;border-left:4px solid var(--c);background:color-mix(in srgb,var(--c) 14%,transparent);font-size:11px;font-weight:700;padding-left:5px;line-height:18px;overflow:hidden;white-space:nowrap}
 .roll .rbar{position:absolute;border-left:1px solid var(--line);font-size:10px;color:var(--muted);padding-left:3px;line-height:16px;cursor:pointer}
 .roll .rbar:hover{background:var(--sel)}
+.roll .rbar.on{background:var(--sel);color:var(--live);font-weight:700}
+.roll .rrange{background:var(--sel);pointer-events:none;z-index:1;border-left:1px solid var(--live);border-right:1px solid var(--live)}
+.roll.select-tool .rg{cursor:default}
 .roll .rchord{position:absolute;margin-left:1px;border:1px solid var(--line);border-radius:4px;background:var(--card);font-size:12px;font-weight:700;padding:0 5px;line-height:22px;overflow:hidden;white-space:nowrap}
 .roll .rchord.playing{border-color:var(--chord);background:var(--chord-tint)}
 .roll .rk{position:sticky;left:0;width:46px;z-index:4;background:var(--card);border-right:1px solid var(--line)}
