@@ -47,6 +47,12 @@ public:
     void setUiState (const juce::String& json);
     juce::String getUiState() const;
 
+    // リアルタイム録音（メロディー）：録音中で曲を再生しているあいだ、鍵盤を押した・離した時刻（曲の位置の秒。カウントイン中は負）を記録する。
+    // オーディオスレッドが書き、メッセージスレッドが takeRecEvents で取り出す（ロックフリーの単一生産者・単一消費者）。サステインペダルは見ない
+    struct RecEvent { int session = -1; double seconds = 0; int note = 60; int velocity = 0; bool on = false; };
+    void setRecording (bool r) { recording.store (r); }
+    void takeRecEvents (std::vector<RecEvent>& out);
+
     // Finder・エクスプローラーから開いた曲ファイル（メッセージスレッドだけで使う）。
     // アプリが受け取って入れ、画面の準備ができたらエディタが取り出して JS に渡す
     void queueOpenFiles (const juce::StringArray& paths) { pendingOpenFiles.addArray (paths); }
@@ -68,6 +74,10 @@ private:
     mutable juce::CriticalSection stateLock;
     juce::String uiState;
     juce::StringArray pendingOpenFiles;
+
+    std::atomic<bool> recording { false };
+    juce::AbstractFifo recFifo { 1024 };
+    std::array<RecEvent, 1024> recEvents {};
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (SketchProcessor)
 };

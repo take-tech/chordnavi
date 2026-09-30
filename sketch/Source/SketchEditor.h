@@ -60,13 +60,15 @@ private:
     // 試聴（JS の player.js から）：
     //   songPlay({ notes:[開始秒, 長さ秒, 音, 強さ0〜1, …], melody:[同じ], drums:[開始秒, 種類, …], length, leadIn, loop, timbre, melodyTimbre, session })
     //   songUpdate({ …同じ（leadIn は使わない）})・songStop()・previewNotes({ notes, dur, timbre })・setMute(bool)・setTimbre(name)
-    // 再生位置は "songPos" { session, seconds, playing }、押している鍵盤は "midiNotes" { notes } で 30Hz で JS に送る
+    // 再生位置は "songPos" { session, seconds, playing }、押している鍵盤は "midiNotes" { notes } で 30Hz で JS に送る。
+    // 録音（setRecording(bool)）中に弾いた鍵盤は "recNotes" { events:[session, 秒, 音, 強さ, 押した1/離した0, …] }
     void timerCallback() override;
     SongPlayer::Position lastSentPosition { -2, 0.0, false };
     // JS が takeOpenFiles() を呼んだら true（それより前に開いたファイルは、そのときにまとめて返す）。
     // その後に届いたファイルは "openFiles" [{ path, name, text }] で送る
     bool pageReady = false;
     std::vector<int> lastSentNotes;
+    std::vector<SketchProcessor::RecEvent> recBuffer;   // 録音の出来事（タイマーで取り出して "recNotes" で送る）
 
     SketchProcessor& processorRef;
     SketchWebView webView;

@@ -5,7 +5,7 @@ import {createWheel} from '../../shared/ui/wheel.js';
 import {PPQ,METERS,SNAPS,snapTicks,barTicksOf,beatTicksOf,SECTION_COLORS,SECTION_PRESETS,PATTERNS,MIN_BPM,MAX_BPM,
   newSong,demoSong,newSection,newChord,cloneSection,timeline,placedChords,placeChord,removeChord,resizeChord,
   setSectionBars,insertBars,appendSectionFrom,stretchChord,stretchChordStart,pruneMarks,mergeSections,splitSection,insertProgression,setMark,rangeTicks,copyRange,pasteAt,renderSong,buildSmf,safeFileName,
-  songTonic,songFlat,nameOf,tempoAt,PATTERN_GROUPS,NEW_TITLE,SKETCH_SCALES,keyScale,defaultScale,meterAt,tickToSec,withExtension,keyTonic,sameKey,setKeyMark,keyRegion,transposeBars,voicingOf,patternById,VOICINGS,GUITAR_AREAS,melodyBase} from './song.js';
+  songTonic,songFlat,nameOf,tempoAt,PATTERN_GROUPS,NEW_TITLE,SKETCH_SCALES,keyScale,defaultScale,meterAt,tickToSec,withExtension,keyTonic,sameKey,setKeyMark,keyRegion,transposeBars,voicingOf,patternById,VOICINGS,GUITAR_AREAS,melodyBase,addNote,secToTick} from './song.js';
 import {createRoll,M_SNAPS,M_LENS} from './roll.js';
 import * as player from './player.js';
 import {hasNative,nativeFn,onNative} from '../../shared/ui/juce-bridge.js';
@@ -861,6 +861,7 @@ function renderFooter(){
       btn('↓','半音下げる（↓、⇧↓でオクターブ）',()=>roll.onKey(new KeyboardEvent('keydown',{key:'ArrowDown'}))),
       btn(range?'範囲の音を消す':'消す','選んだ音をまとめて消す（⌫）',()=>roll.deleteSelection()),
       ...(s.count>=2?[btn('結合','選んだ音を1つにする（いちばん前の音の高さで、最初から最後まで）',()=>roll.joinSelection())]:[]),
+      btn('クオンタイズ','選んだ音の頭と終わりをスナップ（'+(M_SNAPS.find(x=>x.id===ui.mSnap)?.name||'')+'）にそろえる（Q）',()=>roll.quantizeSelection()),
       btn('分割','選んだ音を2つに分ける（カーソルが音の中ならカーソルで、外なら真ん中で。⌘＋クリックでその位置）',()=>roll.splitSelection()),
       btn('選択を外す','（Esc）',()=>roll.onKey(new KeyboardEvent('keydown',{key:'Escape'})))));
     f.appendChild(h('span','fhint',ui.mTool==='select'
@@ -948,8 +949,9 @@ addEventListener('keydown',e=>{
   if(ui.view==='melody'&&$('printWrap').hidden){
     if(roll.onKey(e))return;
     if(mod)return;
-    if(e.key===' '){e.preventDefault();togglePlay();return;}
+    if(e.key===' '){e.preventDefault();rec?toggleRec():togglePlay();return;}
     if(k==='m'){e.preventDefault();toggleMute();return;}
+    if(k==='r'){e.preventDefault();toggleRec();return;}
     if(e.key==='Home'){cursor={gi:0,pos:0};render();roll.reveal(0);return;}
     return;
   }
@@ -1016,11 +1018,74 @@ function startPlay(){
     render:()=>audible(renderSong(song,rangeTicks(tl,r))),
     loop:()=>ui.loop, countIn:ui.countIn?ui.countBars:0, metronome:()=>ui.metroOn?ui.metro:'off', timbre:()=>ui.timbre,melodyTimbre:()=>ui.mTimbre,
     onPos:(t,counting,cnt)=>onPos(t==null?null:playFrom+t,counting,cnt),
-    onEnd:()=>{playTick=null;playingId=null;render();}
+    onEnd:()=>{finishRec();playTick=null;playingId=null;render();}
   });
   render();
 }
-function togglePlay(){if(player.isPlaying()){player.stop();progPreview=false;playTick=null;playingId=null;render();}else startPlay();}
+function togglePlay(){if(player.isPlaying()){player.stop();finishRec();progPreview=false;playTick=null;playingId=null;render();}else startPlay();}
+
+/* ---------- リアルタイム録音（メロディー） ----------
+   ● を押すと、カウントイン（設定どおり）のあとカーソルの小節（範囲があれば範囲）から再生しながら、MIDI 鍵盤で弾いた音を録る。
+   今ある音には重ねる。止めたら（●・■・Space・曲の終わり）まとめて入れる（⌘Z 1回で戻せる）。クオンタイズはあとで（Q）。
+   時刻：JUCE 版は C++ が MIDI を受けた瞬間の曲の位置（recNotes）、ブラウザは受けたときの WebAudio の時計 */
+let rec=null;   // {from, to, tempos, notes:[{abs,len,n,v}], open:Map(音 → {abs,v})}
+const nSetRec=nativeFn('setRecording');
+function startRec(){
+  if(player.isPlaying()){player.stop();finishRec();}
+  if(ui.view!=='melody'){ui.view='melody';persist();}
+  const rr=rangeTicks(tl,playRange());
+  rec={from:rr.from,to:rr.to,tempos:renderSong(song,rr).tempos,notes:[],open:new Map()};
+  nSetRec?.(true).catch(e=>console.error(e));
+  roll.clearSelection();
+  startPlay();
+}
+// 周の頭からの秒 → 曲の tick（ループなら周の中に折り返す。カウントイン中の負の時刻は範囲の頭より前）
+function recAbs(sec){
+  const len=rec.to-rec.from;
+  if(sec<0)return rec.from+Math.round(sec*rec.tempos[0].bpm/60*PPQ);
+  let t=secToTick(rec.tempos,sec);
+  if(ui.loop&&len>0)t%=len;else t=Math.min(t,len);
+  return rec.from+Math.round(t);
+}
+function recEvent(sec,n,v,on){
+  if(!rec)return;
+  const abs=recAbs(sec);
+  if(on){recOff(n,abs);rec.open.set(n,{abs,v:Math.max(1,v)});}else recOff(n,abs);
+}
+function recOff(n,abs){
+  const o=rec.open.get(n);if(!o)return;
+  rec.open.delete(n);
+  const end=abs>o.abs?abs:rec.to;   // ループで周をまたいだら周の終わりまで
+  rec.notes.push({abs:o.abs,len:Math.max(20,end-o.abs),n,v:o.v});
+}
+function finishRec(){
+  if(!rec)return;
+  const cur=playTick??rec.to;
+  for(const n of [...rec.open.keys()])recOff(n,Math.max(cur,(rec.open.get(n)?.abs??0)+20));
+  nSetRec?.(false).catch(e=>console.error(e));
+  // 範囲の頭より前（カウントイン中）に弾き始めた音は頭から。頭より前で終わった音は捨てる
+  const got=rec.notes.map(x=>({...x,s:Math.max(x.abs,rec.from)})).filter(x=>x.abs+x.len>x.s);
+  const r=rec;rec=null;
+  roll.setRecNotes([]);
+  if(got.length){commit(()=>{for(const x of got)addNote(song,tl,x.s,x.abs+x.len-x.s,x.n,{v:x.v});});toast(`${got.length}音を録音しました`);}
+  else render();
+}
+function toggleRec(){
+  if(rec){player.stop();finishRec();progPreview=false;playTick=null;playingId=null;render();return;}
+  startRec();
+}
+$('recBtn').onclick=toggleRec;
+onNative('recNotes',({events})=>{
+  if(!rec||!Array.isArray(events))return;
+  const s=player.playSession();
+  for(let i=0;i+4<events.length;i+=5)if(events[i]===s)recEvent(events[i+1],events[i+2],events[i+3],!!events[i+4]);
+});
+// 録音中の表示：確定した音と、押している音（今の位置まで）
+function recDisplay(abs){
+  const list=rec.notes.map(x=>({start:Math.max(x.abs,rec.from),end:x.abs+x.len,midi:x.n}));
+  for(const [n,o] of rec.open)list.push({start:Math.max(o.abs,rec.from),end:Math.max(abs,o.abs+20),midi:n});
+  return list;
+}
 // カウントインの「•」：大きな拍（6/8 なら付点4分）で数える。8つを超えるなら今の小節の分だけ並べ、前に「2/2」のように小節を出す
 function renderCountDots(disp,cnt,m){
   const {P,size}=player.pulsesOf(m);
@@ -1056,6 +1121,7 @@ function onPos(abs,counting,cnt){
   }
   placePlayhead();
   if(ui.view==='melody')roll.setPlayhead(abs);
+  if(rec)roll.setRecNotes(recDisplay(abs));
 }
 /* ---------- 位置の表示（テンポ・拍子・キー・位置・経過時間） ---------- */
 // 再生中は再生位置、止まっているときはカーソル位置の値
@@ -1513,9 +1579,10 @@ if(hasNative){
 }else setMidiStatus('このブラウザは非対応');
 function onMidi({data:[st,d1,d2]}){
   const t=st&0xf0;
-  if(t===0x90&&d2>0){held.add(d1);player.noteOn(d1,d2,ui.timbre);}
+  if(t===0x90&&d2>0){held.add(d1);player.noteOn(d1,d2,liveTimbre());}
   else if(t===0x80||t===0x90){held.delete(d1);player.noteOff(d1);}
   else return;
+  if(rec&&!hasNative){const sec=player.songSeconds();if(sec!=null)recEvent(sec,d1,d2,t===0x90&&d2>0);}
   heldChanged();
 }
 // 開発用：MIDI 機器なしで確認するときにコンソールから MIDI メッセージを流し込む（例：__midi([0x90,60,100])）
@@ -1539,7 +1606,9 @@ for(const m of player.METRONOMES.filter(x=>x.id!=='off'))metroMenu.appendChild(O
 for(const t of player.TIMBRES)$('timbre').appendChild(Object.assign(h('option','',t.name),{value:t.id}));
 // 保存してあった音色が今の環境（JUCE 版・ブラウザ）の選択肢に無ければピアノ
 if(!player.TIMBRES.some(t=>t.id===ui.timbre))ui.timbre='piano';
-player.setLiveTimbre(ui.timbre);
+// MIDI 鍵盤で弾く音の音色：メロディーの画面ではメロディーの音色
+const liveTimbre=()=>ui.view==='melody'?ui.mTimbre:ui.timbre;
+player.setLiveTimbre(liveTimbre());
 addPatternOptions($('pattern'));
 for(const [v,n] of INS_LENS)$('insLen').appendChild(Object.assign(h('option','',n),{value:v}));
 for(const p of SECTION_PRESETS)$('secNames').appendChild(Object.assign(h('option'),{value:p.name}));
@@ -1559,7 +1628,7 @@ const countMenu=$('countMenu');
 $('countKind').onclick=e=>{e.stopPropagation();fileMenu.hidden=true;metroMenu.hidden=true;$('themeMenu').hidden=true;countMenu.hidden=!countMenu.hidden;};
 countMenu.addEventListener('click',e=>{const v=+e.target.closest('button')?.value;if(!v)return;ui.countIn=true;uiSet('countBars',v);countMenu.hidden=true;});
 addEventListener('click',e=>{if(!e.target.closest('#countMenu'))countMenu.hidden=true;});
-$('timbre').addEventListener('change',e=>{uiSet('timbre',e.target.value);player.setLiveTimbre(ui.timbre);player.refresh();});
+$('timbre').addEventListener('change',e=>{uiSet('timbre',e.target.value);player.setLiveTimbre(liveTimbre());player.refresh();});
 $('insLen').addEventListener('change',e=>uiSet('insLen',e.target.value));
 /* ---------- メロディー（ピアノロール） ---------- */
 const roll=createRoll($('roll'),{
@@ -1584,12 +1653,13 @@ for(const t of player.TIMBRES)$('mTimbre').appendChild(Object.assign(h('option',
 if(!player.TIMBRES.some(t=>t.id===ui.mTimbre))ui.mTimbre='square';
 $('mSnap').addEventListener('change',e=>uiSet('mSnap',e.target.value));
 $('mLen').addEventListener('change',e=>uiSet('mLen',e.target.value));
-$('mTimbre').addEventListener('change',e=>{uiSet('mTimbre',e.target.value);player.refresh();player.playNotes([melodyBase(curKey())+7],ui.mTimbre,.5);});
+$('mTimbre').addEventListener('change',e=>{uiSet('mTimbre',e.target.value);player.setLiveTimbre(liveTimbre());player.refresh();player.playNotes([melodyBase(curKey())+7],ui.mTimbre,.5);});
 $('midiParts').addEventListener('change',e=>uiSet('midiParts',e.target.value));
 document.querySelectorAll('#zoomSeg button').forEach(b=>b.onclick=()=>uiSet('mZoom',+b.dataset.v));
 document.querySelectorAll('#viewSeg button').forEach(b=>b.onclick=()=>{
   if(ui.view===b.dataset.v)return;
-  roll.clearSelection();editOpen=false;uiSet('view',b.dataset.v);player.refresh();
+  if(rec){player.stop();finishRec();playTick=null;}
+  roll.clearSelection();editOpen=false;uiSet('view',b.dataset.v);player.setLiveTimbre(liveTimbre());player.refresh();
   if(ui.view==='melody'){roll.reveal(roll?(tl.bars[cursor.gi]?.start??0)+cursor.pos:0);$('roll').focus({preventScroll:true});}else sheet.focus({preventScroll:true});
 });
 for(const id of ['hearChords','hearMelody'])$(id).onclick=()=>{uiSet(id,!ui[id]);player.refresh();};
@@ -1669,6 +1739,7 @@ function render(){
   document.querySelectorAll('#voicingSeg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.v===song.voicing));
   document.querySelectorAll('#areaSeg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.v===song.guitarArea));
   $('areaSeg').hidden=song.voicing!=='guitar';
+  $('recBtn').setAttribute('aria-pressed',!!rec);$('recBtn').classList.toggle('on',!!rec);
   const playing=player.isPlaying(), pb=$('playBtn');
   pb.textContent=playing?'■':'▶';pb.setAttribute('aria-label',playing?'停止':'再生');pb.classList.toggle('on',playing);
   if(!playing){$('posDisp').textContent=fmtPos(cursor.gi,cursor.pos)||'1.1.1';$('posDisp').classList.remove('count');lastPos='';}

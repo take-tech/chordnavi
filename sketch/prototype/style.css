@@ -427,3 +427,9 @@ body.grabbing,body.grabbing *{cursor:grabbing!important}
 :root[data-theme=dark] .roll .gtone{background:rgba(227,162,26,.22);box-shadow:inset 0 1px 0 rgba(227,162,26,.35)}
 :root[data-theme=dark] .roll .gtone.root{background:rgba(227,162,26,.42)}
 :root[data-theme=dark] .roll .gtone span{color:#F0C060}
+
+/* 録音ボタン（録音中は赤く点滅）と、録音中の音 */
+.transport .rec{color:#C4456A}
+.transport .rec.on{background:#C4456A;border-color:#C4456A;color:#fff;animation:recblink 1s steps(2,start) infinite}
+@keyframes recblink{50%{opacity:.55}}
+.roll .note.rec{background:#E05A7E;border-color:#A83A5A;opacity:.9;pointer-events:none;z-index:3}

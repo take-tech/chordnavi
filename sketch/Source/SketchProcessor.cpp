@@ -23,8 +23,23 @@ void SketchProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Midi
 {
     juce::ScopedNoDenormals noDenormals;
 
+    // 録音の時刻：このブロックの頭の曲の位置（前のブロックの終わり）＋ブロックの中での位置
+    const auto songPos = songPlayer.getPosition();
+    const auto sr = getSampleRate() > 0 ? getSampleRate() : 44100.0;
+    const bool rec = recording.load() && songPos.playing;
+
     for (const auto meta : midiMessages)
-        handleMidi (meta.getMessage());
+    {
+        const auto m = meta.getMessage();
+        handleMidi (m);
+        if (rec && (m.isNoteOn() || m.isNoteOff()))
+        {
+            const auto scope = recFifo.write (1);
+            if (scope.blockSize1 > 0)
+                recEvents[(size_t) scope.startIndex1] = { songPos.session, songPos.seconds + meta.samplePosition / sr,
+                                                          m.getNoteNumber(), m.isNoteOn() ? (int) m.getVelocity() : 0, m.isNoteOn() };
+        }
+    }
 
     juce::uint64 mask[2] {};
     for (int n = 0; n < 128; ++n)
@@ -76,6 +91,13 @@ void SketchProcessor::handleMidi (const juce::MidiMessage& m)
         sustained.fill (false);
         synth.allNotesOff();
     }
+}
+
+void SketchProcessor::takeRecEvents (std::vector<RecEvent>& out)
+{
+    const auto scope = recFifo.read (recFifo.getNumReady());
+    for (int i = 0; i < scope.blockSize1; ++i) out.push_back (recEvents[(size_t) (scope.startIndex1 + i)]);
+    for (int i = 0; i < scope.blockSize2; ++i) out.push_back (recEvents[(size_t) (scope.startIndex2 + i)]);
 }
 
 std::vector<int> SketchProcessor::getHeldNotes() const

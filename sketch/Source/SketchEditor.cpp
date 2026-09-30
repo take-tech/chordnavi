@@ -210,6 +210,11 @@ juce::WebBrowserComponent::Options SketchEditor::makeOptions()
                                  const auto timbre = timbreFromName (args.isEmpty() ? juce::String() : args[0].getProperty ("timbre", "piano").toString());
                                  completion (juce::var (! notes.empty() && processorRef.getSynth().queue (notes, 0.0, dur, timbre, false)));
                              })
+        .withNativeFunction ("setRecording", [this] (const auto& args, auto completion)
+                             {
+                                 processorRef.setRecording (! args.isEmpty() && (bool) args[0]);
+                                 completion (juce::var (true));
+                             })
         .withNativeFunction ("setMute", [this] (const auto& args, auto completion)
                              {
                                  processorRef.setMuted (! args.isEmpty() && (bool) args[0]);
@@ -252,6 +257,21 @@ void SketchEditor::timerCallback()
     if (pageReady)
         if (const auto paths = processorRef.takeOpenFiles(); ! paths.isEmpty())
             webView.emitEventIfBrowserIsVisible ("openFiles", openFileList (paths));
+
+    // 録音した鍵盤の出来事 → "recNotes" { events:[session, 秒, 音, 強さ, 押した1/離した0, …] }
+    recBuffer.clear();
+    processorRef.takeRecEvents (recBuffer);
+    if (! recBuffer.empty())
+    {
+        juce::Array<juce::var> list;
+        for (const auto& e : recBuffer)
+        {
+            list.add (e.session); list.add (e.seconds); list.add (e.note); list.add (e.velocity); list.add (e.on ? 1 : 0);
+        }
+        auto* o = new juce::DynamicObject();
+        o->setProperty ("events", list);
+        webView.emitEventIfBrowserIsVisible ("recNotes", juce::var (o));
+    }
 
     const auto notes = processorRef.getHeldNotes();
     if (notes != lastSentNotes)

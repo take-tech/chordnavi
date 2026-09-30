@@ -356,6 +356,7 @@ export function createRoll(root,ctx){
       return true;
     }
     if(mod)return false;
+    if(k==='q'){e.preventDefault();quantizeSelection();return true;}
     if(e.key==='Escape'&&(nsel.size||ctx.range())){nsel=new Set();ctx.setRange(null);return true;}
     if((e.key==='Delete'||e.key==='Backspace')&&nsel.size){
       e.preventDefault();ctx.commit(()=>removeNotes(ctx.song(),nsel));nsel=new Set();ctx.changed();return true;
@@ -433,6 +434,31 @@ export function createRoll(root,ctx){
     nsel=new Set(ids2);ctx.changed();
   }
   const splitSelection=()=>splitNotes(new Set(nsel));
+  // クオンタイズ：選んだ音の頭と終わりをスナップにそろえる（長さは1スナップ以上）
+  function quantizeSelection(){
+    const picked=noteData().filter(x=>nsel.has(x.m.id));
+    if(!picked.length){ctx.toast?.('クオンタイズする音を選んでください');return;}
+    const st=snapT(), total=ctx.tl().total;
+    ctx.commit(()=>{
+      const song=ctx.song(), tl=ctx.tl();
+      removeNotes(song,new Set(picked.map(x=>x.m.id)));
+      for(const x of picked){
+        const s0=Math.min(total-1,snapRound(x.start)), e0=Math.max(s0+st,snapRound(x.end));
+        addNote(song,tl,s0,e0-s0,x.midi,{v:x.m.v,id:x.m.id});
+      }
+    });
+    ctx.changed();
+  }
+  // 録音中の音（{start,end,midi}）を重ねて出す（描き直さずに、その層だけ入れ替える）
+  function setRecNotes(list){
+    if(!grid)return;
+    grid.querySelectorAll('.note.rec').forEach(n=>n.remove());
+    const px=ppt();
+    for(const x of list||[]){
+      if(x.midi<LOW||x.midi>HIGH)continue;
+      grid.appendChild(box('note rec',x.start*px,y(x.midi),Math.max(3,(x.end-x.start)*px-1),ROW-1));
+    }
+  }
   // 選んでいる音を消す
   function deleteSelection(){if(!nsel.size)return;ctx.commit(()=>removeNotes(ctx.song(),nsel));nsel=new Set();ctx.changed();}
   // ステップ入力：カーソルの位置に音（和音なら全部）を置いて、入力の長さだけ進む
@@ -445,5 +471,5 @@ export function createRoll(root,ctx){
   // 休符：カーソルを入力の長さだけ進める
   function stepRest(){const tl=ctx.tl();ctx.setCursorAbs(Math.min(tl.total-1,ctx.cursorAbs()+lenT()));reveal(ctx.cursorAbs());}
 
-  return {render,onKey,setPlayhead,reveal,selection,clearSelection,deleteSelection,selectRange,joinSelection,splitSelection,stepInput,stepRest,newNote};
+  return {render,onKey,setPlayhead,reveal,selection,clearSelection,deleteSelection,selectRange,joinSelection,splitSelection,quantizeSelection,setRecNotes,stepInput,stepRest,newNote};
 }

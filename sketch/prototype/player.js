@@ -206,6 +206,15 @@ onNative('songPos',p=>{
 // opts：render()→{notes,melody,tempos,meters,length}（範囲の頭が 0）、loop、countIn、metronome()、timbre()、melodyTimbre()、onPos(tick|null, countIn?)、onEnd()
 let run=null;
 export const isPlaying=()=>!!run;
+// 録音用：今の再生の番号（JUCE 版。C++ の recNotes の session と比べる）と、曲の頭からの秒（ブラウザ。周の頭が 0、カウントイン中は負）
+export const playSession=()=>run?.native?run.session:null;
+export function songSeconds(){
+  if(!run)return null;
+  if(run.native){const L=run.last;return L.seconds+(L.playing?(performance.now()-L.at)/1000:0);}
+  return ac.currentTime-run.start;
+}
+// 周の長さ（秒）
+export const passSeconds=()=>run?(run.native?run.dur:run.data?.dur):null;
 export function play(opts){
   stop();
   if(hasNative){playNative(opts);return;}
