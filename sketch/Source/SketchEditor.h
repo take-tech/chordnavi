@@ -39,6 +39,9 @@ private:
 
     juce::WebBrowserComponent::Options makeOptions();
 
+    // 画面の「ウィンドウを広げたとき」：false＝全体を拡大、true＝広げる（ページのズームを 1 より大きくしない。JS の setScaleMode）
+    bool expandMode = false;
+
     // JS: startMidiDragBytes({ name, data }) — data は SMF の base64（JS の song.js が作る）。
     // 一時ファイルに書いて、マウスボタンが押されたままのこのタイミングで OS のファイルドラッグを始める
     void startMidiDragBytes (const juce::Array<juce::var>& args,

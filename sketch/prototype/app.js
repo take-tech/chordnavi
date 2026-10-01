@@ -14,7 +14,8 @@ import {hasNative,nativeFn,onNative} from '../../shared/ui/juce-bridge.js';
 const STORE='chordsketch.v1';
 const UI_DEFAULT={snap:'beat',perRow:4,insLen:'bar',dia:'7',timbre:'piano',metro:'click',metroOn:true,countIn:false,countBars:1,loop:false,keepNames:false,step:false,theme:'light',prog:{major:0,minor:13},progVar:0,
   // メロディー（ピアノロール）：表示・スナップ・入力の長さ・横の拡大・音色・鳴らすもの・ガイド、MIDI に入れるもの
-  view:'chords',mSnap:'8',mLen:'8',mZoom:1,mTimbre:'square',hearChords:true,hearMelody:true,guideChord:true,guideScale:true,midiParts:'both',mTimbreSet:false,mTool:'draw'};
+  view:'chords',mSnap:'8',mLen:'8',mZoom:1,mTimbre:'square',hearChords:true,hearMelody:true,guideChord:true,guideScale:true,midiParts:'both',mTimbreSet:false,mTool:'draw',
+  scaleMode:'zoom'};   // ウィンドウを広げたとき：zoom＝全体を拡大、expand＝大きさはそのままで広げる
 let song, ui={...UI_DEFAULT};
 let tl;                     // timeline(song) のキャッシュ（changed() で更新）
 let sel=null;               // 選択中のコード {si,id}
@@ -1725,13 +1726,16 @@ function applyTheme(){
   const t=ui.theme==='auto'?(dark.matches?'dark':'light'):ui.theme;
   document.documentElement.dataset.theme=t;$('themeBtn').textContent=THEME_NAME[ui.theme];
   $('themeBtn').title=`テーマ：${THEME_LABEL[ui.theme]}（押して選ぶ）`;
-  document.querySelectorAll('#themeMenu button').forEach(b=>b.setAttribute('aria-checked',b.dataset.v===ui.theme));
+  document.querySelectorAll('#themeMenu button[data-v]').forEach(b=>b.setAttribute('aria-checked',b.dataset.v===ui.theme));
+  document.querySelectorAll('#themeMenu button[data-scale]').forEach(b=>b.setAttribute('aria-checked',b.dataset.scale===ui.scaleMode));
 }
 // テーマはメニューから選ぶ（ライト／ダーク／自動）
 const themeMenu=$('themeMenu');
 $('themeBtn').onclick=e=>{e.stopPropagation();fileMenu.hidden=true;$('metroMenu').hidden=true;themeMenu.hidden=!themeMenu.hidden;};
 themeMenu.addEventListener('click',e=>{
   // data-theme は使わない（[data-theme=dark] の配色がその要素に効いてしまう）
+  const sc=e.target.closest('[data-scale]')?.dataset.scale;
+  if(sc){ui.scaleMode=sc;applyScaleMode();persist();themeMenu.hidden=true;return;}
   const v=e.target.closest('[data-v]')?.dataset.v;if(!v)return;
   ui.theme=v;applyTheme();persist();themeMenu.hidden=true;
 });
@@ -1793,15 +1797,26 @@ function render(){
 // 余った高さの分だけ画面を縦に伸ばす（シートが広がる）。横長なら縦に合わせて左右に余白を出す。
 // 文字がにじまないよう、拡大率が 1 にほぼ等しいときはちょうど 1 にし、位置は整数のピクセルにそろえる
 // （JUCE 版の macOS は WebView のページのズームで拡大縮小するので、ここでは倍率 1 になる）
+// 「広げる」（ui.scaleMode='expand'）では 1 より大きくしない：基準より大きいウィンドウでは、画面を横にも縦にも広げる
+// （左のパネルの幅はそのまま、シート・ピアノロールが広がる）。JUCE 版の macOS は C++ のページのズームも同じ決まり（setScaleMode）
 const BASE_W=1280, BASE_H=780;
 function fit(){
+  const expand=ui.scaleMode==='expand';
   let s=Math.min(innerWidth/BASE_W,innerHeight/BASE_H);
+  if(expand)s=Math.min(1,s);
   if(Math.abs(s-1)<.015)s=1;
+  const w=expand?Math.max(BASE_W,Math.floor(innerWidth/s)):BASE_W;
   const h=Math.max(BASE_H,Math.floor(innerHeight/s));
-  const x=Math.round((innerWidth-BASE_W*s)/2), y=Math.round((innerHeight-h*s)/2);
+  const x=Math.round((innerWidth-w*s)/2), y=Math.round((innerHeight-h*s)/2);
   const st=$('stage');
-  st.style.height=h+'px';
+  st.style.width=w+'px';st.style.height=h+'px';
   st.style.transform=`translate(${Math.max(0,x)}px,${Math.max(0,y)}px) scale(${s})`;
 }
+const nScale=nativeFn('setScaleMode');
+function applyScaleMode(){
+  nScale?.(ui.scaleMode).catch(e=>console.error(e));
+  applyTheme();fit();if(ui.view==='melody')roll.render();else renderSheet();
+}
 addEventListener('resize',()=>{fit();if(ui.view==='melody')roll.render();else renderSheet();});
+nScale?.(ui.scaleMode).catch(e=>console.error(e));
 fit();applyTheme();rotateTo(curKey().idx,true);render();renderLive();renderFileState();
