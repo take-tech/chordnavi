@@ -914,11 +914,21 @@ function grabVoicing(e,p,m,keys,isOn){
   e.preventDefault();
   const y0=e.clientY;let moved=false,target=m,last=null;
   const rowAt=ev=>{const el=document.elementFromPoint(keys.getBoundingClientRect().left+4,ev.clientY)?.closest('.vrow');return el&&keys.contains(el)?+el.dataset.m:null;};
-  // 動かしているあいだは、見た目だけ m の音を target に置いた形にする（バーが行を移っていく。コード名もその場で）。確定は離したとき
+  // 動かしているあいだは、つかんだ音を浮いたバーにしてポインタにそのままついてこさせ（行の単位で飛ばない）、行き先の行にうすい印。
+  // ほかの音とコード名は、行き先に置いた形でその場で出す。確定は離したとき
   const cur=chordVoicingNotes(song,p), nameEl=document.querySelector('#vpanel .vname b'), name0=nameEl?.textContent;
+  const src=keys.querySelector(`.vrow[data-m="${m}"]`);
+  let float=null;
+  const k=()=>{const r=keys.getBoundingClientRect();return r.height/(keys.offsetHeight||1);};
+  const placeFloat=ev=>{
+    if(!float){float=h('div','vfloat');keys.appendChild(float);src?.classList.add('lifted');}
+    const r=keys.getBoundingClientRect();
+    float.style.top=((ev.clientY-r.top)/k()+keys.scrollTop-7)+'px';
+  };
   const showAt=t=>{
     const set=new Set(cur.filter(n=>n!==m).concat(t)), low=Math.min(...set);
-    keys.querySelectorAll('.vrow').forEach(r=>{const n=+r.dataset.m;r.classList.toggle('on',set.has(n));r.classList.toggle('bass',n===low);r.classList.toggle('drop',n===t&&t!==m);});
+    keys.querySelectorAll('.vrow').forEach(r=>{const n=+r.dataset.m;r.classList.toggle('on',n!==m&&set.has(n)&&n!==t);r.classList.toggle('bass',n===low&&n!==t);r.classList.toggle('drop',n===t);});
+    float?.classList.toggle('bass',t===low);
     const d=detectChords([...set].sort((a,b)=>a-b),1)[0];
     if(nameEl)nameEl.textContent=d?chordNameOf(d,isFlatKey(p.key.idx),keyTonic(p.key)):name0;
   };
@@ -926,7 +936,8 @@ function grabVoicing(e,p,m,keys,isOn){
     if(!isOn)return;
     last=ev;
     if(!moved&&Math.abs(ev.clientY-y0)<4)return;
-    moved=true;
+    if(!moved){moved=true;placeFloat(ev);showAt(m);}
+    placeFloat(ev);
     const t=rowAt(ev);
     if(t==null||t===target||(t!==m&&cur.includes(t)))return;   // ほかに鳴らしている高さは飛ばす
     target=t;showAt(t);
@@ -935,12 +946,13 @@ function grabVoicing(e,p,m,keys,isOn){
   // リストの上下の端では自動でスクロール
   const timer=setInterval(()=>{
     if(!moved||!last)return;
-    const r=keys.getBoundingClientRect(), k=r.height/(keys.offsetHeight||1), edge=24*k;
-    const d=last.clientY<r.top+edge?-8:last.clientY>r.bottom-edge?8:0;
+    const r=keys.getBoundingClientRect(), edge=10*k();   // 端のごく近く（または外）だけ
+    const d=last.clientY<r.top+edge?-6:last.clientY>r.bottom-edge?6:0;
     if(d){const t0=keys.scrollTop;keys.scrollTop+=d;if(keys.scrollTop!==t0)move(last);}
   },30);
   const up=()=>{
     removeEventListener('pointermove',move);removeEventListener('pointerup',up);clearInterval(timer);
+    float?.remove();src?.classList.remove('lifted');
     if(!moved){toggleVoicing(p,m);return;}
     if(target===m){render();return;}   // 元の高さに戻したら何もしない
     setVoicing(p,cur.filter(n=>n!==m).concat(target).sort((a,b)=>a-b));
@@ -1895,12 +1907,14 @@ document.querySelectorAll('#voicingSeg button').forEach(b=>b.onclick=()=>{if(son
 document.querySelectorAll('#areaSeg button').forEach(b=>b.onclick=()=>{if(song.guitarArea!==b.dataset.v){commit(()=>{song.guitarArea=b.dataset.v;});previewSel();}});
 document.querySelectorAll('#rowSeg button').forEach(b=>b.onclick=()=>uiSet('perRow',+b.dataset.v));
 $('undo').onclick=undo;$('redo').onclick=redo;
+// オクターブ：数字の右に ▲▼ を縦に並べる（幅を取らないように）
 function octControl(id,key){
   const box=$(id);box.innerHTML='';
-  const minus=h('button','','−'),val=h('span','',''),plus=h('button','','＋');
+  const val=h('span','',''), arrows=h('div','oct-arrows'), plus=h('button','','▲'), minus=h('button','','▼');
+  plus.title='1オクターブ上げる';minus.title='1オクターブ下げる';
   minus.onclick=()=>commit(()=>{song[key]=Math.max(-2,song[key]-1);});
   plus.onclick=()=>commit(()=>{song[key]=Math.min(2,song[key]+1);});
-  box.append(minus,val,plus);
+  arrows.append(plus,minus);box.append(val,arrows);
   return ()=>{val.textContent=(song[key]>0?'+':'')+song[key];minus.disabled=song[key]<=-2;plus.disabled=song[key]>=2;};
 }
 const renderOctUp=octControl('octUp','octave'), renderOctBass=octControl('octBass','bassOctave');
