@@ -457,7 +457,7 @@ function renderSheet(){
       if(sel&&sel.id===p.c.id)blk.classList.add('sel');
       if(playingId===p.c.id)blk.classList.add('playing');
       blk.append(h('span','n',first||w>30?nameOf(song,p.c,p.key):''),h('span','d',first?degOfItem(p.c):''));
-      blk.title=`${nameOf(song,p.c,p.key)}（${degOfItem(p.c)}）${fmtLen(p.end-p.start,b.meter)}　パターン：${patternById(p.pattern).name}${p.c.pattern?'（このコードだけ）':''}${blk.dataset.sync?'　拍の裏から（シンコペーション）':''}`;
+      blk.title=`クリックで選んでコード編集（ルート・種類・鳴らす音・長さ・パターン）、ドラッグで移動、端をドラッグで長さ　─　${nameOf(song,p.c,p.key)}（${degOfItem(p.c)}）${fmtLen(p.end-p.start,b.meter)}　パターン：${patternById(p.pattern).name}${p.c.pattern?'（このコードだけ）':''}${blk.dataset.sync?'　拍の裏から（シンコペーション）':''}`;
       if(first&&p.c.v){blk.classList.add('custom');blk.title+='　ボイシングを編集済み';}
       if(first&&p.c.pattern){const t=h('span','ptag',patternById(p.c.pattern).short);t.title='このコードだけのパターン：'+patternById(p.c.pattern).name;blk.appendChild(t);blk.classList.add('haspat');}
       if(first)blk.appendChild(Object.assign(h('div','rs rsl'),{title:'ドラッグで頭の位置を変える（前に伸ばすと前のコードを上書き）'}));
