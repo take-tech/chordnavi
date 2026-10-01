@@ -286,10 +286,10 @@ function renderProg(){
       if(k)cell.appendChild(h('span','dash','-'));
       cell.appendChild(h('span','pc',nameOfItem({off,q,boff})));
     });
-    cell.title=cell.textContent;names.appendChild(cell);
+    names.appendChild(cell);
   }
   names.querySelectorAll('.pb').forEach(cell=>fitText(cell,7.5));
-  names.title=progressionDegrees(bars);
+  names.title=`ドラッグでコードのシートに入れる（小節の上ならその小節から上書き、何もないところなら新しいセクションを作る）　${progressionDegrees(bars)}`;
   $('progPlay').textContent=progPreview&&player.isPlaying()?'停止':'試聴';
   $('progIns').title=`カーソルのある小節（${cursor.gi+1}小節目）から${bars.length}小節を上書きで入れる（1コード＝1小節）`;
 }
@@ -310,7 +310,6 @@ $('progPlay').onclick=()=>{
 };
 // プリセットの進行をシートへドラッグ：小節の上なら、その小節から上書きで入れる（「挿入」と同じ）。
 // 何もないところ（セクションの外）なら、その進行の小節数で新しいセクションを作って入れる（名前は、直前のセクションの次の定番の名前）
-$('progNames').title='シートへドラッグ：小節の上ならそこから入れる、何もないところなら新しいセクションを作る';
 $('progNames').addEventListener('pointerdown',e=>{
   if(e.button!==0)return;
   e.preventDefault();
@@ -556,8 +555,11 @@ function sectionHead(s,si){
   pat.value=s.pattern||'';
   pat.addEventListener('change',()=>commit(()=>{s.pattern=pat.value||null;}));
   const {from,to}=tl.secRanges[si];
-  const pick=h('button','','範囲');pick.title='このセクションを選択';
-  pick.onclick=()=>{range={from,to};sel=null;cursor={gi:from,pos:0};render();};
+  // 範囲：このセクションの小節を選ぶ。選んでいるときにもう一度押すと外す
+  const picked=!!range&&range.from===from&&range.to===to;
+  const pick=h('button','tg','範囲');pick.setAttribute('aria-pressed',picked);
+  pick.title=picked?'このセクションの選択を外す':'このセクションの小節を選ぶ（もう一度押すと外す）';
+  pick.onclick=()=>{if(picked)range=null;else{range={from,to};cursor={gi:from,pos:0};}sel=null;render();};
   const drag=midiHandle(()=>({from,to}),()=>sectionFileLabel(s,si));drag.textContent='⠿ MIDI';drag.title='このセクションを DAW へドラッグ';
   const dup=h('button','','複製');dup.onclick=()=>commit(()=>song.sections.splice(si+1,0,cloneSection(s)));
   const up=h('button','','↑');up.title='前へ';up.disabled=si===0;
