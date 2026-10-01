@@ -1953,6 +1953,8 @@ themeMenu.addEventListener('click',e=>{
   if(sc){ui.scaleMode=sc;applyScaleMode();persist();themeMenu.hidden=true;return;}
   const v=e.target.closest('[data-v]')?.dataset.v;if(!v)return;
   ui.theme=v;applyTheme();persist();themeMenu.hidden=true;
+  // スキンで書体・文字の幅が変わるので、入りきらない文字の縮め方を測り直す（Modern の C♯m7 が省略されないように）
+  requestAnimationFrame(()=>{document.querySelectorAll('.left .pchip .n').forEach(n=>fitText(n,9));document.querySelectorAll('#progNames .pb').forEach(c=>fitText(c,7.5));});
 });
 addEventListener('click',e=>{if(!e.target.closest('#themeMenu'))themeMenu.hidden=true;});
 dark.addEventListener('change',applyTheme);
