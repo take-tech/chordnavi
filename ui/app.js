@@ -27,7 +27,7 @@ const picks=new Map();
 const pickedNotes=()=>[...new Set(picks.values())];
 const isPicked=midi=>[...picks.values()].includes(midi);
 const stringPick=s=>picks.get('s'+s);
-const MAX_PICK=8, PICK_COLOR='#6B4FBB';
+const MAX_PICK=8, PICK_COLOR='var(--pick)';
 const tonic=()=>tonicOf(state.idx,state.mode);
 const playChord=ch=>{stopPlayback(false);play1(ch,state.timbre);};
 
@@ -97,7 +97,6 @@ const syncing=()=>state.syncTempo&&hostBpm>0;
 const bpm=()=>syncing()?Math.min(300,Math.max(20,hostBpm)):inputBpm();
 const host=await getHostInfo();
 if(!host.standalone){
-  document.getElementById('themeBtn').hidden=false;   // DAW 上はメニューが無いのでタイトル横にボタン
   hostBpm=host.bpm||0;
   state.syncTempo=true;
   document.getElementById('bpmSync').hidden=false;
@@ -150,19 +149,33 @@ bindSeg('labelSeg','label',()=>{renderKeyPanel();renderFretPanel();});
 bindSeg('viewSeg','view',()=>render());
 bindSeg('fbViewSeg','fbView',()=>render());
 
-/* ---------- テーマ（ライト／ダーク／自動＝OS の外観に合わせる） ---------- */
-// Standalone はメニューの「オプション → テーマ」、DAW 上はタイトル横のボタンで切り替える
-const THEMES=['light','dark','auto'], THEME_LABEL={light:'☀ ライト',dark:'☾ ダーク',auto:'◐ 自動'};
+/* ---------- テーマ（ライト／ダーク／自動＝OS の外観に合わせる）とスキン ---------- */
+// タイトルの右の歯車のボタンのメニューで切り替える（Standalone はメニューの「オプション → テーマ」でも）。
+// スキンは明るい／暗い土台（data-theme）の上に data-skin で色と素材を上書きする（ChordSketch と同じ考え方）
+const THEMES={light:{base:'light',label:'☀ ライト'},dark:{base:'dark',label:'☾ ダーク'},auto:{base:null,label:'◐ 自動'},
+  kawaii:{base:'light',skin:'kawaii',label:'Kawaii'},cyber:{base:'dark',skin:'cyber',label:'Cyber'},modern:{base:'light',skin:'modern',label:'Modern'},
+  luxury:{base:'dark',skin:'luxury',label:'Luxury'},old:{base:'light',skin:'old',label:'Old'}};
 const darkQuery=matchMedia('(prefers-color-scheme: dark)');
+const themeBtn=document.getElementById('themeBtn'), themePop=document.getElementById('themePop');
 function applyTheme(){
-  const dark=state.theme==='dark'||(state.theme==='auto'&&darkQuery.matches);
-  document.documentElement.dataset.theme=dark?'dark':'light';
-  document.getElementById('themeBtn').textContent=THEME_LABEL[state.theme];
+  const th=THEMES[state.theme]||THEMES.light, base=th.base||(darkQuery.matches?'dark':'light');
+  document.documentElement.dataset.theme=base;
+  if(th.skin)document.documentElement.dataset.skin=th.skin;else delete document.documentElement.dataset.skin;
+  themeBtn.title=`設定（テーマ：${th.label}）`;
+  themePop.querySelectorAll('button').forEach(b=>b.setAttribute('aria-checked',b.dataset.v===state.theme));
   reportTheme(state.theme);
 }
-function setTheme(name){if(!THEMES.includes(name))return;state.theme=name;applyTheme();persist();}
+function setTheme(name){if(!(name in THEMES))return;state.theme=name;applyTheme();persist();render();}
 darkQuery.addEventListener('change',()=>{if(state.theme==='auto')applyTheme();});
-document.getElementById('themeBtn').onclick=()=>setTheme(THEMES[(THEMES.indexOf(state.theme)+1)%THEMES.length]);
+for(const [id,th] of Object.entries(THEMES)){
+  const b=document.createElement('button');b.dataset.v=id;b.textContent=th.label;b.setAttribute('role','menuitemradio');
+  b.onclick=()=>{themePop.hidden=true;themeBtn.setAttribute('aria-expanded','false');setTheme(id);};
+  if(id==='kawaii')themePop.append(Object.assign(document.createElement('div'),{className:'menu-sep'}));
+  themePop.append(b);
+}
+themePop.prepend(Object.assign(document.createElement('span'),{className:'menu-lbl',textContent:'テーマ'}));
+themeBtn.onclick=e=>{e.stopPropagation();themePop.hidden=!themePop.hidden;themeBtn.setAttribute('aria-expanded',!themePop.hidden);};
+document.addEventListener('pointerdown',e=>{if(!themePop.hidden&&!e.target.closest('#themePop,#themeBtn')){themePop.hidden=true;themeBtn.setAttribute('aria-expanded','false');}});
 onSetTheme(setTheme);
 bindSeg('tabAreaSeg','tabArea',()=>render());
 // 選択中のコードも3和音／4和音の対応する和音に切り替えて、鍵盤・指板の着色に反映し、試聴する
@@ -203,12 +216,12 @@ function noteInfo(pc){
 }
 function dotStyle(n){
   if(n.chordMode){
-    if(n.inChord)return {fill:n.chordRoot?'#8E2346':'#C4456A',op:1};
-    if(n.inScale)return {fill:n.isRoot?'#E3A21A':'#2E8C80',op:.25};
+    if(n.inChord)return {fill:n.chordRoot?'var(--chord-root)':'var(--chord)',op:1};
+    if(n.inScale)return {fill:n.isRoot?'var(--root)':'var(--tone)',op:.25};
     return null;
   }
   if(!n.inScale)return null;
-  return {fill:n.isRoot?'#E3A21A':'#2E8C80',op:1};
+  return {fill:n.isRoot?'var(--root)':'var(--tone)',op:1};
 }
 
 /* ---------- 鍵盤 ---------- */
@@ -227,7 +240,7 @@ function renderKeyboard(){
   }
   for(let o=0;o<octs;o++)for(const pc in BLK){
     const midi=BASE+o*12+(+pc), x=(o*7+BLK[pc]+1)*W-BW/2, {n,ds,on,live}=keyStyle(midi);
-    el('rect',{x,y:0,width:BW,height:BH,fill:live?'#1F4FA8':on?'#4B3590':n.inChord?'#8E2346':'var(--key-black)',rx:2,'data-note':midi},g);
+    el('rect',{x,y:0,width:BW,height:BH,fill:live?'var(--live-deep)':on?'var(--pick-deep)':n.inChord?'var(--chord-root)':'var(--key-black)',rx:2,'data-note':midi},g);
     if(ds){el('circle',{cx:x+BW/2,cy:BH-14,r:10.5,fill:ds.fill,opacity:ds.op,stroke:'#fff','stroke-width':1.5},g);
       txt(g,x+BW/2,BH-14,n.label,{fill:'#fff','font-size':9,'font-weight':700,opacity:ds.op===1?1:.6});}
   }
@@ -237,7 +250,7 @@ function renderKeyboard(){
 /* ---------- MIDI キーボード入力 ---------- */
 // 弾いている音（MIDI 番号）。表示できる範囲の外の音はオクターブを折り返して見せる
 let liveNotes=[];
-const LIVE_COLOR='#2F6FD6';
+const LIVE_COLOR='var(--live)';
 const KB_RANGE=[48,84];   // 鍵盤 C3〜C6
 // 指板：いちばん低い開放弦〜いちばん高い弦の 15 フレット（レギュラーなら E2〜G5）
 const fbRange=()=>{const t=tuningStrings();return [Math.min(...t),Math.max(...t)+15];};
@@ -377,7 +390,7 @@ function renderTab(){
     const g=el('g',{class:'col'},svg);
     el('rect',{class:'colbg',x:x0,y:0,width:cw,height:H,fill:c.playing?'var(--chord-tint)':'transparent'},g);
     if(i>0)el('line',{x1:x0,y1:TOP,x2:x0,y2:BOT,stroke:mode==='prog'?'var(--ink)':'var(--line)','stroke-width':mode==='prog'?1.2:1},g);
-    txt(g,cx,14,c.title,{fill:c.playing?'#C4456A':'var(--ink)','font-size':small?11:14,'font-weight':700});
+    txt(g,cx,14,c.title,{fill:c.playing?'var(--chord)':'var(--ink)','font-size':small?11:14,'font-weight':700});
     if(c.sub)txt(g,cx,30,c.sub,{fill:'var(--muted)','font-size':10});
     if(!c.v)return;
     const fs=Math.min(small?12:14,GAP*.75), bh=Math.min(16,GAP-1);
@@ -386,7 +399,7 @@ function renderTab(){
       if(f==null){txt(g,cx,y,'×',{fill:'var(--faint2)','font-size':10});continue;}
       const label=String(f);
       el('rect',{x:cx-(label.length>1?10:7),y:y-bh/2,width:label.length>1?20:14,height:bh,fill:c.playing?'var(--chord-tint)':'var(--panel)'},g);
-      txt(g,cx,y,label,{fill:s===c.v.bassString?'#E3A21A':'var(--ink)','font-size':fs,'font-weight':700});
+      txt(g,cx,y,label,{fill:s===c.v.bassString?'var(--root)':'var(--ink)','font-size':fs,'font-weight':700});
     }
     if(mode==='chord')txt(g,cx,H-12,'クリックで試聴',{fill:'var(--faint)','font-size':9});
     g.addEventListener('pointerdown',e=>{e.preventDefault();playNotes(c.v.notes,state.timbre);});
@@ -407,7 +420,7 @@ function renderChart(){
   cols.forEach((c,i)=>{
     const x0=L+i*cw, cx=x0+cw/2, g=el('g',{class:'col'},svg);
     el('rect',{class:'colbg',x:x0,y:0,width:cw,height:H,fill:c.playing?'var(--chord-tint)':'transparent'},g);
-    txt(g,cx,14,c.title,{fill:c.playing?'#C4456A':'var(--ink)','font-size':small?11:14,'font-weight':700});
+    txt(g,cx,14,c.title,{fill:c.playing?'var(--chord)':'var(--ink)','font-size':small?11:14,'font-weight':700});
     if(c.sub)txt(g,cx,30,c.sub,{fill:'var(--muted)','font-size':10});
     if(!c.v)return;
     const v=c.v, fretted=v.frets.filter(f=>f!=null&&f>0);
@@ -437,7 +450,7 @@ function renderChart(){
     }
     v.frets.forEach((f,s)=>{
       if(f==null||f===0||(barre&&f===lo&&s!==v.bassString))return;
-      el('circle',{cx:fx(f),cy:sy(s),r,fill:s===v.bassString?'#E3A21A':'var(--ink)',stroke:s===v.bassString&&barre&&f===lo?'var(--card)':'none','stroke-width':1},g);
+      el('circle',{cx:fx(f),cy:sy(s),r,fill:s===v.bassString?'var(--root)':'var(--ink)',stroke:s===v.bassString&&barre&&f===lo?'var(--card)':'none','stroke-width':1},g);
     });
     if(mode==='chord')txt(g,cx,H-8,'クリックで試聴',{fill:'var(--faint)','font-size':9});
     g.addEventListener('pointerdown',e=>{e.preventDefault();playNotes(v.notes,state.timbre);});
@@ -854,7 +867,7 @@ function applySaved(saved){
   pick('tuning',v=>v===null||Array.isArray(v)&&v.length>=6&&v.length<=8&&v.every(m=>Number.isInteger(m)&&m>=TUNE_MIN&&m<=TUNE_MAX));
   pick('timbre',oneOf(TIMBRES.map(t=>t.id)));
   pick('loop',bool);pick('half',bool);pick('conform',bool);
-  pick('theme',oneOf(['light','dark','auto']));
+  pick('theme',v=>typeof v==='string'&&v in THEMES);
   if(!host.standalone)pick('syncTempo',bool);
   for(const key of ['prog','vari'])
     for(const m of ['major','minor']){

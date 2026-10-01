@@ -9,6 +9,9 @@
   --key-chord:#F6D6DF; --key-pick:#E4DDF5; --key-live:#D6E4FA;
   --wood:#E9DCC6; --inlay:#CDBB9C; --fret:#9AA2B8; --nut:#1E2742; --string:#5B6275;
   --staff-line:#5B6275;
+  /* 意味を持つ色（スキンで少し調子を変えるだけで、ルート＝オレンジ・スケール音＝緑・構成音＝赤・判別＝紫・MIDI＝青は変えない） */
+  --chord-root:#8E2346; --pick:#6B4FBB; --pick-deep:#4B3590; --live:#2F6FD6; --live-deep:#1F4FA8;
+  --font-head:inherit;
 }
 /* ダークテーマ：ルート・スケール音・コード構成音などの意味を持つ色はそのまま */
 [data-theme=dark]{
@@ -129,8 +132,27 @@ svg text{font-family:inherit}
 .legend[hidden]{display:none}
 .seg[hidden]{display:none}
 /* DAW 上だけ出すテーマのボタン（Standalone はメニューの「オプション → テーマ」） */
-.themebtn{font:inherit;font-size:11px;font-weight:500;vertical-align:middle;margin-left:6px;border:1px solid var(--line);background:var(--card);color:var(--muted);border-radius:10px;padding:1px 9px;cursor:pointer}
+h1{display:flex;align-items:center}
+h1>span:first-child{flex:1}
+/* 設定（歯車）：テーマのメニュー。Standalone・DAW のどちらでも出す */
+.themebtn{display:inline-flex;align-items:center;justify-content:center;width:30px;height:28px;padding:0;border:1px solid var(--line);background:var(--card);color:var(--ink2);border-radius:6px;cursor:pointer}
+.themebtn:hover{color:var(--ink);border-color:var(--ink2)}
+.themebtn[aria-expanded=true]{background:var(--ink);color:var(--on-ink)}
 .themebtn[hidden]{display:none}
+.theme-wrap{position:relative;display:inline-block}
+.theme-pop{position:absolute;right:0;top:34px;z-index:40;display:flex;flex-direction:column;min-width:140px;padding:4px;background:var(--card);
+  border:1px solid var(--ink2);border-radius:6px;box-shadow:0 6px 20px rgba(30,39,66,.2);font-size:12px;font-weight:500;letter-spacing:0}
+.theme-pop[hidden]{display:none}
+.theme-pop button{font:inherit;text-align:left;border:0;background:none;color:var(--ink);padding:4px 10px;border-radius:4px;cursor:pointer}
+.theme-pop button:hover{background:var(--panel)}
+.theme-pop .menu-lbl{font-size:11px;color:var(--muted);padding:2px 10px}
+.theme-pop button[aria-checked=true]{color:var(--live);font-weight:700}
+.theme-pop button[aria-checked=true]::after{content:' ✓'}
+.theme-pop .menu-sep{height:1px;background:var(--line);margin:4px 6px}
+/* 五度圏の強調の色（共有の wheel.js は色が決め打ちなので CSS で変数に置き換える） */
+#wheel [fill="#2E8C80"]{fill:var(--tone)}
+#wheel [fill="#E3A21A"]{fill:var(--root)}
+h1{font-family:var(--font-head)}   /* 見出しの書体はアプリ名だけ（パネルの見出しは日本語と英字が混ざるので本文の書体） */
 /* TAB譜：列を押すとその形を鳴らす */
 #tab .col{cursor:pointer}
 #tab .col:hover .colbg{fill:rgba(30,39,66,.05)}
@@ -179,3 +201,147 @@ button,svg{-webkit-user-drag:none}
 #fb .tune{fill:transparent;cursor:pointer}
 #fb .tune:hover{fill:rgba(30,39,66,.08)}
 #fb .tune:active{fill:rgba(30,39,66,.18)}
+
+/* ---------- スキン（ChordSketch と同じ 5 種類。色だけでなく面の質感・段差・部品の形を変える） ----------
+   どれも目に痛くしない：広い面は彩度を抑え、鮮やかな色・光るものは小さなところ（オンのボタン・音の印）だけ。
+   ボタンの種類が多いので、まとめて :is(...) で指す */
+
+/* Kawaii：ぬいぐるみ・おもちゃ。水玉の背景、点線のステッチのパネル、下に厚みのある丸いボタン */
+:root[data-skin=kawaii]{
+  --page:#F6DCE6; --bg:#FBEAF0; --panel:#FFF6F9; --card:#FFFDFE; --ink:#4E3149; --ink2:#6E4C66; --muted:#93778C; --line:#EDCBDB;
+  --faint:#BC9DB1; --faint2:#D6BCCB; --on-ink:#FFF6FA;
+  --root:#F2A65A; --tone:#5DBFA8; --chord:#E2669A; --chord-root:#B8467A; --chord-tint:#FBDDE9; --live:#7C8FE0; --pick:#9A7BD6;
+  --wheel-outer:#7E5F98; --wheel-inner:#9D80B4;
+  --key-black:#6E5182; --key-line:#B996AE; --wood:#FCE6EE; --inlay:#F1C3D5; --fret:#D9A9C0; --nut:#9A5C86; --string:#A88199;
+  --font-head:"Hiragino Maru Gothic ProN","Hiragino Maru Gothic Pro","Kosugi Maru","Yu Gothic UI",sans-serif;
+}
+[data-skin=kawaii] .stage{background:radial-gradient(circle,#F7D3E1 2.2px,transparent 2.8px) 0 0/22px 22px,radial-gradient(circle,#E8E0FA 2.2px,transparent 2.8px) 11px 11px/22px 22px,#FBEAF0}
+[data-skin=kawaii] .panel{border:0;border-radius:18px;outline:1.5px dashed #EDB8CD;outline-offset:-6px;box-shadow:0 0 0 3px #FFF6F9,0 0 0 4.5px #F1C9D9,0 4px 0 4.5px #EBC0D2}
+[data-skin=kawaii] h1{color:#D45A8E}
+[data-skin=kawaii] h2::before{content:'♡ ';color:#F28DB2;font-size:12px}
+[data-skin=kawaii] :is(.sync,.pills button,.variants button,.actions button,.handle,.editbar button,.tune-reset,.selinfo button,.pickinfo>button,.themebtn){
+  border:1.5px solid #E7BCD0;border-radius:999px;background:#FFFDFE;box-shadow:0 2px 0 #E9C3D4}
+[data-skin=kawaii] :is(.sync,.pills button,.variants button,.actions button,.handle,.tune-reset):active{transform:translateY(2px);box-shadow:none}
+[data-skin=kawaii] .seg{border:1.5px solid #E7BCD0;border-radius:999px;box-shadow:0 2px 0 #E9C3D4}
+[data-skin=kawaii] .seg button{border-radius:999px}
+[data-skin=kawaii] :is(.seg button,.pills button,.variants button,.actions button,.sync)[aria-pressed=true]{background:#F7A9C6;border-color:#E07FA6;color:#4A1830}
+[data-skin=kawaii] .chip{border:1.5px solid #E3B2C8;border-radius:12px;box-shadow:0 2px 0 #F0CFDD}
+[data-skin=kawaii] :is(select,input[type=number]){border:1.5px solid #EDCBDB;border-radius:10px}
+[data-skin=kawaii] :is(.dia,.notes,.detail){border-top:1.5px dashed #F1D2DF}
+
+/* Cyber：シンセの画面（参考：Serum 2・Avenger）。スレートのモジュール、見出しは明るい帯、シアンはオンだけ */
+:root[data-skin=cyber]{
+  --page:#15191E; --bg:#1B2026; --panel:#2A3038; --card:#20262D; --ink:#D2DAE2; --ink2:#AEB9C5; --muted:#8793A1; --line:#3A424D;
+  --faint:#5F6A77; --faint2:#47505B; --on-ink:#0D1A22;
+  --root:#E0A63A; --tone:#2FA6B8; --chord:#D2588E; --chord-root:#A63A6A; --chord-tint:#3A2333; --live:#40BEF0; --pick:#8A78D8;
+  --wheel-outer:#252B33; --wheel-inner:#313842;
+  --key-white:#B9C3CD; --key-black:#14181D; --key-line:#14181D; --wood:#20262D; --inlay:#323A44; --fret:#4A5460; --nut:#9AA6B2; --string:#7D8995;
+  --staff-line:#8793A1; --key-chord:#B58AA2; --key-pick:#9E93C9; --key-live:#7FA6C9;
+  --font-head:"DIN Condensed","Avenir Next Condensed","Bahnschrift","Hiragino Sans",sans-serif;
+}
+[data-skin=cyber] .stage{background:#15191E;gap:8px;padding:10px}
+[data-skin=cyber] .panel{border:1px solid #0F1215;border-radius:2px;background:linear-gradient(#2E353E,#272D35);box-shadow:inset 0 1px 0 rgba(255,255,255,.06)}
+[data-skin=cyber] .right .head{margin:-12px -16px 10px;padding:6px 16px;background:#3A424D;box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 1px 0 #0F1215}
+[data-skin=cyber] :is(h1,h2){letter-spacing:.06em;font-weight:600}
+[data-skin=cyber] h1{font-size:26px;letter-spacing:.14em}
+[data-skin=cyber] :is(.dia-head,.notes){font-family:inherit}
+[data-skin=cyber] :is(.sync,.pills button,.variants button,.actions button,.handle,.editbar button,.tune-reset,.selinfo button,.pickinfo>button,.themebtn){
+  background:linear-gradient(#3A424C,#323942);border:1px solid #14181C;border-radius:2px;color:#D2DAE2;box-shadow:inset 0 1px 0 rgba(255,255,255,.07)}
+[data-skin=cyber] .seg{border:1px solid #14181C;border-radius:2px;background:#14181C;gap:1px}
+[data-skin=cyber] .seg button{background:linear-gradient(#3A424C,#323942);color:#D2DAE2}
+[data-skin=cyber] :is(.seg button,.pills button,.variants button,.actions button,.sync)[aria-pressed=true]{
+  background:#1A2028;color:#56C8F5;border-color:#14181C;box-shadow:inset 0 -2px 0 #40BEF0,inset 0 1px 3px rgba(0,0,0,.5)}
+[data-skin=cyber] .chip{background:linear-gradient(#384049,#30373F);border-color:#14181C;border-radius:2px}
+[data-skin=cyber] :is(select,input[type=number]){background:#1A1F25;border-color:#14181C;border-radius:2px}
+[data-skin=cyber] :is(#kb,#fb,#tab,#staff){background:#1E2329;border-radius:2px}
+
+/* Modern：プロ向けの道具（参考：Ableton・Apple のアプリ）。枠線なし、面の塗り分けと余白で区切る */
+:root[data-skin=modern]{
+  --page:#E4E4E7; --bg:#E4E4E7; --panel:#F4F4F5; --card:#FFFFFF; --ink:#18181B; --ink2:#3F3F46; --muted:#71717A; --line:#E4E4E7;
+  --faint:#A1A1AA; --faint2:#D4D4D8; --on-ink:#FAFAFA; --live:#2563EB; --wheel-outer:#27272A; --wheel-inner:#3F3F46;
+  --key-black:#27272A; --key-line:#A1A1AA; --wood:#F4F4F5; --inlay:#D4D4D8; --fret:#C4C4CC; --nut:#18181B; --string:#71717A;
+  --font-head:"SF Pro Display","Helvetica Neue","Segoe UI Variable Display","Segoe UI","Hiragino Sans",sans-serif;
+}
+[data-skin=modern] body{font-family:-apple-system,"SF Pro Text","Segoe UI Variable Text","Segoe UI","Hiragino Sans","Yu Gothic UI",sans-serif}
+[data-skin=modern] .stage{gap:10px;padding:10px}
+[data-skin=modern] .panel{border:0;border-radius:12px;background:#FFFFFF}
+[data-skin=modern] .left .panel{background:#F4F4F5}
+[data-skin=modern] :is(.dia-head,.notes,.controls label){font-size:10.5px;font-weight:600;letter-spacing:.1em}
+[data-skin=modern] :is(.sync,.pills button,.variants button,.actions button,.handle,.editbar button,.tune-reset,.selinfo button,.pickinfo>button,.themebtn){
+  background:#F4F4F5;border:0;border-radius:6px;color:#18181B}
+[data-skin=modern] .left :is(.sync,.seg button){background:#E4E4E7}
+[data-skin=modern] .handle{box-shadow:inset 0 0 0 1px #A1A1AA}
+[data-skin=modern] .seg{border:0;border-radius:7px;background:#F4F4F5;padding:2px;gap:2px}
+[data-skin=modern] .left .seg{background:#E4E4E7}
+[data-skin=modern] .seg button{border-radius:5px;background:transparent}
+[data-skin=modern] .seg button[aria-pressed=true]{background:#FFFFFF;color:#18181B;box-shadow:0 1px 2px rgba(0,0,0,.12)}
+[data-skin=modern] :is(.pills button,.variants button,.actions button,.sync)[aria-pressed=true]{background:#18181B;color:#FAFAFA}
+[data-skin=modern] .chip{background:#FFFFFF;border:1px solid #C4C4CC;border-radius:6px}
+[data-skin=modern] .chips .chip{background:#FFFFFF}
+[data-skin=modern] .detail{border-top:0}
+[data-skin=modern] :is(select,input[type=number]){background:#FFFFFF;border:0;border-radius:6px;box-shadow:inset 0 0 0 1px #E4E4E7}
+[data-skin=modern] :is(.dia,.notes){border-top:0}
+
+/* Luxury：黒い鉄のラック機材（参考：Vooster の EQ）。鉄板の粒子、四隅のビス、押し込み式のボタン（オンは文字が琥珀色に灯る） */
+:root[data-skin=luxury]{
+  --page:#0D0D0C; --bg:#161615; --panel:#232321; --card:#2B2B28; --ink:#DCD6C8; --ink2:#B9B1A0; --muted:#8E887B; --line:#3A3935;
+  --faint:#6A665D; --faint2:#4C4A45; --on-ink:#2A1606;
+  --root:#D9A04A; --tone:#7AA08A; --chord:#B45468; --chord-root:#8A3646; --chord-tint:#3B1E25; --live:#4F7FB8; --pick:#A48CC4;
+  --wheel-outer:#262624; --wheel-inner:#34332F;
+  --key-white:#D6CDB8; --key-black:#141413; --key-line:#141413; --wood:#2E2A24; --inlay:#4A4238; --fret:#6E6658; --nut:#D6CDB8; --string:#9E9483;
+  --staff-line:#8E887B; --key-chord:#BF929A; --key-pick:#A99BBE; --key-live:#8EA4BE;
+  --font-head:"DIN Condensed","Avenir Next Condensed","Bahnschrift","Hiragino Sans",sans-serif;
+  --lux-grain:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .07 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+  --lux-screw:radial-gradient(circle at 45% 40%,#77736A 0 1.2px,#3E3C37 2.6px,#1A1A18 3.6px,transparent 4.2px);
+}
+[data-skin=luxury] .stage{background:var(--lux-grain),linear-gradient(#1B1B1A,#121211)}
+[data-skin=luxury] .panel{border:1px solid #0A0A09;border-radius:3px;
+  background:var(--lux-screw) 4px 4px/11px 11px no-repeat,var(--lux-screw) calc(100% - 4px) 4px/11px 11px no-repeat,
+    var(--lux-screw) 4px calc(100% - 4px)/11px 11px no-repeat,var(--lux-screw) calc(100% - 4px) calc(100% - 4px)/11px 11px no-repeat,
+    var(--lux-grain),linear-gradient(#2A2A27,#1F1F1D);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.07),inset 0 -1px 0 rgba(0,0,0,.6),0 2px 6px rgba(0,0,0,.55)}
+[data-skin=luxury] h1{letter-spacing:.12em;font-weight:600;text-shadow:0 1px 0 #000}
+[data-skin=luxury] h2{letter-spacing:.04em}
+/* エリア名：枠で囲まず、文字の右に彫った溝の線 */
+[data-skin=luxury] .dia{border-top:0}
+[data-skin=luxury] .dia-head::after{content:'';flex:1;order:1;border-top:1px solid #0B0B0A;border-bottom:1px solid rgba(255,255,255,.07)}
+[data-skin=luxury] .dia-head>.spacer{display:none}
+[data-skin=luxury] .dia-head>.seg{order:2}
+[data-skin=luxury] :is(.notes,.detail){border-top:1px solid #0B0B0A;box-shadow:inset 0 1px 0 rgba(255,255,255,.06)}
+[data-skin=luxury] :is(.sync,.pills button,.variants button,.actions button,.handle,.editbar button,.tune-reset,.selinfo button,.pickinfo>button,.themebtn){
+  background:linear-gradient(#3C3B37,#2A2927);border:1px solid #0B0B0A;border-radius:3px;color:#D6CFBF;box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 1px 2px rgba(0,0,0,.6)}
+[data-skin=luxury] .seg{border:1px solid #0B0B0A;border-radius:3px;background:#0B0B0A;gap:1px;box-shadow:0 1px 2px rgba(0,0,0,.6)}
+[data-skin=luxury] .seg button{background:linear-gradient(#3C3B37,#2A2927);color:#D6CFBF}
+[data-skin=luxury] :is(.seg button,.pills button,.variants button,.actions button,.sync)[aria-pressed=true]{
+  background:linear-gradient(#1B1B19,#242422);color:#F0B062;text-shadow:0 0 6px rgba(240,160,80,.45);box-shadow:inset 0 2px 4px rgba(0,0,0,.75)}
+[data-skin=luxury] .chip{background:linear-gradient(#3B3A36,#2E2D2A);border-color:#0B0B0A;box-shadow:inset 0 1px 0 rgba(255,255,255,.1),0 1px 2px rgba(0,0,0,.5)}
+[data-skin=luxury] .chip.playing{background:radial-gradient(ellipse at 50% 30%,#5A3E1E,#3A2A16);border-color:#C8742C}
+[data-skin=luxury] :is(select,input[type=number]){background:#141413;border:1px solid #0A0A09;border-bottom-color:#45443E;border-radius:2px;box-shadow:inset 0 1px 3px rgba(0,0,0,.8)}
+
+/* Old：アナログシンセ（参考：UAD PolyMAX）。塗装のグレーの面、木のサイド板、見出しは濃い帯、クリーム色のプラスチックのボタン */
+:root[data-skin=old]{
+  --page:#3A2A1E; --bg:#C4C6C4; --panel:#D3D5D2; --card:#E6E6E1; --ink:#2B2E30; --ink2:#44494C; --muted:#61676B; --line:#A7ABAB;
+  --faint:#868C8F; --faint2:#A3A8A9; --on-ink:#3A2208;
+  --root:#E4962A; --tone:#2E7F8F; --chord:#C2483E; --chord-root:#8E2E26; --chord-tint:#EBCDC6; --live:#2F6FB0; --pick:#6A5A90;
+  --wheel-outer:#3D4448; --wheel-inner:#566065;
+  --key-white:#F2F1EC; --key-black:#2B2E30; --key-line:#5A5F62; --wood:#C9A77E; --inlay:#E6DCC8; --fret:#8E8A82; --nut:#F2F1EC; --string:#5A5F62;
+  --font-head:"Avenir Next Condensed","DIN Condensed","Bahnschrift","Hiragino Sans",sans-serif;
+  --old-grain:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.1' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .2 0 0 0 0 .2 0 0 0 0 .2 0 0 0 .09 0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+  --old-wood:repeating-linear-gradient(90deg,rgba(0,0,0,.12) 0 1px,transparent 1px 3px,rgba(255,220,170,.06) 3px 4px,transparent 4px 7px),
+             linear-gradient(90deg,#5A3820,#8A5A34 30%,#7A4C2A 60%,#5E3C22);
+}
+[data-skin=old] .stage{background:var(--old-grain),linear-gradient(#CBCDCA,#BDC0BE);padding:18px 32px}
+[data-skin=old] .stage::before,[data-skin=old] .stage::after{content:'';position:absolute;top:0;bottom:0;width:16px;background:var(--old-wood);pointer-events:none}
+[data-skin=old] .stage::before{left:0;box-shadow:inset -2px 0 3px rgba(0,0,0,.35)}
+[data-skin=old] .stage::after{right:0;box-shadow:inset 2px 0 3px rgba(0,0,0,.35)}
+[data-skin=old] .panel{border:1px solid #9A9E9E;border-radius:3px;background:var(--old-grain),#D3D5D2;box-shadow:inset 0 1px 0 rgba(255,255,255,.55),0 1px 2px rgba(0,0,0,.18)}
+[data-skin=old] .right .head{margin:-12px -16px 10px;padding:5px 16px;background:#B9BCBA;box-shadow:inset 0 1px 0 rgba(255,255,255,.4),inset 0 -1px 0 rgba(0,0,0,.12)}
+[data-skin=old] h1{color:#2E7F8F}
+[data-skin=old] :is(.sync,.pills button,.variants button,.actions button,.handle,.editbar button,.tune-reset,.selinfo button,.pickinfo>button,.themebtn){
+  background:linear-gradient(#F4F3EE,#D9D8D1);border:1px solid #8E9292;border-radius:4px;color:#2B2E30;box-shadow:inset 0 1px 0 #fff,0 1px 2px rgba(0,0,0,.25)}
+[data-skin=old] .seg{border:1px solid #8E9292;border-radius:4px;background:#8E9292;gap:1px;box-shadow:0 1px 2px rgba(0,0,0,.2)}
+[data-skin=old] .seg button{background:linear-gradient(#F4F3EE,#D9D8D1);color:#2B2E30}
+[data-skin=old] :is(.seg button,.pills button,.variants button,.actions button,.sync)[aria-pressed=true]{
+  background:radial-gradient(ellipse at 50% 35%,#F8BC5E,#E2902C 75%);color:#3A2208;border-color:#9A5E1C;box-shadow:inset 0 1px 0 rgba(255,240,200,.6)}
+[data-skin=old] .chip{background:linear-gradient(#F4F3EE,#E0DFD8);border-color:#7E8484;box-shadow:inset 0 1px 0 #fff,0 1px 1px rgba(0,0,0,.15)}
+[data-skin=old] :is(select,input[type=number]){background:#ECECE7;border:1px solid #8E9292;box-shadow:inset 0 1px 2px rgba(0,0,0,.15)}
