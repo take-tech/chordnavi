@@ -57,9 +57,9 @@ h1{font-size:17px;font-weight:900;letter-spacing:.02em;margin:0 6px 0 0;white-sp
 /* 位置の表示（DAW のトランスポート風の暗い枠。テーマによらず同じ色）：
    2列の幅を固定し、数字は右そろえ（等幅）。左＝テンポ／拍子・キー、右＝位置／経過時間 */
 .lcd{--lcd-bg:#12151C;--lcd-hi:#7CC4FF;--lcd-lo:#5E9ED6;--lcd-dim:#4B5670;--lcd-line:#262C3A;
-  display:grid;grid-template-columns:86px 84px;grid-template-rows:17px 14px;background:var(--lcd-bg);border:1px solid #07090D;border-radius:4px;
+  display:grid;grid-template-columns:104px 104px;grid-template-rows:17px 14px;background:var(--lcd-bg);border:1px solid #07090D;border-radius:4px;
   padding:3px 0;font-variant-numeric:tabular-nums;font-family:"SF Mono",Menlo,Consolas,"Hiragino Sans",monospace;letter-spacing:.02em}
-.lcd-c{display:flex;align-items:center;justify-content:flex-end;gap:7px;padding:0 9px;white-space:nowrap;min-width:0}
+.lcd-c{display:flex;align-items:center;justify-content:flex-end;gap:7px;padding:0 12px;white-space:nowrap;min-width:0}
 .lcd .r1,.lcd .r2{border-left:1px solid var(--lcd-line)}
 .lcd button{border:0;background:none;padding:0;border-radius:2px;color:inherit;font:inherit;cursor:pointer;letter-spacing:inherit}
 .lcd button:hover{color:#fff}
