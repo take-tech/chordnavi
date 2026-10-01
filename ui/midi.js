@@ -1,8 +1,8 @@
 /* MIDI 関連の C++ 連携。MIDI の生成とファイル書き出しは C++（MidiExport）側で行う */
-import {CHORD} from './theory.js';
+import {CHORD} from '../shared/ui/theory.js';
 
 // プラグイン内（WebBrowserComponent）でのみ JUCE ブリッジを読み込む
-const juce=window.__JUCE__?await import('./juce/index.js'):null;
+import {juce} from '../shared/ui/juce-bridge.js';   // JUCE の JS はプラグイン・Standalone の中でだけ読まれる
 const native=name=>juce?juce.getNativeFunction(name):(...a)=>{console.warn(`native ${name} は使えません`,a);return Promise.resolve(null);};
 const nativeStartDrag=native('startMidiDrag');
 const nativeSave=native('saveMidi');

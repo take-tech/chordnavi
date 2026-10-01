@@ -133,4 +133,31 @@ juce::File writeTempFile (const std::vector<Chord>& chords, double bpm, const ju
 
     return file;
 }
+
+juce::File writeTempBytes (const juce::MemoryBlock& smf, const juce::String& name, const juce::String& folder)
+{
+    if (smf.getSize() == 0)
+        return {};
+
+    auto dir = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile (folder);
+
+    if (! dir.createDirectory())
+        return {};
+
+    const auto base = name.endsWithIgnoreCase (".mid") ? name.dropLastCharacters (4) : name;
+    auto file = dir.getChildFile (safeFileName (base) + ".mid");
+
+    if (! file.replaceWithData (smf.getData(), smf.getSize()))
+        return {};
+
+    return file;
+}
+
+juce::File withExtensionIfMissing (const juce::File& file, const juce::String& ext)
+{
+    if (file.getFileName().endsWithIgnoreCase ("." + ext))
+        return file;
+
+    return file.getParentDirectory().getChildFile (file.getFileName() + "." + ext);
+}
 }

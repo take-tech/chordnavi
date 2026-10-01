@@ -1,5 +1,5 @@
 /* 状態の保存・復元（C++ の getStateInformation／setStateInformation に預ける）。プラグイン内でのみ有効 */
-const juce=window.__JUCE__?await import('./juce/index.js'):null;
+import {juce,onNative} from '../shared/ui/juce-bridge.js';   // JUCE の JS はプラグイン・Standalone の中でだけ読まれる
 const nativeSave=juce?juce.getNativeFunction('saveState'):null;
 const nativeLoad=juce?juce.getNativeFunction('loadState'):null;
 
@@ -27,7 +27,7 @@ export function saveState(obj){
 
 // DAW が状態を復元したとき（プロジェクトの読み込み・取り消しなど）
 export function onStateRestored(cb){
-  if(window.__JUCE__)window.__JUCE__.backend.addEventListener('stateRestored',json=>{
+  onNative('stateRestored',json=>{
     try{cb(JSON.parse(json));}catch(e){console.error(e);}
   });
 }

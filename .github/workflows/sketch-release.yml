@@ -1,10 +1,13 @@
-name: Build Installers
+# ChordSketch のインストーラー（ChordNavi は release.yml）。
+# タグ sketch-v* を push すると .pkg（macOS）と Setup.exe（Windows）を作って GitHub Release に添付する。
+# 手動実行（workflow_dispatch）では成果物だけ作る
+name: Build ChordSketch Installers
 
 on:
   workflow_dispatch:
   push:
     tags:
-      - "v*"
+      - "sketch-v*"
 
 jobs:
   macos:
@@ -18,10 +21,12 @@ jobs:
         run: cmake -S . -B build-release -DCMAKE_BUILD_TYPE=Release
 
       - name: Build
-        run: cmake --build build-release --config Release --target MidiExportTests ChordNavi_VST3 ChordNavi_AU ChordNavi_Standalone -j4
+        run: cmake --build build-release --config Release --target MidiExportTests ChordSketch_Standalone -j4
 
       - name: Unit tests
-        run: ./build-release/MidiExportTests_artefacts/Release/MidiExportTests
+        run: |
+          ./build-release/MidiExportTests_artefacts/Release/MidiExportTests
+          node sketch/prototype/song.test.mjs
 
       - name: Import Apple Developer ID certificates
         env:
@@ -53,15 +58,15 @@ jobs:
           MACOS_NOTARY_PASSWORD: ${{ secrets.MACOS_NOTARY_PASSWORD }}
           MACOS_NOTARY_TEAM_ID: ${{ secrets.MACOS_NOTARY_TEAM_ID }}
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
+          VERSION="${GITHUB_REF_NAME#sketch-v}"
           if [ "$VERSION" = "$GITHUB_REF_NAME" ]; then VERSION=""; fi
-          CHORDNAVI_VERSION="$VERSION" ./scripts/package_macos.sh
+          CHORDSKETCH_VERSION="$VERSION" ./scripts/package_sketch_macos.sh
 
       - name: Upload artifact
         uses: actions/upload-artifact@v7
         with:
-          name: ChordNavi-macOS-pkg
-          path: build-release/packages/*.pkg
+          name: ChordSketch-macOS-pkg
+          path: build-release/packages/ChordSketch-*.pkg
 
   windows:
     name: Windows Installer
@@ -80,11 +85,13 @@ jobs:
 
       - name: Build
         shell: pwsh
-        run: cmake --build build --config Release --target MidiExportTests ChordNavi_VST3 ChordNavi_Standalone -- /m
+        run: cmake --build build --config Release --target MidiExportTests ChordSketch_Standalone -- /m
 
       - name: Unit tests
         shell: pwsh
-        run: ./build/MidiExportTests_artefacts/Release/MidiExportTests.exe
+        run: |
+          ./build/MidiExportTests_artefacts/Release/MidiExportTests.exe
+          node sketch/prototype/song.test.mjs
 
       - name: Install Inno Setup
         shell: pwsh
@@ -93,25 +100,22 @@ jobs:
       - name: Package
         shell: pwsh
         run: |
-          $version = "${env:GITHUB_REF_NAME}" -replace '^v', ''
+          $version = "${env:GITHUB_REF_NAME}" -replace '^sketch-v', ''
           if ($version -eq "${env:GITHUB_REF_NAME}") {
-            $version = (Select-String -Path CMakeLists.txt -Pattern 'project\(ChordNavi VERSION ([0-9.]+)\)').Matches[0].Groups[1].Value
+            $version = [regex]::Match((Get-Content CMakeLists.txt -Raw), 'juce_add_plugin\(ChordSketch\s+VERSION\s+([0-9.]+)').Groups[1].Value
           }
-          $vst3 = Get-ChildItem -Path build -Recurse -Directory -Filter "ChordNavi.vst3" | Where-Object { $_.FullName -match "Release" } | Select-Object -First 1
-          $app  = Get-ChildItem -Path build -Recurse -File -Filter "ChordNavi.exe" | Where-Object { $_.FullName -match "Standalone" } | Select-Object -First 1
-          if (-not $vst3) { throw "ChordNavi.vst3 was not found under build" }
-          if (-not $app)  { throw "ChordNavi.exe was not found under build" }
+          $app = Get-ChildItem -Path build -Recurse -File -Filter "ChordSketch.exe" | Where-Object { $_.FullName -match "Standalone" } | Select-Object -First 1
+          if (-not $app) { throw "ChordSketch.exe was not found under build" }
           New-Item -ItemType Directory -Force -Path build/packages | Out-Null
-          $env:CHORDNAVI_VERSION = $version
-          $env:CHORDNAVI_VST3_DIR = $vst3.FullName
-          $env:CHORDNAVI_APP_EXE = $app.FullName
-          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" installer/windows/ChordNavi.iss
+          $env:CHORDSKETCH_VERSION = $version
+          $env:CHORDSKETCH_APP_EXE = $app.FullName
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" installer/windows/ChordSketch.iss
 
       - name: Upload artifact
         uses: actions/upload-artifact@v7
         with:
-          name: ChordNavi-Windows-Setup
-          path: build/packages/*.exe
+          name: ChordSketch-Windows-Setup
+          path: build/packages/ChordSketch-*.exe
 
   github-release:
     name: Attach To GitHub Release
@@ -129,4 +133,5 @@ jobs:
       - name: Create release
         uses: softprops/action-gh-release@v3
         with:
+          name: ChordSketch ${{ github.ref_name }}
           files: dist/**/*

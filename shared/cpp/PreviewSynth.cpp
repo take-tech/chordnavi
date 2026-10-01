@@ -191,6 +191,26 @@ void PreviewSynth::startDue (juce::int64 now)
     }
 }
 
+void PreviewSynth::startNote (int note, float velocity, juce::int64 startIn, juce::int64 length, Timbre timbre, int owner)
+{
+    auto& v = findFreeVoice();
+    startVoice (v, juce::jlimit (0, 127, note), juce::jmax<juce::int64> (0, startIn), juce::jmax<juce::int64> (1, length), timbre);
+    v.owner   = owner;
+    v.velGain = std::pow (juce::jlimit (0.0f, 1.0f, velocity), 0.7f) * 1.2f;
+}
+
+void PreviewSynth::fadeOwner (int owner)
+{
+    const auto fade = (juce::int64) (fadeSeconds * sampleRate);
+
+    for (auto& v : voices)
+    {
+        if (! v.active || v.owner != owner) continue;
+        if (v.startIn > 0)       v.active = false;
+        else if (v.fadeLeft < 0) v.fadeLeft = fade;
+    }
+}
+
 void PreviewSynth::noteOn (int note, float velocity, Timbre timbre)
 {
     noteOff (note);   // 同じ音を弾き直したら前の音はリリース
@@ -327,6 +347,33 @@ void PreviewSynth::startVoice (Voice& v, int note, juce::int64 startIn, juce::in
             break;
         }
 
+        case Timbre::lead:
+        {
+            // メロディー向け：少しずらした2本のノコギリ波を、パッドより明るいローパスで。立ち上がりは速く、離したら短く切る
+            constexpr double detuneCents = 5.0;
+            v.phaseInc  = freq * std::pow (2.0,  detuneCents / 1200.0) / sampleRate;
+            v.phaseInc2 = freq * std::pow (2.0, -detuneCents / 1200.0) / sampleRate;
+            v.phase2    = 0.21;
+            v.lpCoeff   = (float) (1.0 - std::exp (-twoPi * 3200.0 / sampleRate));
+            v.gain      = peakGain * 0.85f;
+            v.attackSamples = (juce::int64) (0.006 * sampleRate);
+            v.releaseRate   = decayPerSample (0.07, sampleRate);
+            break;
+        }
+
+        case Timbre::square:
+        {
+            // 矩形波（ノコギリ波を半周ずらして引く）。伸ばしている間は減らさず、離したら少しだけ余韻を残す
+            v.phaseInc  = freq / sampleRate;
+            v.phaseInc2 = v.phaseInc;
+            v.phase2    = 0.5;
+            v.lpCoeff   = (float) (1.0 - std::exp (-twoPi * 6000.0 / sampleRate));   // 耳に痛い高域だけ少し丸める
+            v.gain      = peakGain * 0.5f;
+            v.attackSamples = (juce::int64) (0.003 * sampleRate);
+            v.releaseRate   = decayPerSample (0.12, sampleRate);
+            break;
+        }
+
         case Timbre::guitar:
         {
             // Karplus-Strong：ノイズで弾いた遅延線を平均化フィルタで回す
@@ -391,7 +438,20 @@ float PreviewSynth::renderSample (Voice& v)
             break;
         }
 
+        case Timbre::square:
+        {
+            const auto sq = 0.5f * (polyBlepSaw (v.phase, v.phaseInc) - polyBlepSaw (v.phase2, v.phaseInc2));
+            v.lpState += v.lpCoeff * (sq - v.lpState);
+            out = v.lpState * v.gain;
+            advance (v.phase, v.phaseInc);
+            advance (v.phase2, v.phaseInc2);
+
+            if (v.age < v.attackSamples) out *= (float) v.age / (float) v.attackSamples;
+            break;
+        }
+
         case Timbre::pad:
+        case Timbre::lead:
         {
             const auto saw = 0.5f * (polyBlepSaw (v.phase, v.phaseInc) + polyBlepSaw (v.phase2, v.phaseInc2));
             v.lpState += v.lpCoeff * (saw - v.lpState);

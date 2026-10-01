@@ -30,4 +30,11 @@ namespace MidiExport
 
     // 一時フォルダに <safeName>.mid を書き出して返す。失敗時は存在しない File を返す
     juce::File writeTempFile (const std::vector<Chord>& chords, double bpm, const juce::String& name);
+
+    // できあがった SMF（ChordSketch では JS の song.js が作る）を、一時フォルダの folder の中に <safeName>.mid で書く。
+    // name の拡張子（.mid）はあってもなくてもよい。失敗時は存在しない File を返す
+    juce::File writeTempBytes (const juce::MemoryBlock& smf, const juce::String& name, const juce::String& folder);
+
+    // 拡張子 ext（"mid" など、ドットなし）が無ければ付ける（大文字小文字は区別しない。ほかの拡張子は残して後ろに付ける）
+    juce::File withExtensionIfMissing (const juce::File& file, const juce::String& ext);
 }

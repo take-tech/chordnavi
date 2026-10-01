@@ -1,8 +1,8 @@
 /* 試聴。プラグイン内では C++ 側の簡易シンセ（processBlock）で鳴らす。
    ブラウザで ui/ を直接開いたとき（開発用プレビュー）だけ WebAudio の三角波で代用する */
-import {CHORD,voicing} from './theory.js';
+import {CHORD,voicing} from '../shared/ui/theory.js';
 
-const juce=window.__JUCE__?await import('./juce/index.js'):null;
+import {juce} from '../shared/ui/juce-bridge.js';   // JUCE の JS はプラグイン・Standalone の中でだけ読まれる
 const nativePlay=juce?juce.getNativeFunction('playChords'):null;
 
 const SINGLE_DUR=1.1;
