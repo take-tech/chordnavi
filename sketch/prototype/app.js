@@ -2029,4 +2029,32 @@ function applyScaleMode(){
 }
 addEventListener('resize',()=>{fit();if(ui.view==='melody')roll.render();else renderSheet();});
 nScale?.(ui.scaleMode).catch(e=>console.error(e));
+/* ---------- マウスを乗せた部品の説明を、下のバーの右に出す ----------
+   title の付いた部品（ボタン・選択欄・チップ・小節番号など）と五度圏の扇形。乗せているあいだは title を外して吹き出しを出さない（二重にしない）。
+   離したら title を戻し、下のバーは元の操作のヒントに戻す */
+let tipEl=null;
+function tipText(el){
+  const w=el.closest?.('#wheel .wedge');
+  if(w)return `キー：${w.getAttribute('aria-label')}（クリックで変える）`;
+  return el.title||el.dataset.tip||'';
+}
+function clearTip(){
+  if(tipEl){if(!tipEl.title&&tipEl.dataset.tip)tipEl.title=tipEl.dataset.tip;delete tipEl.dataset.tip;tipEl=null;}
+  const hint=$('footer').querySelector('.fhint');
+  if(hint&&hint.dataset.def!=null){hint.textContent=hint.dataset.def;delete hint.dataset.def;hint.classList.remove('tip');}
+}
+document.addEventListener('mouseover',e=>{
+  const el=e.target.closest?.('[title],[data-tip],#wheel .wedge');
+  if(el===tipEl)return;
+  clearTip();
+  if(!el||el.closest('#footer'))return;
+  const text=tipText(el);if(!text)return;
+  tipEl=el;if(el.title){el.dataset.tip=el.title;el.removeAttribute('title');}
+  const hint=$('footer').querySelector('.fhint');if(!hint)return;
+  hint.dataset.def=hint.textContent;hint.textContent=text;hint.classList.add('tip');
+});
+document.addEventListener('mouseleave',clearTip);
+// 下のバーを描き直したときも、乗せている部品の説明を出し直す
+const renderFooter0=renderFooter;
+renderFooter=function(){renderFooter0();if(tipEl&&document.contains(tipEl)){const hint=$('footer').querySelector('.fhint');if(hint){hint.dataset.def=hint.textContent;hint.textContent=tipText(tipEl);hint.classList.add('tip');}}else tipEl=null;};
 fit();applyTheme();rotateTo(curKey().idx,true);render();renderLive();renderFileState();
