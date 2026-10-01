@@ -866,44 +866,90 @@ function openColorPop(si,anchor){
 function closePop(){pop.hidden=true;sheet.focus({preventScroll:true});}
 addEventListener('pointerdown',e=>{if(!pop.hidden&&!pop.contains(e.target)&&!e.target.closest('.bar-no,.sec-sw'))pop.hidden=true;},true);
 
-/* ---------- コード MIDI（ボイシングの編集。右端のパネル） ----------
-   コードのチップの「編集」で開く。縦の鍵盤で鳴らす音を足す・消す（いちばん低い音がベース）。変えるとその音からコード名を判別して付け替える
+/* ---------- コード編集（ボイシングの編集。右端のパネル） ----------
+   コードのチップの「コード編集」で開く。縦の鍵盤で鳴らす音を足す・消す、鳴らしている音を押したまま上下に動かして別の高さへ（いちばん低い音がベース）。
+   開いたときは、鳴らす音の真ん中がパネルの真ん中に来る位置。変えるとその音からコード名を判別して付け替える
    （判別できない組み合わせならコード名はそのまま）。音はコードの v（キーの基準の音からの半音）に持ち、パターンはそのままかかる */
 let vedit=null;   // 編集しているコード {id}
-const V_LOW=28, V_HIGH=88;   // パネルの鍵盤の範囲（E1〜E6）
+const V_LOW=24, V_HIGH=96;   // パネルの鍵盤の範囲（C1〜C7）
 function renderVoicing(){
   const panel=$('vpanel');
   const p=vedit&&placedChords(song,tl).find(x=>x.c.id===vedit.id);
   if(!p||ui.view==='melody'){if(!p)vedit=null;panel.hidden=true;return;}
   panel.hidden=false;
-  const keep=panel.querySelector('.vkeys')?.scrollTop;
+  const keep=vedit.shown?panel.querySelector('.vkeys')?.scrollTop:null;   // 開いたばかりなら真ん中に合わせる
   panel.innerHTML='';
   const notes=chordVoicingNotes(song,p), on=new Set(notes), kf=isFlatKey(p.key.idx);
   const ch=p.ch, tones=new Set((CHORD[ch.q]?.iv||[]).map(x=>mod12(ch.root+x)));if(ch.bass!=null)tones.add(ch.bass);
   const head=h('div','vhead');
   const x=h('button','x','×');x.title='閉じる';x.onclick=()=>{vedit=null;render();};
-  head.append(h('span','vtitle','コード MIDI'),h('span','spacer'),x);
+  head.append(h('span','vtitle','コード編集'),h('span','spacer'),x);
   const name=h('div','vname');name.append(h('b','',nameOf(song,p.c,p.key)),h('span','',degOfItem(p.c)+(p.c.v?'・編集済み':'・自動')));
   const keys=h('div','vkeys');
+  keys.appendChild(h('div','vpad'));   // 上下の余白：端の音でも真ん中に寄せられるように
   for(let m=V_HIGH;m>=V_LOW;m--){
     const row=h('div','vrow'+([1,3,6,8,10].includes(m%12)?' black':'')+(on.has(m)?' on':'')+(m===notes[0]?' bass':'')+(tones.has(m%12)?' tone':''));
     row.append(h('span','vlbl',noteName(m,kf)+(Math.floor(m/12)-1)),h('span','vbar',''));
     if(m===notes[0])row.title='ベース（いちばん低い音）';
-    row.onclick=()=>toggleVoicing(p,m);
+    row.dataset.m=m;
+    row.addEventListener('pointerdown',e=>grabVoicing(e,p,m,keys,on.has(m)));
     keys.appendChild(row);
   }
+  keys.appendChild(h('div','vpad'));
   const play=h('button','','▶ 試聴');play.title='このボイシングを鳴らす';play.onclick=()=>player.playNotes(chordVoicingNotes(song,placedChords(song,tl).find(x=>x.c.id===vedit.id)),ui.timbre,1.2);
   const reset=h('button','','元に戻す（自動）');reset.title='編集した音を消して、自動のボイシングに戻す';reset.disabled=!p.c.v;
   reset.onclick=()=>{commit(()=>{const c=song.sections[p.si].chords.find(x=>x.id===p.c.id);delete c.v;});player.playNotes(chordVoicingNotes(song,placedChords(song,tl).find(x=>x.c.id===vedit.id)),ui.timbre,1.2);};
   const foot=h('div','vfoot');foot.append(play,reset);
-  panel.append(head,name,h('div','vhint','押して音を足す・消す。いちばん低い音がベース。オレンジはコードの構成音'),keys,foot);
+  panel.append(head,name,h('div','vhint','押して音を足す・消す、押したまま上下で移動。いちばん低い音がベース。オレンジはコードの構成音'),keys,foot);
   if(keep!=null)keys.scrollTop=keep;
-  else{const r=keys.querySelector('.vrow.on');if(r)keys.scrollTop=Math.max(0,r.offsetTop-keys.clientHeight+40);}   // 最初は上の音が見える位置
+  else{   // 鳴らす音（いちばん低い音〜高い音）の真ん中を、パネルの真ん中に
+    const hi=keys.querySelector(`.vrow[data-m="${Math.min(V_HIGH,notes.at(-1))}"]`), lo=keys.querySelector(`.vrow[data-m="${Math.max(V_LOW,notes[0])}"]`);
+    if(hi&&lo)keys.scrollTop=Math.max(0,(hi.offsetTop+lo.offsetTop+lo.offsetHeight)/2-keys.clientHeight/2);
+    vedit.shown=true;
+  }
+}
+// 鍵盤の行を押す：動かさずに離したら足す・消す。鳴らしている音なら、押したまま上下に動かして別の高さへ（行き先の行に印、音を鳴らす）
+function grabVoicing(e,p,m,keys,isOn){
+  if(e.button!==0)return;
+  e.preventDefault();
+  const y0=e.clientY;let moved=false,target=m,last=null;
+  const src=keys.querySelector(`.vrow[data-m="${m}"]`);
+  const rowAt=ev=>{const el=document.elementFromPoint(keys.getBoundingClientRect().left+4,ev.clientY)?.closest('.vrow');return el&&keys.contains(el)?+el.dataset.m:null;};
+  const mark=()=>{keys.querySelectorAll('.vrow.drop').forEach(r=>r.classList.remove('drop'));if(moved&&target!==m)keys.querySelector(`.vrow[data-m="${target}"]`)?.classList.add('drop');};
+  const move=ev=>{
+    if(!isOn)return;
+    last=ev;
+    if(!moved&&Math.abs(ev.clientY-y0)<4)return;
+    if(!moved){moved=true;src?.classList.add('moving');}
+    const t=rowAt(ev);
+    if(t!=null&&t!==target){target=t;mark();if(t!==m)player.playNotes([t],ui.timbre,.35);}
+  };
+  // リストの上下の端では自動でスクロール
+  const timer=setInterval(()=>{
+    if(!moved||!last)return;
+    const r=keys.getBoundingClientRect(), k=r.height/(keys.offsetHeight||1), edge=24*k;
+    const d=last.clientY<r.top+edge?-8:last.clientY>r.bottom-edge?8:0;
+    if(d){const t0=keys.scrollTop;keys.scrollTop+=d;if(keys.scrollTop!==t0)move(last);}
+  },30);
+  const up=()=>{
+    removeEventListener('pointermove',move);removeEventListener('pointerup',up);clearInterval(timer);
+    src?.classList.remove('moving');
+    if(!moved){toggleVoicing(p,m);return;}
+    mark();
+    const cur=chordVoicingNotes(song,p);
+    if(target===m||cur.includes(target)){render();return;}   // 同じ高さ・もう鳴らしている高さなら何もしない
+    setVoicing(p,cur.filter(n=>n!==m).concat(target).sort((a,b)=>a-b));
+  };
+  addEventListener('pointermove',move);addEventListener('pointerup',up);
 }
 function toggleVoicing(p,m){
   const cur=chordVoicingNotes(song,p);
   const next=cur.includes(m)?cur.filter(n=>n!==m):[...cur,m].sort((a,b)=>a-b);
   if(!next.length){toast('音を1つ以上残してください');return;}
+  setVoicing(p,next);
+}
+// 鳴らす音を next（低い順）にして、その音からコード名を付け替える
+function setVoicing(p,next){
   const t=keyTonic(p.key), base=melodyBase(p.key), d=detectChords(next,1)[0];
   commit(()=>{
     const c=song.sections[p.si].chords.find(x=>x.id===p.c.id);
@@ -935,7 +981,7 @@ function chordEditor(p){
   const close=h('button','x','×');close.title='閉じる（Esc）';close.onclick=()=>{editOpen=false;render();};
   // 1段目：コード名・度数・閉じる。2段目：コード（ルート・種類・ベース）と鳴らす音の編集。3段目：長さ・パターンと複製・削除
   const head=h('div','ce-row ce-head');
-  head.append(h('b','ce-name',nameOf(song,c,p.key)),h('span','ce-deg',degOfItem(c)+(c.v?'・鳴らす音を編集済み':'')),h('span','spacer'),close);
+  head.append(h('b','ce-name',nameOf(song,c,p.key)),h('span','ce-deg',degOfItem(c)+(c.v?'・編集済み':'')),h('span','spacer'),close);
   const st=snapOf(b.meter), max=maxLenAt(p.start);
   const minus=h('button','','−'),plus=h('button','','＋');minus.title=plus.title='長さ（スナップ単位）';
   minus.onclick=()=>commit(()=>stretchChord(song,sel.si,sel.id,p.end-p.start-st,st,max));
@@ -947,7 +993,7 @@ function chordEditor(p){
   addPatternOptions(pat);
   pat.value=c.pattern||'';
   pat.onchange=()=>edit(cc=>{if(pat.value)cc.pattern=pat.value;else delete cc.pattern;});
-  const vbtn=h('button',c.v?'on':'','鳴らす音を編集');vbtn.title='鳴らす音（ボイシング）を鍵盤で変える（右端のパネル。音を変えるとコード名が追随する）';
+  const vbtn=h('button',c.v?'on':'','コード編集');vbtn.title='鳴らす音（ボイシング）を鍵盤で変える（右端のパネル。音を変えるとコード名が追随する）';
   vbtn.onclick=()=>{vedit={id:c.id};render();};
   const dup=h('button','','複製');dup.title='すぐ後ろに同じコードを置く（⌘D）';dup.onclick=duplicateSel;
   const del=h('button','del','削除');del.title='このコードを消す（⌫）';del.onclick=deleteSel;
