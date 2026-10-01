@@ -456,13 +456,17 @@ body.grabbing,body.grabbing *{cursor:grabbing!important}
 .vkeys{flex:1;overflow-y:auto;position:relative;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
 .vrow{display:flex;align-items:center;height:15px;cursor:pointer;border-bottom:1px solid var(--grid2);background:var(--card)}
 .vrow.black{background:var(--grid2)}
-.vrow:hover{background:var(--sel)}
 .vlbl{width:38px;font-size:9px;color:var(--faint);text-align:right;padding-right:6px}
 .vrow.tone .vbar{background:rgba(227,162,26,.22)}
 .vbar{flex:1;height:100%}
 .vpad{height:45%}
 .vrow.on .vbar{background:#3D7CC9;border-radius:2px;margin:1px 4px 1px 0}
 .vrow.bass .vbar{background:#2E8C80}
+.vrow:hover{box-shadow:inset 3px 0 0 var(--live)}   /* マウスを乗せた行：黒鍵の灰色と混ざらないよう、背景は変えずに左の線と音名・バーで示す */
+.vrow:hover .vlbl{color:var(--live);font-weight:700}
+.vrow:hover .vbar{background:rgba(61,124,201,.28);border-radius:2px;margin:1px 4px 1px 0}
+.vrow.on:hover .vbar{background:#5B95DB}
+.vrow.bass:hover .vbar{background:#3FA597}
 .vrow.on .vlbl{color:var(--ink);font-weight:700}
 .vrow.on{cursor:grab}
 .vrow.moving .vbar{opacity:.4}
