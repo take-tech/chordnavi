@@ -8,10 +8,10 @@
 </head>
 <body>
 <div class="stage" id="stage">
-  <header class="top panel">
+  <header class="top panel" aria-label="トップバー">
     <h1>ChordSketch</h1>
     <input id="title" class="title" maxlength="60" aria-label="曲名"><span id="fileState" class="file-state" hidden title="保存していない変更があります">●</span>
-    <div class="transport">
+    <div class="transport" role="group" aria-label="トランスポート">
       <button id="toStart" title="先頭へ（Home）">⏮</button>
       <button id="playBtn" class="play" title="再生／停止（Space キー）" aria-label="再生">▶</button>
       <button id="recBtn" class="tg rec" aria-pressed="false" aria-label="録音" title="録音（R）：1小節前から再生して、弾いた音を録る"><svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><circle cx="8" cy="8" r="5.5" fill="currentColor"/></svg></button>
@@ -19,14 +19,14 @@
       <button id="muteBtn" class="tg mute" aria-pressed="false" title="ミュート（M）" aria-label="ミュート">M</button>
     </div>
     <!-- 位置の表示（DAW のトランスポートと同じ並び）：今の位置のテンポ／拍子・キー、位置／経過時間。数字を押すとその値を変える -->
-    <div class="lcd" id="lcd">
+    <div class="lcd" id="lcd" role="group" aria-label="ディスプレイ">
       <button class="lcd-c l1" id="lcdTempo" title="テンポ：押して入力・上下にドラッグ（⇧で 0.1 ずつ）"><b id="lcdBpm">120.0</b></button>
       <span class="lcd-c r1 pos" id="posDisp" title="位置（小節.拍.16分）">1.1.1</span>
       <span class="lcd-c l2"><button id="lcdMeter" title="拍子（押すと変更）">4/4</button><button id="lcdKey" title="キー">C</button></span>
       <span class="lcd-c r2 time" id="lcdTime" title="経過時間（分:秒）">0:00.0</span>
     </div>
     <!-- メトロノーム（上）とカウントイン（下）。アイコンでオン／オフ、種類は ▾ から -->
-    <div class="clickgrp">
+    <div class="clickgrp" role="group" aria-label="クリック">
       <button id="metroBtn" class="tg ic2" aria-pressed="false" aria-label="メトロノーム" title="メトロノーム（試聴のみ）：オン／オフ"><svg viewBox="0 0 20 20" width="15" height="15" aria-hidden="true"><path d="M7.2 2.5h5.6l3.2 15H4z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M5.2 13.5h9.6" stroke="currentColor" stroke-width="1.4"/><path d="M10 13.5 14.8 4.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="13.3" cy="7.3" r="1.5" fill="currentColor"/></svg></button>
       <div class="menu">
         <button id="metroKind" class="ic2 kind" aria-haspopup="true" title="メトロノームの種類">▾</button>
@@ -67,7 +67,7 @@
     <input id="fileInput" type="file" accept=".chordsketch,.json" hidden>
   </header>
 
-  <aside class="left panel">
+  <aside class="left panel" aria-label="サイドパネル">
     <svg id="wheel" viewBox="-210 -215 420 425" role="group" aria-label="五度圏"></svg>
     <div class="keyrow">
       <select id="keySel" aria-label="キー"></select>
@@ -76,7 +76,7 @@
     <div class="keyrow">
       <select id="scaleSel" aria-label="スケール" title="スケール"></select>
     </div>
-    <div class="sub-head" title="クリックで試聴・ダブルクリックで入力・ドラッグで配置">ダイアトニックコード<span class="spacer"></span>
+    <div class="sub-head" title="クリックで試聴・ダブルクリックで入力・ドラッグで配置">ダイアトニック<span class="spacer"></span>
       <div class="seg small" id="diaSeg"><button data-v="7" aria-pressed="true">4和音</button><button data-v="3" aria-pressed="false">3和音</button></div></div>
     <div class="palette" id="dia"></div>
     <div class="sub-head">コード作成</div>
@@ -94,13 +94,13 @@
   </aside>
 
   <main class="main panel">
-    <div class="tabs" id="tabs" role="tablist" aria-label="開いている曲"></div>
-    <div class="toolbar">
+    <div class="tabs" id="tabs" role="tablist" aria-label="曲タブ"></div>
+    <div class="toolbar" role="toolbar" aria-label="編集バー">
       <div class="seg view-seg" id="viewSeg" role="tablist" aria-label="表示"><button data-v="chords" title="コードビュー（Tab で切り替え）">コード</button><button data-v="melody" title="メロディービュー（Tab で切り替え）">メロディー</button></div>
       <span class="lbl">スナップ</span>
       <div class="seg small only-chords" id="snapSeg"><button data-v="bar">1小節</button><button data-v="beat">1拍</button><button data-v="half" title="シンコペーション・食いのコード用">半拍</button></div>
       <select id="mSnap" class="only-melody" aria-label="メロディーのスナップ" title="音を置く・動かす位置の単位"></select>
-      <label class="fld only-chords" title="パレット・数字キー・MIDI 鍵盤で入れるコードの長さ">長さ <select id="insLen"></select></label>
+      <label class="fld only-chords" title="ダイアトニック・数字キー・MIDI 入力で入れるコードの長さ">長さ <select id="insLen"></select></label>
       <label class="fld only-melody" title="クリック・MIDI 鍵盤のステップ入力で置く音の長さ">長さ <select id="mLen"></select></label>
       <span class="lbl" title="1行に並べる小節の数">表示</span>
       <div class="seg small only-chords" id="rowSeg" title="1行に並べる小節の数"><button data-v="4" title="1行に4小節">4</button><button data-v="8" title="1行に8小節">8</button></div>
@@ -111,7 +111,7 @@
       <button class="handle" id="dragSel" title="選択範囲（なければ曲全体）を DAW へドラッグ">⠿ <span id="dragLabel">曲全体</span>をドラッグ</button>
       <button id="saveMidi">MIDI保存</button>
     </div>
-    <div class="toolbar out only-chords">
+    <div class="toolbar out only-chords" role="toolbar" aria-label="サウンドバー">
       <label class="fld" title="コードの試聴の音色（MIDI には影響しない）">音色 <select id="timbre"></select></label>
       <span class="sep"></span>
       <span class="lbl strong" title="MIDI の出力（パターン・鳴らし方・オクターブ・ベース）">出力</span>
@@ -123,7 +123,7 @@
       <span class="lbl">上声</span><div class="oct" id="octUp"></div>
       <button id="bassBtn" class="tg small" aria-pressed="true" title="ベース音を出す／出さない（右はベースのオクターブ）">ベース</button><div class="oct" id="octBass"></div>
     </div>
-    <div class="toolbar out only-melody">
+    <div class="toolbar out only-melody" role="toolbar" aria-label="サウンドバー">
       <div class="seg small tool-seg" id="toolSeg" title="道具（⌘で入れ替え）">
         <button data-v="draw" aria-label="描く" title="描く：押して音を置く・右へ引いて長さ（⌘で選ぶ）"><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M3 13l.8-3.2L11 2.6a1.3 1.3 0 0 1 1.8 0l.6.6a1.3 1.3 0 0 1 0 1.8L6.2 12.2z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M9.8 3.8l2.4 2.4" stroke="currentColor" stroke-width="1.5"/></svg></button>
         <button data-v="select" aria-label="選ぶ" title="選ぶ：ドラッグで囲んで選ぶ（⌘で描く）"><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><rect x="2.5" y="3.5" width="11" height="9" rx="1" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2.4 1.6"/></svg></button></div>
@@ -140,8 +140,8 @@
     </div>
     <div class="sheet" id="sheet" tabindex="0" aria-label="コードビュー"></div>
     <div class="roll" id="roll" tabindex="0" aria-label="メロディービュー" hidden></div>
-    <aside class="vpanel" id="vpanel" aria-label="コード編集（鳴らす音）" hidden></aside>
-    <div class="footer" id="footer"></div>
+    <aside class="vpanel" id="vpanel" aria-label="コード編集パネル" hidden></aside>
+    <div class="footer" id="footer" role="region" aria-label="インフォバー"></div>
   </main>
 </div>
 

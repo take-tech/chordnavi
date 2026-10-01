@@ -810,7 +810,7 @@ function openMarkPop(gi,pos,anchor,only=null){
   if(doTempo)pop.append(h('span','lbl','テンポ ♩='),bpm,h('span','lbl','位置'),posSel);
   if(doMeter)pop.append(h('span','lbl','拍子（小節の頭）'),met);
   if(doKey)pop.append(h('span','lbl','キー（小節の頭）'),keyS,transL);
-  pop.appendChild(h('p','note',only==='tempo'?'小数点1けたまで入れられます（例：128.5）。空欄にすると外します。上部の表示のテンポは、つかんで上下にドラッグしても変えられます（⇧で 0.1 ずつ）。':
+  pop.appendChild(h('p','note',only==='tempo'?'小数点1けたまで（例：128.5）。空欄で外す。ディスプレイのテンポは上下にドラッグでも変えられる（⇧で 0.1 ずつ）。':
     only?'「変更なし」にすると外します。直前と同じ値にしたときもタグは消えます。':
     'テンポは半拍単位の位置で、拍子とキーは小節の頭で変えられます。空欄・「変更なし」にすると外します。直前と同じ値にしたときもタグは消えます。'));
   const btns=h('div','btns');
@@ -887,7 +887,7 @@ function renderVoicing(){
   const ch=p.ch, tones=new Set((CHORD[ch.q]?.iv||[]).map(x=>mod12(ch.root+x)));if(ch.bass!=null)tones.add(ch.bass);
   const head=h('div','vhead');
   const x=h('button','x','×');x.title='閉じる';x.onclick=()=>{vedit=null;render();};
-  head.append(h('span','vtitle','コード編集'),h('span','spacer'),x);
+  head.append(h('span','vtitle','コード編集パネル'),h('span','spacer'),x);
   const name=h('div','vname');name.append(h('b','',nameOf(song,p.c,p.key)),h('span','',degOfItem(p.c)+(p.c.v?'・編集済み':'・自動')));
   const keys=h('div','vkeys');
   keys.appendChild(h('div','vpad'));   // 上下の余白：端の音でも真ん中に寄せられるように
@@ -991,7 +991,7 @@ let editOpen=false;
 function chordEditor(p){
   const c=p.c, b=tl.bars.find(x=>p.start>=x.start&&p.start<x.start+x.ticks), kt=keyTonic(p.key), kf=isFlatKey(p.key.idx);
   const edit=mut=>commit(()=>{const cc=song.sections[sel.si].chords.find(x=>x.id===sel.id);mut(cc);});
-  const box=h('div','chip-edit');box.setAttribute('role','dialog');box.setAttribute('aria-label','コードの編集');
+  const box=h('div','chip-edit');box.setAttribute('role','dialog');box.setAttribute('aria-label','コードメニュー');
   const opt=(s,text,value)=>s.appendChild(Object.assign(h('option','',text),{value}));
   const root=h('select','');for(let off=0;off<12;off++)opt(root,noteName(mod12(kt+off),kf),off);
   root.value=c.off;root.title='ルート';
