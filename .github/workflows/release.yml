@@ -12,7 +12,7 @@ jobs:
     runs-on: macos-14
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Configure
         run: cmake -S . -B build-release -DCMAKE_BUILD_TYPE=Release
@@ -58,7 +58,7 @@ jobs:
           CHORDNAVI_VERSION="$VERSION" ./scripts/package_macos.sh
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ChordNavi-macOS-pkg
           path: build-release/packages/*.pkg
@@ -68,7 +68,7 @@ jobs:
     runs-on: windows-2022
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install WebView2 SDK
         shell: pwsh
@@ -108,7 +108,7 @@ jobs:
           & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" installer/windows/ChordNavi.iss
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ChordNavi-Windows-Setup
           path: build/packages/*.exe
@@ -122,11 +122,11 @@ jobs:
       contents: write
     steps:
       - name: Download artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: dist
 
       - name: Create release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: dist/**/*
