@@ -913,16 +913,24 @@ function grabVoicing(e,p,m,keys,isOn){
   if(e.button!==0)return;
   e.preventDefault();
   const y0=e.clientY;let moved=false,target=m,last=null;
-  const src=keys.querySelector(`.vrow[data-m="${m}"]`);
   const rowAt=ev=>{const el=document.elementFromPoint(keys.getBoundingClientRect().left+4,ev.clientY)?.closest('.vrow');return el&&keys.contains(el)?+el.dataset.m:null;};
-  const mark=()=>{keys.querySelectorAll('.vrow.drop').forEach(r=>r.classList.remove('drop'));if(moved&&target!==m)keys.querySelector(`.vrow[data-m="${target}"]`)?.classList.add('drop');};
+  // 動かしているあいだは、見た目だけ m の音を target に置いた形にする（バーが行を移っていく。コード名もその場で）。確定は離したとき
+  const cur=chordVoicingNotes(song,p), nameEl=document.querySelector('#vpanel .vname b'), name0=nameEl?.textContent;
+  const showAt=t=>{
+    const set=new Set(cur.filter(n=>n!==m).concat(t)), low=Math.min(...set);
+    keys.querySelectorAll('.vrow').forEach(r=>{const n=+r.dataset.m;r.classList.toggle('on',set.has(n));r.classList.toggle('bass',n===low);r.classList.toggle('drop',n===t&&t!==m);});
+    const d=detectChords([...set].sort((a,b)=>a-b),1)[0];
+    if(nameEl)nameEl.textContent=d?chordNameOf(d,isFlatKey(p.key.idx),keyTonic(p.key)):name0;
+  };
   const move=ev=>{
     if(!isOn)return;
     last=ev;
     if(!moved&&Math.abs(ev.clientY-y0)<4)return;
-    if(!moved){moved=true;src?.classList.add('moving');}
+    moved=true;
     const t=rowAt(ev);
-    if(t!=null&&t!==target){target=t;mark();if(t!==m)player.playNotes([t],ui.timbre,.35);}
+    if(t==null||t===target||(t!==m&&cur.includes(t)))return;   // ほかに鳴らしている高さは飛ばす
+    target=t;showAt(t);
+    if(t!==m)player.playNotes([t],ui.timbre,.35);
   };
   // リストの上下の端では自動でスクロール
   const timer=setInterval(()=>{
@@ -933,11 +941,8 @@ function grabVoicing(e,p,m,keys,isOn){
   },30);
   const up=()=>{
     removeEventListener('pointermove',move);removeEventListener('pointerup',up);clearInterval(timer);
-    src?.classList.remove('moving');
     if(!moved){toggleVoicing(p,m);return;}
-    mark();
-    const cur=chordVoicingNotes(song,p);
-    if(target===m||cur.includes(target)){render();return;}   // 同じ高さ・もう鳴らしている高さなら何もしない
+    if(target===m){render();return;}   // 元の高さに戻したら何もしない
     setVoicing(p,cur.filter(n=>n!==m).concat(target).sort((a,b)=>a-b));
   };
   addEventListener('pointermove',move);addEventListener('pointerup',up);
