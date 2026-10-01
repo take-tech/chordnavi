@@ -1,5 +1,5 @@
 import {MAJ_LABEL,MIN_LABEL,SIG,DIATONIC,CHORD,chordDeg,chordAt,chordName as chordNameOf,
-  noteName,tonicOf,isFlatKey,keyName as keyNameOf,detectChords,mod12,PROGRESSIONS,variantsOf,progressionDegrees,
+  noteName,tonicOf,isFlatKey,keyName as keyNameOf,detectChords,mod12,PROGRESSIONS,variantsOf,
   CONFORM_SCALES,conformBars,diatonicOf,scaleById,chordPcs} from '../../shared/ui/theory.js';
 import {createWheel} from '../../shared/ui/wheel.js';
 import {PPQ,METERS,SNAPS,snapTicks,barTicksOf,beatTicksOf,SECTION_COLORS,SECTION_PRESETS,PATTERNS,MIN_BPM,MAX_BPM,
@@ -289,7 +289,7 @@ function renderProg(){
     names.appendChild(cell);
   }
   names.querySelectorAll('.pb').forEach(cell=>fitText(cell,7.5));
-  names.title=`ドラッグで入れる（小節の上は上書き、空きは新しいセクション）　${progressionDegrees(bars)}`;
+  names.title='ドラッグで入れる（小節の上は上書き、空きは新しいセクション）';
   $('progPlay').textContent=progPreview&&player.isPlaying()?'停止':'試聴';
   $('progIns').title=`${cursor.gi+1}小節目から${bars.length}小節を上書きで入れる`;
 }
