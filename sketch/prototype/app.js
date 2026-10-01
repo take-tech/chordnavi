@@ -93,6 +93,8 @@ function fixSelection(){
 }
 
 /* ---------- 表記 ---------- */
+// テンポは小数点1けたまで（0.1 単位）
+const round1=x=>Math.round(x*10)/10;
 const $=id=>document.getElementById(id);
 // 五度圏・パレット・コード作成・MIDI 入力は、カーソルのある場所のキー（途中で転調していればそのキー）
 const curKey=()=>tl.bars[cursor.gi]?.key||song.key;
@@ -785,8 +787,8 @@ function openMarkPop(gi,pos,anchor,only=null){
   const tm=sec.marks.find(m=>m.bar===b.bar&&m.bpm&&(m.pos||0)===pos), mm=sec.marks.find(m=>m.bar===b.bar&&m.meter);
   pop.innerHTML='';
   pop.appendChild(h('h4','',only==='tempo'?`テンポ（${fmtPos(gi,pos)} から）`:only==='meter'?`拍子（${gi+1}小節目から）`:only==='key'?`キー（${gi+1}小節目から）`:`${fmtPos(gi,pos)} からの変更`));
-  const bpm=h('input','');bpm.type='number';bpm.min=MIN_BPM;bpm.max=MAX_BPM;
-  bpm.value=atStart?song.bpm:tm?.bpm??'';bpm.placeholder=String(Math.round(tempoAt(tl.tempos,b.start+pos)));
+  const bpm=h('input','');bpm.type='number';bpm.min=MIN_BPM;bpm.max=MAX_BPM;bpm.step='0.1';   // 小数点1けたまで
+  bpm.value=atStart?song.bpm:tm?.bpm??'';bpm.placeholder=String(round1(tempoAt(tl.tempos,b.start+pos)));
   const posSel=h('select','');
   const bt=beatTicksOf(b.meter);
   for(let t=0;t<b.ticks;t+=bt/2)posSel.appendChild(Object.assign(h('option','',`${gi+1}.${beatSub(t,b.meter)}`),{value:t}));
@@ -806,14 +808,14 @@ function openMarkPop(gi,pos,anchor,only=null){
   if(doTempo)pop.append(h('span','lbl','テンポ ♩='),bpm,h('span','lbl','位置'),posSel);
   if(doMeter)pop.append(h('span','lbl','拍子（小節の頭）'),met);
   if(doKey)pop.append(h('span','lbl','キー（小節の頭）'),keyS,transL);
-  pop.appendChild(h('p','note',only==='tempo'?'空欄にすると外します。上部の表示のテンポは、つかんで上下にドラッグしても変えられます。':
+  pop.appendChild(h('p','note',only==='tempo'?'小数点1けたまで入れられます（例：128.5）。空欄にすると外します。上部の表示のテンポは、つかんで上下にドラッグしても変えられます（⇧で 0.1 ずつ）。':
     only?'「変更なし」にすると外します。直前と同じ値にしたときもタグは消えます。':
     'テンポは半拍単位の位置で、拍子とキーは小節の頭で変えられます。空欄・「変更なし」にすると外します。直前と同じ値にしたときもタグは消えます。'));
   const btns=h('div','btns');
   const ok=h('button','tg','適用');ok.setAttribute('aria-pressed','true');
   const cancel=h('button','','閉じる');
   ok.onclick=()=>{
-    const v=Math.round(+bpm.value), m=met.value?met.value.split('/').map(Number):null, p=+posSel.value;
+    const v=round1(+bpm.value), m=met.value?met.value.split('/').map(Number):null, p=+posSel.value;
     const clampBpm=x=>Math.min(MAX_BPM,Math.max(MIN_BPM,x));
     commit(()=>{
       // 出している項目だけを変える
@@ -1374,12 +1376,15 @@ $('lcdTempo').addEventListener('pointerdown',e=>{
   if(e.button!==0)return;
   e.preventDefault();
   const src=tempoSource(lcdTick()), y0=e.clientY, v0=src.song?song.bpm:src.mark.bpm, el=e.currentTarget;
-  let dragging=false;
+  let dragging=false, acc=v0, lastY=y0;
+  // 上下に 3px で 1 BPM。⇧ を押しているあいだは 0.1 ずつ（途中で押しても離しても、そこから続けて動く）
   const move=ev=>{
     const dy=y0-ev.clientY;
     if(!dragging&&Math.abs(dy)<3)return;
     if(!dragging){dragging=true;snapshot();document.body.classList.add('tempo-drag');}
-    const v=Math.min(MAX_BPM,Math.max(MIN_BPM,Math.round(v0+dy/3)));
+    acc+=(lastY-ev.clientY)/3*(ev.shiftKey?.1:1);lastY=ev.clientY;
+    acc=Math.min(MAX_BPM,Math.max(MIN_BPM,acc));
+    const v=ev.shiftKey?round1(acc):Math.round(acc);
     const cur=src.song?song.bpm:src.mark.bpm;
     if(v===cur)return;
     if(src.song)song.bpm=v;else src.mark.bpm=v;

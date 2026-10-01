@@ -384,4 +384,14 @@ test('コードのボイシングの編集：鳴らす音・キーと一緒に�
   delete c.v;p=placedChords(s)[0];
   assert.equal(chordVoicingNotes(s,p).length,5);              // 自動に戻す（ベース＋4和音）
 });
+test('テンポの小数（0.1 単位）：秒への換算と MIDI のテンポ',()=>{
+  const s=newSong();s.bpm=128.5;s.sections=[newSection('A',1,2)];placeChord(s,0,newChord(0,0,B,0,''));
+  setMark(s,0,1,0,{bpm:90.5});
+  const tl=timeline(s);
+  assert.deepEqual(tl.tempos,[{tick:0,bpm:128.5},{tick:B,bpm:90.5}]);
+  assert.ok(Math.abs(tickToSec(tl.tempos,B)-4*60/128.5)<1e-9);
+  const smf=buildSmf(renderSong(s));
+  const us=Math.round(60e6/128.5), i=[...smf].findIndex((x,k)=>x===0xff&&smf[k+1]===0x51);
+  assert.deepEqual([smf[i+3],smf[i+4],smf[i+5]],[us>>16&255,us>>8&255,us&255]);
+});
 console.log(`${n} tests passed`);
