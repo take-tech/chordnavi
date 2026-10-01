@@ -472,7 +472,7 @@ body.grabbing,body.grabbing *{cursor:grabbing!important}
 .vrow.bass:hover .vbar{background:#3FA597}
 .vrow.on .vlbl{color:var(--ink);font-weight:700}
 .vrow.on{cursor:grab}
-.vrow.drop .vbar{background:rgba(61,124,201,.22);border-radius:2px;margin:1px 4px 1px 0;outline:1px dashed #3D7CC9;outline-offset:-1px}   /* 行き先 */
+.vrow.vdrop .vbar{background:rgba(61,124,201,.22);border-radius:2px;margin:1px 4px 1px 0;outline:1px dashed #3D7CC9;outline-offset:-1px}   /* 行き先 */
 .vfloat{position:absolute;left:42px;right:4px;height:13px;border-radius:2px;background:#3D7CC9;box-shadow:0 2px 8px rgba(30,39,66,.35);pointer-events:none;z-index:2}   /* つかんでいる音 */
 .vfloat.bass{background:#2E8C80}
 .vkeys:has(.vfloat) .vrow{cursor:grabbing}

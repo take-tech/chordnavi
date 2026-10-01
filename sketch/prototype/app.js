@@ -913,21 +913,24 @@ function grabVoicing(e,p,m,keys,isOn){
   if(e.button!==0)return;
   e.preventDefault();
   const y0=e.clientY;let moved=false,target=m,last=null;
-  const rowAt=ev=>{const el=document.elementFromPoint(keys.getBoundingClientRect().left+4,ev.clientY)?.closest('.vrow');return el&&keys.contains(el)?+el.dataset.m:null;};
   // 動かしているあいだは、つかんだ音を浮いたバーにしてポインタにそのままついてこさせ（行の単位で飛ばない）、行き先の行にうすい印。
   // ほかの音とコード名は、行き先に置いた形でその場で出す。確定は離したとき
   const cur=chordVoicingNotes(song,p), nameEl=document.querySelector('#vpanel .vname b'), name0=nameEl?.textContent;
-  const src=keys.querySelector(`.vrow[data-m="${m}"]`);
+  const src=keys.querySelector(`.vrow[data-m="${m}"]`), rowH=src.offsetHeight, top0=keys.querySelector('.vrow').offsetTop;
   let float=null;
   const k=()=>{const r=keys.getBoundingClientRect();return r.height/(keys.offsetHeight||1);};
+  const yIn=ev=>(ev.clientY-keys.getBoundingClientRect().top)/k()+keys.scrollTop;   // リストの中の y（スクロール込み）
+  const grab=yIn(e)-src.offsetTop;   // つかんだ位置（バーの上端から）。浮いたバーはこのずれを保って動かす
+  let floatTop=src.offsetTop;
   const placeFloat=ev=>{
-    if(!float){float=h('div','vfloat');keys.appendChild(float);src?.classList.add('lifted');}
-    const r=keys.getBoundingClientRect();
-    float.style.top=((ev.clientY-r.top)/k()+keys.scrollTop-7)+'px';
+    if(!float){float=h('div','vfloat');keys.appendChild(float);}
+    floatTop=yIn(ev)-grab;float.style.top=floatTop+1+'px';
   };
+  // 行き先：浮いたバーの真ん中がある行（見えているバーと行き先がずれないように）
+  const rowAt=()=>{const i=Math.floor((floatTop+rowH/2-top0)/rowH), n=V_HIGH-i;return n>=V_LOW&&n<=V_HIGH?n:null;};
   const showAt=t=>{
     const set=new Set(cur.filter(n=>n!==m).concat(t)), low=Math.min(...set);
-    keys.querySelectorAll('.vrow').forEach(r=>{const n=+r.dataset.m;r.classList.toggle('on',n!==m&&set.has(n)&&n!==t);r.classList.toggle('bass',n===low&&n!==t);r.classList.toggle('drop',n===t);});
+    keys.querySelectorAll('.vrow').forEach(r=>{const n=+r.dataset.m;r.classList.toggle('on',n!==m&&set.has(n)&&n!==t);r.classList.toggle('bass',n===low&&n!==t);r.classList.toggle('vdrop',n===t);});
     float?.classList.toggle('bass',t===low);
     const d=detectChords([...set].sort((a,b)=>a-b),1)[0];
     if(nameEl)nameEl.textContent=d?chordNameOf(d,isFlatKey(p.key.idx),keyTonic(p.key)):name0;
@@ -938,7 +941,7 @@ function grabVoicing(e,p,m,keys,isOn){
     if(!moved&&Math.abs(ev.clientY-y0)<4)return;
     if(!moved){moved=true;placeFloat(ev);showAt(m);}
     placeFloat(ev);
-    const t=rowAt(ev);
+    const t=rowAt();
     if(t==null||t===target||(t!==m&&cur.includes(t)))return;   // ほかに鳴らしている高さは飛ばす
     target=t;showAt(t);
     if(t!==m)player.playNotes([t],ui.timbre,.35);
@@ -952,7 +955,7 @@ function grabVoicing(e,p,m,keys,isOn){
   },30);
   const up=()=>{
     removeEventListener('pointermove',move);removeEventListener('pointerup',up);clearInterval(timer);
-    float?.remove();src?.classList.remove('lifted');
+    float?.remove();
     if(!moved){toggleVoicing(p,m);return;}
     if(target===m){render();return;}   // 元の高さに戻したら何もしない
     setVoicing(p,cur.filter(n=>n!==m).concat(target).sort((a,b)=>a-b));
