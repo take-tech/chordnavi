@@ -1720,12 +1720,12 @@ const renderOctUp=octControl('octUp','octave'), renderOctBass=octControl('octBas
 $('octUp').title='上声のオクターブ（ピアノ：0 = ルートが C3〜B3、ギター：0 = フォームのまま）';$('octBass').title='ベースのオクターブ（ピアノ：0 = C2〜B2、ギター：0 = 一番低い弦のまま）';
 
 /* ---------- テーマ ---------- */
-const THEMES=['light','dark','auto'], THEME_NAME={light:'☀',dark:'☾',auto:'◐'}, THEME_LABEL={light:'ライト',dark:'ダーク',auto:'自動'};
+const THEMES=['light','dark','auto'], THEME_LABEL={light:'ライト',dark:'ダーク',auto:'自動'};
 const dark=matchMedia('(prefers-color-scheme: dark)');
 function applyTheme(){
   const t=ui.theme==='auto'?(dark.matches?'dark':'light'):ui.theme;
-  document.documentElement.dataset.theme=t;$('themeBtn').textContent=THEME_NAME[ui.theme];
-  $('themeBtn').title=`テーマ：${THEME_LABEL[ui.theme]}（押して選ぶ）`;
+  document.documentElement.dataset.theme=t;
+  $('themeBtn').title=`設定（テーマ：${THEME_LABEL[ui.theme]}・ウィンドウを広げたとき：${ui.scaleMode==='expand'?'広げる':'全体を拡大'}）`;
   document.querySelectorAll('#themeMenu button[data-v]').forEach(b=>b.setAttribute('aria-checked',b.dataset.v===ui.theme));
   document.querySelectorAll('#themeMenu button[data-scale]').forEach(b=>b.setAttribute('aria-checked',b.dataset.scale===ui.scaleMode));
 }
