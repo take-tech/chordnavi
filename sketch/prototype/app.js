@@ -5,7 +5,7 @@ import {createWheel} from '../../shared/ui/wheel.js';
 import {PPQ,METERS,SNAPS,snapTicks,barTicksOf,beatTicksOf,SECTION_COLORS,SECTION_PRESETS,PATTERNS,MIN_BPM,MAX_BPM,
   newSong,demoSong,newSection,newChord,cloneSection,timeline,placedChords,placeChord,removeChord,resizeChord,
   setSectionBars,insertBars,appendSectionFrom,stretchChord,stretchChordStart,pruneMarks,mergeSections,splitSection,insertProgression,setMark,rangeTicks,copyRange,pasteAt,renderSong,buildSmf,safeFileName,
-  songTonic,songFlat,nameOf,tempoAt,PATTERN_GROUPS,NEW_TITLE,SKETCH_SCALES,keyScale,defaultScale,meterAt,tickToSec,withExtension,keyTonic,sameKey,setKeyMark,keyRegion,transposeBars,voicingOf,patternById,VOICINGS,GUITAR_AREAS,melodyBase,addNote,secToTick,placedNotes} from './song.js';
+  songTonic,songFlat,nameOf,tempoAt,PATTERN_GROUPS,NEW_TITLE,SKETCH_SCALES,keyScale,defaultScale,meterAt,tickToSec,withExtension,keyTonic,sameKey,setKeyMark,keyRegion,transposeBars,voicingOf,patternById,VOICINGS,GUITAR_AREAS,melodyBase,addNote,secToTick,placedNotes,chordVoicingNotes} from './song.js';
 import {createRoll,M_SNAPS,M_LENS,ZOOM_DEFAULT,clampZoom,zoomToSlider,sliderToZoom} from './roll.js';
 import * as player from './player.js';
 import {hasNative,nativeFn,onNative} from '../../shared/ui/juce-bridge.js';
@@ -407,6 +407,7 @@ function renderSheet(){
       if(playingId===p.c.id)blk.classList.add('playing');
       blk.append(h('span','n',first||w>30?nameOf(song,p.c,p.key):''),h('span','d',first?degOfItem(p.c):''));
       blk.title=`${nameOf(song,p.c,p.key)}（${degOfItem(p.c)}）${fmtLen(p.end-p.start,b.meter)}　パターン：${patternById(p.pattern).name}${p.c.pattern?'（このコードだけ）':''}${blk.dataset.sync?'　拍の裏から（シンコペーション）':''}`;
+      if(first&&p.c.v){blk.classList.add('custom');blk.title+='　ボイシングを編集済み';}
       if(first&&p.c.pattern){const t=h('span','ptag',patternById(p.c.pattern).short);t.title='このコードだけのパターン：'+patternById(p.c.pattern).name;blk.appendChild(t);blk.classList.add('haspat');}
       if(first)blk.appendChild(Object.assign(h('div','rs rsl'),{title:'ドラッグで頭の位置を変える（前に伸ばすと前のコードを上書き）'}));
       if(e===p.end)blk.appendChild(Object.assign(h('div','rs'),{title:'ドラッグで長さを変える'}));
@@ -815,6 +816,54 @@ function openColorPop(si,anchor){
 function closePop(){pop.hidden=true;sheet.focus({preventScroll:true});}
 addEventListener('pointerdown',e=>{if(!pop.hidden&&!pop.contains(e.target)&&!e.target.closest('.bar-no,.sec-sw'))pop.hidden=true;},true);
 
+/* ---------- コード MIDI（ボイシングの編集。右端のパネル） ----------
+   コードのチップの「編集」で開く。縦の鍵盤で鳴らす音を足す・消す（いちばん低い音がベース）。変えるとその音からコード名を判別して付け替える
+   （判別できない組み合わせならコード名はそのまま）。音はコードの v（キーの基準の音からの半音）に持ち、パターンはそのままかかる */
+let vedit=null;   // 編集しているコード {id}
+const V_LOW=28, V_HIGH=88;   // パネルの鍵盤の範囲（E1〜E6）
+function renderVoicing(){
+  const panel=$('vpanel');
+  const p=vedit&&placedChords(song,tl).find(x=>x.c.id===vedit.id);
+  if(!p||ui.view==='melody'){if(!p)vedit=null;panel.hidden=true;return;}
+  panel.hidden=false;
+  const keep=panel.querySelector('.vkeys')?.scrollTop;
+  panel.innerHTML='';
+  const notes=chordVoicingNotes(song,p), on=new Set(notes), kf=isFlatKey(p.key.idx);
+  const ch=p.ch, tones=new Set((CHORD[ch.q]?.iv||[]).map(x=>mod12(ch.root+x)));if(ch.bass!=null)tones.add(ch.bass);
+  const head=h('div','vhead');
+  const x=h('button','x','×');x.title='閉じる';x.onclick=()=>{vedit=null;render();};
+  head.append(h('span','vtitle','コード MIDI'),h('span','spacer'),x);
+  const name=h('div','vname');name.append(h('b','',nameOf(song,p.c,p.key)),h('span','',degOfItem(p.c)+(p.c.v?'・編集済み':'・自動')));
+  const keys=h('div','vkeys');
+  for(let m=V_HIGH;m>=V_LOW;m--){
+    const row=h('div','vrow'+([1,3,6,8,10].includes(m%12)?' black':'')+(on.has(m)?' on':'')+(m===notes[0]?' bass':'')+(tones.has(m%12)?' tone':''));
+    row.append(h('span','vlbl',noteName(m,kf)+(Math.floor(m/12)-1)),h('span','vbar',''));
+    if(m===notes[0])row.title='ベース（いちばん低い音）';
+    row.onclick=()=>toggleVoicing(p,m);
+    keys.appendChild(row);
+  }
+  const play=h('button','','▶ 試聴');play.title='このボイシングを鳴らす';play.onclick=()=>player.playNotes(chordVoicingNotes(song,placedChords(song,tl).find(x=>x.c.id===vedit.id)),ui.timbre,1.2);
+  const reset=h('button','','元に戻す（自動）');reset.title='編集した音を消して、自動のボイシングに戻す';reset.disabled=!p.c.v;
+  reset.onclick=()=>{commit(()=>{const c=song.sections[p.si].chords.find(x=>x.id===p.c.id);delete c.v;});player.playNotes(chordVoicingNotes(song,placedChords(song,tl).find(x=>x.c.id===vedit.id)),ui.timbre,1.2);};
+  const foot=h('div','vfoot');foot.append(play,reset);
+  panel.append(head,name,h('div','vhint','押して音を足す・消す。いちばん低い音がベース。オレンジはコードの構成音'),keys,foot);
+  if(keep!=null)keys.scrollTop=keep;
+  else{const r=keys.querySelector('.vrow.on');if(r)keys.scrollTop=Math.max(0,r.offsetTop-keys.clientHeight+40);}   // 最初は上の音が見える位置
+}
+function toggleVoicing(p,m){
+  const cur=chordVoicingNotes(song,p);
+  const next=cur.includes(m)?cur.filter(n=>n!==m):[...cur,m].sort((a,b)=>a-b);
+  if(!next.length){toast('音を1つ以上残してください');return;}
+  const t=keyTonic(p.key), base=melodyBase(p.key), d=detectChords(next,1)[0];
+  commit(()=>{
+    const c=song.sections[p.si].chords.find(x=>x.id===p.c.id);
+    c.v=next.map(n=>n-base);
+    if(d){c.off=mod12(d.root-t);c.q=d.q;if(d.bass!=null&&mod12(d.bass)!==mod12(d.root))c.boff=mod12(d.bass-t);else delete c.boff;delete c.deg;}
+  });
+  if(!d)toast('コードとして判別できない組み合わせです（コード名はそのまま）');
+  player.playNotes(next,ui.timbre,.9);
+}
+
 /* ---------- 下のバー ---------- */
 // 選んだコードの編集パネル：ブロックのすぐ下（下に入らなければ上）に出す。
 // ブロックをクリックしたとき（ドラッグでない）に開き、Esc・ほかの場所のクリック・× で閉じる。Enter で開き直す
@@ -826,13 +875,13 @@ function chordEditor(p){
   const opt=(s,text,value)=>s.appendChild(Object.assign(h('option','',text),{value}));
   const root=h('select','');for(let off=0;off<12;off++)opt(root,noteName(mod12(kt+off),kf),off);
   root.value=c.off;root.title='ルート';
-  root.onchange=()=>{const d=+root.value-c.off;edit(cc=>{cc.off=+root.value;if(cc.boff!=null)cc.boff=mod12(cc.boff+d);delete cc.deg;});previewSel();};
+  root.onchange=()=>{const d=+root.value-c.off;edit(cc=>{cc.off=+root.value;if(cc.boff!=null)cc.boff=mod12(cc.boff+d);delete cc.deg;delete cc.v;});previewSel();};   // コードを変えたら編集したボイシングは消す
   const q=h('select','');for(const k of QUALITIES)opt(q,k===''?'maj':CHORD[k].s,k);
-  q.value=c.q;q.title='種類';q.onchange=()=>{edit(cc=>{cc.q=q.value;});previewSel();};
+  q.value=c.q;q.title='種類';q.onchange=()=>{edit(cc=>{cc.q=q.value;delete cc.v;});previewSel();};
   // ベース：コード作成と同じく「/音名」、ルートと同じ音なら分数コードにしない
   const bass=h('select','');for(let off=0;off<12;off++)opt(bass,'/'+noteName(mod12(kt+off),kf),off);
   bass.value=c.boff??c.off;bass.title='ベース（ルートと同じなら分数コードにしない）';
-  bass.onchange=()=>{edit(cc=>{if(+bass.value===cc.off)delete cc.boff;else cc.boff=+bass.value;});previewSel();};
+  bass.onchange=()=>{edit(cc=>{if(+bass.value===cc.off)delete cc.boff;else cc.boff=+bass.value;delete cc.v;});previewSel();};
   const close=h('button','x','×');close.title='閉じる（Esc）';close.onclick=()=>{editOpen=false;render();};
   const head=h('div','ce-row');
   head.append(h('b','ce-name',nameOf(song,c,p.key)),h('span','ce-deg',degOfItem(c)),h('span','spacer'),root,q,bass,close);
@@ -847,10 +896,12 @@ function chordEditor(p){
   addPatternOptions(pat);
   pat.value=c.pattern||'';
   pat.onchange=()=>edit(cc=>{if(pat.value)cc.pattern=pat.value;else delete cc.pattern;});
+  const vbtn=h('button',c.v?'on':'','編集');vbtn.title='鳴らす音（ボイシング）を鍵盤で変える（右端のパネル。音を変えるとコード名が追随する）';
+  vbtn.onclick=()=>{vedit={id:c.id};render();};
   const dup=h('button','','複製');dup.title='すぐ後ろに同じコードを置く（⌘D）';dup.onclick=duplicateSel;
   const del=h('button','del','削除');del.title='このコードを消す（⌫）';del.onclick=deleteSel;
   const tail=h('div','ce-row');
-  tail.append(h('span','lbl','長さ'),minus,h('b','ce-len',fmtLen(p.end-p.start,b.meter)),plus,h('span','lbl ce-gap','パターン'),pat,h('span','spacer'),dup,del);
+  tail.append(h('span','lbl','長さ'),minus,h('b','ce-len',fmtLen(p.end-p.start,b.meter)),plus,h('span','lbl ce-gap','パターン'),pat,h('span','spacer'),vbtn,dup,del);
   box.append(head,tail);
   return box;
 }
@@ -1013,7 +1064,7 @@ addEventListener('keydown',e=>{
   if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.preventDefault();arrow(e.key==='ArrowRight'?1:-1,e.shiftKey,e.altKey);return;}
   if((e.key==='ArrowUp'||e.key==='ArrowDown')&&sel){
     e.preventDefault();const d=e.key==='ArrowUp'?1:-1;
-    commit(()=>{const c=song.sections[sel.si].chords.find(x=>x.id===sel.id);c.off=mod12(c.off+d);if(c.boff!=null)c.boff=mod12(c.boff+d);});
+    commit(()=>{const c=song.sections[sel.si].chords.find(x=>x.id===sel.id);c.off=mod12(c.off+d);if(c.boff!=null)c.boff=mod12(c.boff+d);if(c.v)c.v=c.v.map(x=>x+d);});
     previewSel();
   }
 });
@@ -1815,6 +1866,7 @@ function render(){
   pressed('hearChords',ui.hearChords);pressed('hearMelody',ui.hearMelody);pressed('guideChord',ui.guideChord);pressed('guideScale',ui.guideScale);
   renderPalette();renderProg();
   if(mel)roll.render();else renderSheet();
+  renderVoicing();
   renderFooter();renderTabs();
 }
 

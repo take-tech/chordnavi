@@ -335,7 +335,10 @@ export function transposeBars(song,tl,from,to,d,md=((mod12(d)+6)%12)-6){
     const base=tl.secRanges[si].from;
     for(const c of s.chords){
       const gi=base+c.bar;
-      if(mod12(d)&&gi>=from&&gi<to){c.off=mod12(c.off+d);if(c.boff!=null)c.boff=mod12(c.boff+d);delete c.deg;}
+      if(gi>=from&&gi<to){
+        if(mod12(d)){c.off=mod12(c.off+d);if(c.boff!=null)c.boff=mod12(c.boff+d);delete c.deg;}
+        if(md&&c.v)c.v=c.v.map(x=>x+md);   // 編集したボイシングは鳴る音を保つ（メロディーと同じ）
+      }
     }
     for(const x of s.melody){const gi=base+x.bar;if(md&&gi>=from&&gi<to)x.p+=md;}
   });
@@ -369,7 +372,7 @@ export const rangeTicks=(tl,{from,to})=>({from:tl.bars[from]?.start??0,to:to>=tl
 export function copyRange(song,{from,to}){
   const tl=timeline(song), r=rangeTicks(tl,{from,to});
   return {len:r.to-r.from,chords:placedChords(song,tl).filter(p=>p.end>r.from&&p.start<r.to).map(p=>{
-    const s=Math.max(p.start,r.from);return {at:s-r.from,len:Math.min(p.end,r.to)-s,off:p.c.off,q:p.c.q,boff:p.c.boff,pattern:p.c.pattern,deg:p.c.deg};
+    const s=Math.max(p.start,r.from);return {at:s-r.from,len:Math.min(p.end,r.to)-s,off:p.c.off,q:p.c.q,boff:p.c.boff,pattern:p.c.pattern,deg:p.c.deg,...(p.c.v?{v:[...p.c.v]}:{})};
   }),
   // メロディーは範囲の中で始まる音（度数と同じく、キーの基準からの半音で持つ）
   melody:placedNotes(song,tl).filter(x=>x.start>=r.from&&x.start<r.to).map(x=>({at:x.start-r.from,len:Math.min(x.end,r.to)-x.start,p:x.m.p,v:x.m.v}))};
@@ -379,7 +382,7 @@ export function pasteAt(song,origin,clip){
   for(const x of clip.chords){
     const tl=timeline(song), abs=origin+x.at, bar=tl.bars.find(b=>abs>=b.start&&abs<b.start+b.ticks);
     if(!bar)continue;
-    placeChord(song,bar.si,{...newChord(bar.bar,abs-bar.start,x.len,x.off,x.q,x.boff),...(x.pattern?{pattern:x.pattern}:{}),...(x.deg!=null?{deg:x.deg}:{})});
+    placeChord(song,bar.si,{...newChord(bar.bar,abs-bar.start,x.len,x.off,x.q,x.boff),...(x.pattern?{pattern:x.pattern}:{}),...(x.deg!=null?{deg:x.deg}:{}),...(x.v?{v:[...x.v]}:{})});
   }
   for(const x of clip.melody||[]){
     const tl=timeline(song), abs=origin+x.at, bar=tl.bars.find(b=>abs>=b.start&&abs<b.start+b.ticks);
@@ -443,6 +446,13 @@ const VEL={bass:88,chord:80,arp:78}, ACC=12, SOFT=-26;
 // 見つからないコード（sus4(♭5) など）はピアノの形にする
 export const VOICINGS=[{id:'piano',name:'ピアノ'},{id:'guitar',name:'ギター'}];
 export const GUITAR_AREAS=[{id:'low',name:'Low'},{id:'mid',name:'Mid'},{id:'high',name:'High'}];
+// 編集したボイシング（コードの v：キーの基準の音 melodyBase からの半音の並び）→ 鳴らす音（低い順）。無ければ null
+export function customNotes(c,key){return c.v?.length?[...new Set(c.v.map(x=>melodyBase(key)+x))].filter(n=>n>=0&&n<128).sort((a,b)=>a-b):null;}
+// 今鳴らす音（低い順。編集したボイシングがあればそれ、無ければ自動。いちばん低い音がベース）。p は placedChords の1つ
+export function chordVoicingNotes(song,p,prev=null){
+  const cn=customNotes(p.c,p.key);if(cn)return cn;
+  const v=voicingOf(song,p.ch,prev);return [v.bass,...v.upper].sort((a,b)=>a-b);
+}
 export function voicingOf(song,ch,prev=null){
   if(song.voicing==='guitar'){
     const form=nearestVoicing(ch,TAB_AREAS[song.guitarArea]??TAB_AREAS.low,prev);
@@ -565,7 +575,9 @@ export function renderSong(song,range){
   const pcs=placedChords(song,tl);
   let tail=null, prevForm=null;
   pcs.forEach((p,i)=>{
-    const v=voicingOf(song,p.ch,prevForm);if(v.form)prevForm=v.form;
+    // 編集したボイシングがあれば、いちばん低い音をベース、残りを上の音として使う（パターンはそのままかかる）
+    const cn=customNotes(p.c,p.key);
+    const v=cn?{bass:cn[0],upper:cn.length>1?cn.slice(1):[cn[0]],form:null}:voicingOf(song,p.ch,prevForm);if(v.form)prevForm=v.form;
     const prev=pcs[i-1];
     const tie=tail&&prev&&prev.end===p.start&&sameCode(prev.c,p.c)?tail:null;
     const r=chordNotes(song,tl,p,tie,v);

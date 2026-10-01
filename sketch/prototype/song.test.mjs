@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import {demoSong,newSong,newSection,newChord,timeline,placedChords,renderSong,buildSmf,placeChord,resizeChord,insertBars,
   setMark,pruneMarks,setKeyMark,appendSectionFrom,stretchChordStart,keyRegion,mergeSections,splitSection,cloneSection,stretchChord,insertProgression,tickToSec,secToTick,copyRange,pasteAt,nameOf,rangeTicks,PPQ,safeFileName,voicingOf,STRUM_TICKS,withExtension,keyScale,sameKey,PATTERNS,PATTERN_GROUPS,
-  melodyBase,placedNotes,addNote,removeNotes,transposeBars} from './song.js';
+  melodyBase,placedNotes,addNote,removeNotes,transposeBars,chordVoicingNotes,customNotes} from './song.js';
 import {diatonicOf,conformBars,chordDeg} from '../../shared/ui/theory.js';
 import {barDrums,pulsesOf,backbeat} from './player.js';
 
@@ -366,5 +366,22 @@ test('メロディー：範囲のコピーと貼り付け、MIDI（2トラック
   assert.ok([...mel].some((x,i)=>x===0x90&&mel[i+1]===72));               // メロディーだけならチャンネル1
   const s2=newSong();s2.sections=[newSection('A',1,1)];placeChord(s2,0,newChord(0,0,B,0,''));
   assert.equal(buildSmf(renderSong(s2),'x','both')[9],0);                 // メロディーが無ければ1トラック
+});
+test('コードのボイシングの編集：鳴らす音・キーと一緒に移調・コード固定・コピー',()=>{
+  const s=newSong();s.pattern='whole';s.sections=[newSection('A',1,2)];
+  const c=placeChord(s,0,newChord(0,0,B,4,'m7'));             // Em7
+  c.v=[-20,2,7,11,14];                                        // E2 D4 G4 B4 D5（Em9 風）
+  let p=placedChords(s)[0];
+  assert.deepEqual(chordVoicingNotes(s,p),[40,62,67,71,74]);
+  assert.deepEqual([...new Set(renderSong(s).notes.map(n=>n.n))].sort((a,b)=>a-b),[40,62,67,71,74]);   // ベース＋上の音
+  s.key={idx:1,mode:'major'};                                 // G に：度数を保って一緒に移調（基準 G3＝55）
+  assert.deepEqual(customNotes(c,s.key),[35,57,62,66,69]);
+  s.key={idx:0,mode:'major'};
+  transposeBars(s,timeline(s),0,2,2);                         // コード固定の付け替え（2半音上）
+  assert.deepEqual(customNotes(c,s.key),[42,64,69,73,76]);
+  const clip=copyRange(s,{from:0,to:1});assert.deepEqual(clip.chords[0].v,[-18,4,9,13,16]);
+  pasteAt(s,B,clip);assert.deepEqual(s.sections[0].chords.find(x=>x.bar===1).v,[-18,4,9,13,16]);
+  delete c.v;p=placedChords(s)[0];
+  assert.equal(chordVoicingNotes(s,p).length,5);              // 自動に戻す（ベース＋4和音）
 });
 console.log(`${n} tests passed`);

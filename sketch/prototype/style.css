@@ -139,7 +139,7 @@ body.tempo-drag,body.tempo-drag *{cursor:ns-resize!important}
 .tip b{color:var(--ink2);font-weight:700}
 
 /* ---------- メイン ---------- */
-.main{display:flex;flex-direction:column}
+.main{display:flex;flex-direction:column;position:relative}
 .toolbar{display:flex;align-items:center;gap:6px;padding:8px 12px;border-bottom:1px solid var(--line);flex-wrap:nowrap}
 .toolbar>*,.top>*{flex-shrink:0}
 #pattern{width:168px}
@@ -437,3 +437,28 @@ body.grabbing,body.grabbing *{cursor:grabbing!important}
 .transport .rec.on{background:#C4456A;border-color:#C4456A;color:#fff;animation:recblink 1s steps(2,start) infinite}
 @keyframes recblink{50%{opacity:.55}}
 .roll .note.rec{background:#E05A7E;border-color:#A83A5A;opacity:.9;pointer-events:none;z-index:3}
+
+/* コード MIDI（ボイシングの編集。右端のパネル） */
+.vpanel{position:absolute;right:0;top:78px;bottom:42px;width:220px;z-index:9;background:var(--panel);border-left:1px solid var(--ink2);
+  box-shadow:-6px 0 18px rgba(30,39,66,.18);display:flex;flex-direction:column}
+.vpanel[hidden]{display:none}
+.vhead{display:flex;align-items:center;gap:6px;padding:6px 8px;border-bottom:1px solid var(--line)}
+.vtitle{font-weight:700;font-size:12px;color:var(--ink2)}
+.vhead .x{border:0;background:none;font-size:15px;padding:0 4px}
+.vname{padding:6px 10px 2px;display:flex;align-items:baseline;gap:8px}
+.vname b{font-size:20px}
+.vname span{font-size:11px;color:var(--muted)}
+.vhint{font-size:10px;color:var(--faint);padding:0 10px 4px}
+.vkeys{flex:1;overflow-y:auto;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.vrow{display:flex;align-items:center;height:15px;cursor:pointer;border-bottom:1px solid var(--grid2);background:var(--card)}
+.vrow.black{background:var(--grid2)}
+.vrow:hover{background:var(--sel)}
+.vlbl{width:38px;font-size:9px;color:var(--faint);text-align:right;padding-right:6px}
+.vrow.tone .vbar{background:rgba(227,162,26,.22)}
+.vbar{flex:1;height:100%}
+.vrow.on .vbar{background:#3D7CC9;border-radius:2px;margin:1px 4px 1px 0}
+.vrow.bass .vbar{background:#2E8C80}
+.vrow.on .vlbl{color:var(--ink);font-weight:700}
+.vfoot{display:flex;gap:6px;padding:6px 8px;justify-content:space-between}
+.blk.custom::after{content:'✎';position:absolute;right:3px;bottom:1px;font-size:9px;color:var(--live)}
+.chip-edit button.on{border-color:var(--live);color:var(--live)}
