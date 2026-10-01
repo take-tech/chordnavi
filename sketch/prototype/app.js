@@ -477,7 +477,7 @@ function barCell(b,rowEnd,songEnd){
       if(x.end<=b.start||x.start>=end)continue;
       const s0=Math.max(x.start,b.start), e0=Math.min(x.end,end);
       const n=h('div','mnote');
-      n.style.cssText=`left:${(s0-b.start)/b.ticks*100}%;width:${(e0-s0)/b.ticks*100}%;top:${6+(hi-x.midi)/Math.max(1,hi-lo)*42}px`;
+      n.style.cssText=`left:${(s0-b.start)/b.ticks*100}%;width:${(e0-s0)/b.ticks*100}%;top:${5+(hi-x.midi)/Math.max(1,hi-lo)*31}px`;   // チップ（段の上から 3〜41px）の中：線の上端 5〜36px
       ml.appendChild(n);
     }
     lane.appendChild(ml);
