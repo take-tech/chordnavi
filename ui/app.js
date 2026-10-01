@@ -493,10 +493,10 @@ function renderFretboard(){
     el('line',{x1:L,y1:y,x2:L+FR*FW,y2:y,stroke:'var(--string)','stroke-width':1+s*1.75/(NS-1)},svg);
     const fs=NS>6?10:11, bh=Math.min(22,SS-2);
     txt(svg,12,y,'−',{fill:'var(--ink2)','font-size':14,'font-weight':700});
-    txt(svg,40,y,octName(open),{fill:'var(--ink)','font-size':fs+1,'font-weight':700});
+    txt(svg,40,y,noteName(mod12(open),isFlatKey(state.idx)),{fill:'var(--ink)','font-size':fs+1,'font-weight':700});   // 音名だけ（オクターブは − ＋ のツールチップに）
     txt(svg,68,y,'＋',{fill:'var(--ink2)','font-size':12,'font-weight':700});
-    el('rect',{class:'tune',x:1,y:y-bh/2,width:22,height:bh,rx:3,'data-tune':-1,'data-string':s},svg).append(Object.assign(document.createElementNS('http://www.w3.org/2000/svg','title'),{textContent:`${s+1}弦を半音下げる`}));
-    el('rect',{class:'tune',x:57,y:y-bh/2,width:22,height:bh,rx:3,'data-tune':1,'data-string':s},svg).append(Object.assign(document.createElementNS('http://www.w3.org/2000/svg','title'),{textContent:`${s+1}弦を半音上げる`}));
+    el('rect',{class:'tune',x:1,y:y-bh/2,width:22,height:bh,rx:3,'data-tune':-1,'data-string':s},svg).append(Object.assign(document.createElementNS('http://www.w3.org/2000/svg','title'),{textContent:`${s+1}弦（${octName(open)}）を半音下げる`}));
+    el('rect',{class:'tune',x:57,y:y-bh/2,width:22,height:bh,rx:3,'data-tune':1,'data-string':s},svg).append(Object.assign(document.createElementNS('http://www.w3.org/2000/svg','title'),{textContent:`${s+1}弦（${octName(open)}）を半音上げる`}));
     for(let f=0;f<=FR;f++){
       const {n,ds}=fretStyle(s,OPEN[s]+f); if(!ds)continue;
       const x=f===0?L-18:L+(f-.5)*FW, k=R/12;
@@ -635,10 +635,6 @@ function renderProgs(){
   nameEl.textContent=nameEl.title=p.name+(vi>0?`（${v.name}）`:'')+(edited?'＊':'');
   degEl.textContent=progressionDegrees(bars);
   degEl.title=progressionDegrees(bars);
-  // 1行に収まらない長い進行は、ディグリーを進行名の下の行に出す（その分ヒントを隠す）
-  const detail=document.querySelector('.detail');
-  detail.classList.remove('longdeg');
-  if(degEl.scrollWidth>degEl.clientWidth+1)detail.classList.add('longdeg');
   progChords=chords;progTitle=title;
   // 幅は拍数で決める（1小節＝4マス、2拍のコードは半分の幅）
   const box=document.getElementById('chips');box.innerHTML='';
@@ -660,7 +656,7 @@ function renderProgs(){
 // 選んだ進行のコードのルート・種類を変え、1小節のコードを分割・結合するバー（ヒントの位置に出す）
 function renderEditBar(chords,{t,orig,bars,where}){
   const bar=document.getElementById('editBar'), i=state.editIdx, ch=i!=null&&chords[i];
-  document.getElementById('hint').hidden=!!ch||document.querySelector('.detail').classList.contains('longdeg');
+  document.getElementById('hint').hidden=!!ch;
   bar.classList.toggle('on',!!ch);
   bar.innerHTML='';
   if(!ch)return;
