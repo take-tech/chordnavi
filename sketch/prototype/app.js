@@ -1004,6 +1004,12 @@ function chordEditor(p){
   box.append(head,chord,tail);
   return box;
 }
+// 編集パネルの外を押したら閉じる（パネルの中・選んでいるチップ・右端のコード編集・ダイアログ・ポップアップは除く）。
+// 押した先の操作がそのまま効くよう、全体を描き直さずにパネルだけ消す
+addEventListener('pointerdown',e=>{
+  if(!editOpen||e.target.closest?.('.chip-edit,.blk.sel,#vpanel,.dialog-wrap,#pop'))return;
+  editOpen=false;sheet.querySelector('.chip-edit')?.remove();
+},true);
 function placeChordEditor(){
   if(!sel||!editOpen||player.isPlaying())return;
   const p=placedChords(song,tl).find(x=>x.c.id===sel.id), blk=sheet.querySelector(`.blk[data-id="${sel.id}"]:not(.cont)`);
