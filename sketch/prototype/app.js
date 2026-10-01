@@ -469,26 +469,18 @@ function barCell(b,rowEnd,songEnd){
     const l=h('div',t%bt===0?'beat':'half');l.style.left=t/b.ticks*100+'%';lane.appendChild(l);
   }
   bar.append(no,lane);
-  // メロディーの帯：その小節で鳴っている音を、曲全体の高さの範囲に合わせて細い線で（小節をまたぐ音は小節ごとに切る）。押すとメロディーの画面のその位置へ
+  // メロディー：その小節で鳴っている音を、コードのチップの段に薄い線で重ねる（高さは曲全体のメロディーの範囲。小節をまたぐ音は小節ごとに切る。
+  // マウスの操作は通すので、チップの操作は今までどおり）
   if(sheetMelody){
-    const ml=h('div','mlane'), end=b.start+b.ticks, {lo,hi}=sheetMelody;
+    const ml=h('div','mlayer'), end=b.start+b.ticks, {lo,hi}=sheetMelody;
     for(const x of sheetMelody.notes){
       if(x.end<=b.start||x.start>=end)continue;
       const s0=Math.max(x.start,b.start), e0=Math.min(x.end,end);
       const n=h('div','mnote');
-      n.style.cssText=`left:${(s0-b.start)/b.ticks*100}%;width:${(e0-s0)/b.ticks*100}%;top:${2+(hi-x.midi)/Math.max(1,hi-lo)*11}px`;
+      n.style.cssText=`left:${(s0-b.start)/b.ticks*100}%;width:${(e0-s0)/b.ticks*100}%;top:${6+(hi-x.midi)/Math.max(1,hi-lo)*42}px`;
       ml.appendChild(n);
     }
-    ml.title='メロディー（押すとメロディーの画面のこの位置へ）';
-    ml.addEventListener('pointerdown',e=>{
-      e.stopPropagation();
-      const r=ml.getBoundingClientRect(), st=snapTicks('beat',b.meter);
-      const pos=Math.min(b.ticks-1,Math.floor((e.clientX-r.left)/r.width*b.ticks/st)*st);
-      cursor={gi:b.gi,pos};range=null;sel=null;
-      $('viewSeg').querySelector('[data-v=melody]').click();
-      roll.reveal(b.start+pos);
-    });
-    bar.appendChild(ml);
+    lane.appendChild(ml);
   }
   return bar;
 }
@@ -988,6 +980,10 @@ addEventListener('keydown',e=>{
   const mod=e.metaKey||e.ctrlKey, k=e.key.toLowerCase();
   if(mod&&k==='z'){e.preventDefault();e.shiftKey?redo():undo();return;}
   if(mod&&k==='y'){e.preventDefault();redo();return;}
+  // Tab：コード ⇔ メロディーの画面を切り替える（カーソルの位置は引き継ぐ）
+  if(e.key==='Tab'&&!mod&&!e.altKey&&$('printWrap').hidden&&!document.querySelector('.dialog-wrap')){
+    e.preventDefault();$('viewSeg').querySelector(`[data-v=${ui.view==='melody'?'chords':'melody'}]`).click();return;
+  }
   // メロディーの画面：音の操作（選択・移動・コピーなど）を先に。コードの操作（数字キー・コードの選択）はしない
   if(ui.view==='melody'&&$('printWrap').hidden){
     if(roll.onKey(e))return;
