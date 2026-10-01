@@ -6,6 +6,10 @@
   --chord-tint:#F6D6DF; --wheel-outer:#1E2742; --wheel-inner:#39456B;
   --grid:#E3E7EF; --grid2:#EEF1F6; --sel:rgba(47,111,214,.12); --live:#2F6FD6; --pick:#6B4FBB;
   --pressed-bg:var(--ink); --pressed-fg:var(--on-ink);   /* 押されているボタン */
+  --note:#3D7CC9; --note-edge:#2A5C9E; --note-hi:#5B95DB;   /* メロディーの音・コード編集パネルの音 */
+  --font-head:inherit;   /* 見出しの書体（スキンで変える） */
+  /* ディスプレイ */
+  --lcd-bg:#12151C; --lcd-hi:#7CC4FF; --lcd-lo:#5E9ED6; --lcd-dim:#4B5670; --lcd-line:#262C3A;
 }
 :root[data-theme=dark]{
   color-scheme:dark;
@@ -15,8 +19,16 @@
   --chord-tint:#4E2536; --wheel-outer:#2B3558; --wheel-inner:#3B4772;
   --grid:#2C3346; --grid2:#252B3B; --sel:rgba(90,150,255,.16);
   --pressed-bg:#46527A; --pressed-fg:#D3D8E3;   /* 押されているボタンを白く光らせない */
+  --wheel-text:#D8DCE6;
+  /* メロディービュー（暗い土台）：ライトの見た目を反転させずに暗くした色 */
+  --roll-key:#B4BAC7; --roll-key-edge:#8F97A8; --roll-key-black:#1A1F2C; --roll-key-label:#3A4258;
+  --roll-row:#353C51; --roll-row-edge:#2D3346; --roll-row-black:#2B3144; --roll-bar:#4A5270; --roll-beat:#2E3448;
+  --roll-out:rgba(10,12,20,.38);
 }
-:root[data-theme=dark] #wheel text{fill:#D8DCE6}   /* 五度圏の白い文字も少し落とす（中央のキー名は --ink） */
+:root[data-theme=dark] #wheel text{fill:var(--wheel-text)}
+/* 五度圏の強調の色（共有の wheel.js は色が決め打ちなので、CSS で変数に置き換える。ChordNavi には影響しない） */
+#wheel [fill="#2E8C80"]{fill:var(--tone)}
+#wheel [fill="#E3A21A"]{fill:var(--root)}   /* 五度圏の白い文字も少し落とす（中央のキー名は --ink） */
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;overflow:hidden;background:var(--page)}
 body{color:var(--ink);font-family:"Hiragino Sans","Yu Gothic UI","Noto Sans JP",sans-serif;font-size:13px;line-height:1.45;
@@ -56,7 +68,7 @@ h1{font-size:17px;font-weight:900;letter-spacing:.02em;margin:0 6px 0 0;white-sp
 .play.on{background:var(--chord);border-color:var(--chord)}
 /* 位置の表示（DAW のトランスポート風の暗い枠。テーマによらず同じ色）：
    2列の幅を固定し、数字は右そろえ（等幅）。左＝テンポ／拍子・キー、右＝位置／経過時間 */
-.lcd{--lcd-bg:#12151C;--lcd-hi:#7CC4FF;--lcd-lo:#5E9ED6;--lcd-dim:#4B5670;--lcd-line:#262C3A;
+.lcd{
   display:grid;grid-template-columns:96px 96px;grid-template-rows:17px 14px;background:var(--lcd-bg);border:1px solid #07090D;border-radius:4px;
   padding:3px 0;font-variant-numeric:tabular-nums;font-family:"SF Mono",Menlo,Consolas,"Hiragino Sans",monospace;letter-spacing:.02em}
 .lcd-c{display:flex;align-items:center;justify-content:flex-end;gap:7px;padding:0 10px;white-space:nowrap;min-width:0}
@@ -95,6 +107,8 @@ body.tempo-drag,body.tempo-drag *{cursor:ns-resize!important}
 .theme-pop button[aria-checked=true]::after{content:' ✓'}
 .menu-sep{height:1px;background:var(--line);margin:4px 2px}
 .menu-lbl{font-size:11px;color:var(--muted);padding:2px 10px}
+.swatch{display:inline-block;width:22px;height:12px;border-radius:6px;margin-right:6px;vertical-align:-1px;border:1px solid rgba(0,0,0,.15);
+  background:linear-gradient(90deg,var(--s1) 0 40%,var(--s2) 40% 70%,var(--s3) 70%)}
 
 /* ---------- 左 ---------- */
 .left{display:flex;flex-direction:column;padding:9px 12px;gap:5px}
@@ -195,7 +209,7 @@ body.grabbing,body.grabbing *{cursor:grabbing!important}
 .lane .beat{position:absolute;top:0;bottom:0;width:0;border-left:1px solid var(--grid)}
 .lane .half{position:absolute;top:28px;bottom:0;width:0;border-left:1px dotted var(--grid)}
 .mlayer{position:absolute;inset:0;pointer-events:none;z-index:1}
-.mlayer .mnote{position:absolute;height:3px;background:var(--live);opacity:.32;border-radius:2px;min-width:2px}
+.mlayer .mnote{position:absolute;height:3px;background:var(--note);opacity:.32;border-radius:2px;min-width:2px}
 .bar.insel .lane{background:linear-gradient(var(--sel),var(--sel)),var(--card)}
 .bar.insel .bar-no{color:var(--live);font-weight:700}
 .bar.play .bar-no{color:var(--chord);font-weight:700}
@@ -414,13 +428,13 @@ body.grabbing,body.grabbing *{cursor:grabbing!important}
 .roll .rrow{background:var(--card);border-bottom:1px solid var(--grid2)}
 .roll .rrow.black{background:var(--grid2)}
 .roll .gout{background:rgba(30,39,66,.11)}
-.roll .gtonic{background:rgba(46,140,128,.16)}
-.roll .gtone{background:rgba(227,162,26,.30);box-shadow:inset 0 1px 0 rgba(227,162,26,.5)}
-.roll .gtone.root{background:rgba(227,162,26,.55)}
+.roll .gtonic{background:color-mix(in srgb,var(--tone) 16%,transparent)}
+.roll .gtone{background:color-mix(in srgb,var(--root) 30%,transparent);box-shadow:inset 0 1px 0 color-mix(in srgb,var(--root) 50%,transparent)}
+.roll .gtone.root{background:color-mix(in srgb,var(--root) 55%,transparent)}
 .roll .gtone span{position:absolute;left:3px;top:0;font-size:9px;line-height:13px;font-weight:700;color:#8A5A00;pointer-events:none}
 .roll .gbar{border-left:1px solid var(--line);pointer-events:none;
   background-image:repeating-linear-gradient(to right,transparent 0 calc(var(--beat) - 1px),var(--grid) calc(var(--beat) - 1px) var(--beat))}
-.roll .note{background:#3D7CC9;border:1px solid #2A5C9E;border-radius:3px;color:#fff;font-size:9px;line-height:11px;padding-left:3px;overflow:hidden;white-space:nowrap;cursor:grab;z-index:2}
+.roll .note{background:var(--note);border:1px solid var(--note-edge);border-radius:3px;color:#fff;font-size:9px;line-height:11px;padding-left:3px;overflow:hidden;white-space:nowrap;cursor:grab;z-index:2}
 .roll .note::after{content:"";position:absolute;right:0;top:0;bottom:0;width:6px;cursor:ew-resize}
 .roll .note.sel{background:#C4456A;border-color:#8E2E4B}
 .roll .note.playing{box-shadow:0 0 0 2px var(--root)}
@@ -431,16 +445,16 @@ body.grabbing,body.grabbing *{cursor:grabbing!important}
 .roll .rplay[hidden]{display:none}
 .roll .rband{border:1px dashed var(--live);background:var(--sel);z-index:4;pointer-events:none}
 /* ダーク：ライトの見た目を反転させずに暗くする（白鍵・スケールの中の行は明るめ、黒鍵・スケールの外の行は暗め） */
-:root[data-theme=dark] .roll .rkey{background:#B4BAC7;border-bottom-color:#8F97A8}
-:root[data-theme=dark] .roll .rkey.black{background:#1A1F2C;border-bottom-color:#1A1F2C}
-:root[data-theme=dark] .roll .rkey span{color:#3A4258}
-:root[data-theme=dark] .roll .rrow{background:#353C51;border-bottom-color:#2D3346}
-:root[data-theme=dark] .roll .rrow.black{background:#2B3144}
-:root[data-theme=dark] .roll .gbar{border-left-color:#4A5270;background-image:repeating-linear-gradient(to right,transparent 0 calc(var(--beat) - 1px),#2E3448 calc(var(--beat) - 1px) var(--beat))}
-:root[data-theme=dark] .roll .gout{background:rgba(10,12,20,.38)}
-:root[data-theme=dark] .roll .gtonic{background:rgba(46,140,128,.25)}
-:root[data-theme=dark] .roll .gtone{background:rgba(227,162,26,.22);box-shadow:inset 0 1px 0 rgba(227,162,26,.35)}
-:root[data-theme=dark] .roll .gtone.root{background:rgba(227,162,26,.42)}
+:root[data-theme=dark] .roll .rkey{background:var(--roll-key);border-bottom-color:var(--roll-key-edge)}
+:root[data-theme=dark] .roll .rkey.black{background:var(--roll-key-black);border-bottom-color:var(--roll-key-black)}
+:root[data-theme=dark] .roll .rkey span{color:var(--roll-key-label)}
+:root[data-theme=dark] .roll .rrow{background:var(--roll-row);border-bottom-color:var(--roll-row-edge)}
+:root[data-theme=dark] .roll .rrow.black{background:var(--roll-row-black)}
+:root[data-theme=dark] .roll .gbar{border-left-color:var(--roll-bar);background-image:repeating-linear-gradient(to right,transparent 0 calc(var(--beat) - 1px),var(--roll-beat) calc(var(--beat) - 1px) var(--beat))}
+:root[data-theme=dark] .roll .gout{background:var(--roll-out)}
+:root[data-theme=dark] .roll .gtonic{background:color-mix(in srgb,var(--tone) 25%,transparent)}
+:root[data-theme=dark] .roll .gtone{background:color-mix(in srgb,var(--root) 22%,transparent);box-shadow:inset 0 1px 0 color-mix(in srgb,var(--root) 35%,transparent)}
+:root[data-theme=dark] .roll .gtone.root{background:color-mix(in srgb,var(--root) 42%,transparent)}
 :root[data-theme=dark] .roll .gtone span{color:#F0C060}
 
 /* 録音ボタン（録音中は赤く点滅）と、録音中の音 */
@@ -464,21 +478,21 @@ body.grabbing,body.grabbing *{cursor:grabbing!important}
 .vrow{display:flex;align-items:center;height:15px;cursor:pointer;border-bottom:1px solid var(--grid2);background:var(--card)}
 .vrow.black{background:var(--grid2)}
 .vlbl{width:38px;font-size:9px;color:var(--faint);text-align:right;padding-right:6px}
-.vrow.tone .vbar{background:rgba(227,162,26,.22)}
+.vrow.tone .vbar{background:color-mix(in srgb,var(--root) 22%,transparent)}
 .vbar{flex:1;height:100%}
 .vpad{height:45%}
-.vrow.on .vbar{background:#3D7CC9;border-radius:2px;margin:1px 4px 1px 0}
-.vrow.bass .vbar{background:#2E8C80}
+.vrow.on .vbar{background:var(--note);border-radius:2px;margin:1px 4px 1px 0}
+.vrow.bass .vbar{background:var(--tone)}
 .vrow:hover{box-shadow:inset 3px 0 0 var(--live)}   /* マウスを乗せた行：黒鍵の灰色と混ざらないよう、背景は変えずに左の線と音名・バーで示す */
 .vrow:hover .vlbl{color:var(--live);font-weight:700}
 .vrow:hover .vbar{background:rgba(61,124,201,.28);border-radius:2px;margin:1px 4px 1px 0}
-.vrow.on:hover .vbar{background:#5B95DB}
+.vrow.on:hover .vbar{background:var(--note-hi)}
 .vrow.bass:hover .vbar{background:#3FA597}
 .vrow.on .vlbl{color:var(--ink);font-weight:700}
 .vrow.on{cursor:grab}
-.vrow.vdrop .vbar{background:rgba(61,124,201,.22);border-radius:2px;margin:1px 4px 1px 0;outline:1px dashed #3D7CC9;outline-offset:-1px}   /* 行き先 */
-.vfloat{position:absolute;left:42px;right:4px;height:13px;border-radius:2px;background:#3D7CC9;box-shadow:0 2px 8px rgba(30,39,66,.35);pointer-events:none;z-index:2}   /* つかんでいる音 */
-.vfloat.bass{background:#2E8C80}
+.vrow.vdrop .vbar{background:rgba(61,124,201,.22);border-radius:2px;margin:1px 4px 1px 0;outline:1px dashed var(--note);outline-offset:-1px}   /* 行き先 */
+.vfloat{position:absolute;left:42px;right:4px;height:13px;border-radius:2px;background:var(--note);box-shadow:0 2px 8px rgba(30,39,66,.35);pointer-events:none;z-index:2}   /* つかんでいる音 */
+.vfloat.bass{background:var(--tone)}
 .vkeys:has(.vfloat) .vrow{cursor:grabbing}
 .vfoot{display:flex;gap:6px;padding:6px 8px;justify-content:space-between}
 .blk.custom::after{content:'✎';position:absolute;right:3px;bottom:1px;font-size:9px;color:var(--live)}
@@ -487,3 +501,54 @@ body.grabbing,body.grabbing *{cursor:grabbing!important}
 /* プリセットの進行のドラッグ：何もないところに落とすと新しいセクション */
 #progNames{cursor:grab}
 .add-sec.drop-new{outline:2px dashed var(--live);outline-offset:4px;border-radius:4px;background:var(--sel)}
+
+/* 見出しの書体（スキンで変える。本文は読みやすいゴシックのまま） */
+.top h1,.sub-head,.sec-head .sec-name,.vtitle,.vname b,.chip-edit .ce-name,.midi-lbl,.print-bar b{font-family:var(--font-head)}
+
+/* ---------- スキン ----------
+   どのスキンも目に痛くしない：文字と背景のコントラスト比はおよそ 7〜12、真っ白・真っ黒は使わない、
+   背景や広い面は彩度を抑え、鮮やかな色は小さなところ（ボタン・印・音）だけ。
+   明るい土台（data-theme=light）か暗い土台（data-theme=dark）の上に、data-skin で色と見出しの書体を上書きする */
+:root[data-skin=kawaii]{   /* パステルのピンクとラベンダー、ミントの差し色 */
+  --page:#EFDDE6; --bg:#F6E9EF; --panel:#FCF5F8; --card:#FFFBFD; --ink:#4A2F45; --ink2:#6B4A63; --muted:#937489; --line:#E4C8D6;
+  --faint:#BC9DB1; --faint2:#D6BCCB; --root:#EBA35A; --tone:#5BAEA2; --chord:#D9668F; --chord-tint:#F8DCE7;
+  --wheel-outer:#6E5182; --wheel-inner:#8E70A3; --grid:#F0DEE7; --grid2:#F7EDF2; --sel:rgba(217,102,143,.13); --live:#B65E95; --pick:#8E73C8;
+  --pressed-bg:#9A5C86; --pressed-fg:#FFF6FA; --note:#A774C9; --note-edge:#82549F; --note-hi:#BC92D8;
+  --lcd-bg:#3B2A3C; --lcd-hi:#FFC9E0; --lcd-lo:#E7A8C6; --lcd-dim:#8D6C86; --lcd-line:#4E3A4F;
+  --font-head:"Hiragino Maru Gothic ProN","Hiragino Maru Gothic Pro","Kosugi Maru","Yu Gothic UI",sans-serif;
+}
+:root[data-skin=cyber]{   /* 紺に近い黒。シアン・マゼンタは細い線と文字だけ */
+  --page:#06080D; --bg:#0B0F17; --panel:#111722; --card:#172030; --ink:#BCD0DC; --ink2:#8EAEC0; --muted:#6C889A; --line:#24344A;
+  --faint:#4C6278; --faint2:#38495D; --root:#D8AE45; --tone:#2BAE9E; --chord:#C95896; --chord-tint:#341A2E;
+  --wheel-outer:#132037; --wheel-inner:#1C2E4C; --grid:#172131; --grid2:#121A26; --sel:rgba(43,174,158,.16); --live:#3BB9CF; --pick:#8A78D8;
+  --pressed-bg:#1C4A58; --pressed-fg:#C6EEF0; --note:#2F9FB8; --note-edge:#1F7488; --note-hi:#4CB8CE; --wheel-text:#BFD6E2;
+  --roll-key:#9FB6C4; --roll-key-edge:#7F96A6; --roll-key-black:#0B1018; --roll-key-label:#22303E;
+  --roll-row:#1B2638; --roll-row-edge:#162030; --roll-row-black:#142030; --roll-bar:#2C405A; --roll-beat:#1A2638; --roll-out:rgba(0,4,10,.42);
+  --lcd-bg:#05080C; --lcd-hi:#58E0C6; --lcd-lo:#3DB6A3; --lcd-dim:#2E5A58; --lcd-line:#13242A;
+  --font-head:"SF Mono",Menlo,Consolas,"Hiragino Sans",monospace;
+}
+:root[data-skin=modern]{   /* 青みのないグレーの濃淡、差し色は青1色 */
+  --page:#E2E3E5; --bg:#ECEDEF; --panel:#F6F6F7; --card:#FCFCFC; --ink:#202124; --ink2:#3C4043; --muted:#6B7075; --line:#D2D5D9;
+  --faint:#9AA0A6; --faint2:#BDC1C6; --root:#E3A03C; --tone:#2E9A8C; --chord:#CC4E69; --chord-tint:#F6DCE2;
+  --wheel-outer:#2E3236; --wheel-inner:#4A4F55; --grid:#E7E9EC; --grid2:#F0F2F3; --sel:rgba(26,115,232,.11); --live:#1A73E8; --pick:#7A56C0;
+  --pressed-bg:#2E3236; --pressed-fg:#FAFAFA; --note:#2F7BE0; --note-edge:#1F5DB0; --note-hi:#5A97E8;
+  --lcd-bg:#1E1F21; --lcd-hi:#9CC3FF; --lcd-lo:#7AA7E8; --lcd-dim:#5A5F66; --lcd-line:#2E3033;
+}
+:root[data-skin=luxury]{   /* 焦げ茶に近い黒、アイボリーの文字、くすんだ金 */
+  --page:#0E0C0A; --bg:#16130F; --panel:#1D1914; --card:#25201A; --ink:#E0D6C2; --ink2:#C4B597; --muted:#9A8B71; --line:#393026;
+  --faint:#6C5E4A; --faint2:#524638; --root:#C69E4A; --tone:#7AA08A; --chord:#B45468; --chord-tint:#3B1E25;
+  --wheel-outer:#2A231B; --wheel-inner:#3A3025; --grid:#29231C; --grid2:#211C16; --sel:rgba(198,158,74,.15); --live:#C69E4A; --pick:#A48CC4;
+  --pressed-bg:#5A4A2C; --pressed-fg:#F0E5CE; --note:#B08A42; --note-edge:#86682F; --note-hi:#C9A45E; --wheel-text:#E6DCC8;
+  --roll-key:#CBBFA8; --roll-key-edge:#A89A80; --roll-key-black:#14110D; --roll-key-label:#3A3024;
+  --roll-row:#2F2820; --roll-row-edge:#28221B; --roll-row-black:#241F19; --roll-bar:#4B3F31; --roll-beat:#2A241D; --roll-out:rgba(8,6,4,.42);
+  --lcd-bg:#0B0907; --lcd-hi:#E2C27A; --lcd-lo:#C3A35E; --lcd-dim:#6A5A40; --lcd-line:#2A2219;
+  --font-head:"Hiragino Mincho ProN","Yu Mincho","Noto Serif JP",serif;
+}
+:root[data-skin=old]{   /* セピアの紙、茶色のインク、レンガ色の差し色 */
+  --page:#D6C9AE; --bg:#E3D8C1; --panel:#EEE5D0; --card:#F6EFDF; --ink:#3D3022; --ink2:#5A4834; --muted:#827059; --line:#C9B999;
+  --faint:#A6957A; --faint2:#C0B194; --root:#BD872C; --tone:#5A876B; --chord:#A64A3B; --chord-tint:#EAD0C2;
+  --wheel-outer:#4A3B2A; --wheel-inner:#67533C; --grid:#E1D5BC; --grid2:#EAE1CC; --sel:rgba(166,74,59,.11); --live:#86572A; --pick:#6C5888;
+  --pressed-bg:#4A3B2A; --pressed-fg:#F6EFDF; --note:#8A5A2B; --note-edge:#68411C; --note-hi:#A5733F;
+  --lcd-bg:#2C2318; --lcd-hi:#F0D9A6; --lcd-lo:#D2B884; --lcd-dim:#7C6A4E; --lcd-line:#3E3225;
+  --font-head:"Hiragino Mincho ProN","Yu Mincho","Noto Serif JP",serif;
+}

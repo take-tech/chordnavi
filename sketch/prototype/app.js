@@ -1931,16 +1931,20 @@ const renderOctUp=octControl('octUp','octave'), renderOctBass=octControl('octBas
 $('octUp').title='上声のオクターブ';$('octBass').title='ベースのオクターブ';
 
 /* ---------- テーマ ---------- */
-const THEMES=['light','dark','auto'], THEME_LABEL={light:'ライト',dark:'ダーク',auto:'自動'};
+// テーマ（スキン）：土台（明るい light／暗い dark）と、色・見出しの書体を上書きするスキン（CSS の data-skin）
+const THEMES={light:{base:'light'},dark:{base:'dark'},auto:{base:null},
+  kawaii:{base:'light',skin:'kawaii'},cyber:{base:'dark',skin:'cyber'},modern:{base:'light',skin:'modern'},
+  luxury:{base:'dark',skin:'luxury'},old:{base:'light',skin:'old'}};
 const dark=matchMedia('(prefers-color-scheme: dark)');
 function applyTheme(){
-  const t=ui.theme==='auto'?(dark.matches?'dark':'light'):ui.theme;
+  const th=THEMES[ui.theme]||THEMES.light, t=th.base||(dark.matches?'dark':'light');
   document.documentElement.dataset.theme=t;
+  if(th.skin)document.documentElement.dataset.skin=th.skin;else delete document.documentElement.dataset.skin;
   $('themeBtn').title='設定（テーマ・ウィンドウの広げ方）';
   document.querySelectorAll('#themeMenu button[data-v]').forEach(b=>b.setAttribute('aria-checked',b.dataset.v===ui.theme));
   document.querySelectorAll('#themeMenu button[data-scale]').forEach(b=>b.setAttribute('aria-checked',b.dataset.scale===ui.scaleMode));
 }
-// テーマはメニューから選ぶ（ライト／ダーク／自動）
+// テーマはメニューから選ぶ（ライト／ダーク／自動／スキン）
 const themeMenu=$('themeMenu');
 $('themeBtn').onclick=e=>{e.stopPropagation();fileMenu.hidden=true;$('metroMenu').hidden=true;themeMenu.hidden=!themeMenu.hidden;};
 themeMenu.addEventListener('click',e=>{
