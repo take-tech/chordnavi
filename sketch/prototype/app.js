@@ -883,8 +883,9 @@ function chordEditor(p){
   bass.value=c.boff??c.off;bass.title='ベース（ルートと同じなら分数コードにしない）';
   bass.onchange=()=>{edit(cc=>{if(+bass.value===cc.off)delete cc.boff;else cc.boff=+bass.value;delete cc.v;});previewSel();};
   const close=h('button','x','×');close.title='閉じる（Esc）';close.onclick=()=>{editOpen=false;render();};
-  const head=h('div','ce-row');
-  head.append(h('b','ce-name',nameOf(song,c,p.key)),h('span','ce-deg',degOfItem(c)),h('span','spacer'),root,q,bass,close);
+  // 1段目：コード名・度数・閉じる。2段目：コード（ルート・種類・ベース）と鳴らす音の編集。3段目：長さ・パターンと複製・削除
+  const head=h('div','ce-row ce-head');
+  head.append(h('b','ce-name',nameOf(song,c,p.key)),h('span','ce-deg',degOfItem(c)+(c.v?'・鳴らす音を編集済み':'')),h('span','spacer'),close);
   const st=snapOf(b.meter), max=maxLenAt(p.start);
   const minus=h('button','','−'),plus=h('button','','＋');minus.title=plus.title='長さ（スナップ単位）';
   minus.onclick=()=>commit(()=>stretchChord(song,sel.si,sel.id,p.end-p.start-st,st,max));
@@ -896,13 +897,15 @@ function chordEditor(p){
   addPatternOptions(pat);
   pat.value=c.pattern||'';
   pat.onchange=()=>edit(cc=>{if(pat.value)cc.pattern=pat.value;else delete cc.pattern;});
-  const vbtn=h('button',c.v?'on':'','編集');vbtn.title='鳴らす音（ボイシング）を鍵盤で変える（右端のパネル。音を変えるとコード名が追随する）';
+  const vbtn=h('button',c.v?'on':'','鳴らす音を編集');vbtn.title='鳴らす音（ボイシング）を鍵盤で変える（右端のパネル。音を変えるとコード名が追随する）';
   vbtn.onclick=()=>{vedit={id:c.id};render();};
   const dup=h('button','','複製');dup.title='すぐ後ろに同じコードを置く（⌘D）';dup.onclick=duplicateSel;
   const del=h('button','del','削除');del.title='このコードを消す（⌫）';del.onclick=deleteSel;
+  const chord=h('div','ce-row');
+  chord.append(h('span','lbl ce-lbl','コード'),root,q,bass,h('span','spacer'),vbtn);
   const tail=h('div','ce-row');
-  tail.append(h('span','lbl','長さ'),minus,h('b','ce-len',fmtLen(p.end-p.start,b.meter)),plus,h('span','lbl ce-gap','パターン'),pat,h('span','spacer'),vbtn,dup,del);
-  box.append(head,tail);
+  tail.append(h('span','lbl ce-lbl','長さ'),minus,h('b','ce-len',fmtLen(p.end-p.start,b.meter)),plus,h('span','lbl ce-gap','パターン'),pat,h('span','spacer'),dup,del);
+  box.append(head,chord,tail);
   return box;
 }
 function placeChordEditor(){
