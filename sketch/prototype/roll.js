@@ -41,41 +41,48 @@ export function createRoll(root,ctx){
   const snapRound=abs=>{const b=barAt(abs);if(!b)return 0;const st=snapT();return b.start+Math.round((abs-b.start)/st)*st;};
   const h=(tag,cls,text)=>{const e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;};
   const box=(cls,x,yy,w,hh)=>{const e=h('div',cls);e.style.cssText=`left:${x}px;top:${yy}px;width:${w}px;height:${hh}px`;return e;};
+  // 横の位置・幅は tick で持ち、1 tick あたりの px（root の --ppt）を掛けて CSS が並べる。拡大を変えるときは --ppt を変えるだけで済む（描き直さない）
+  const X=t=>`calc(var(--ppt) * ${t}px)`;
+  const tbox=(cls,t0,yy,tw,hh,minus=0,min=0)=>{
+    const e=h('div',cls), w=minus||min?`max(${min}px, calc(var(--ppt) * ${tw}px - ${minus}px))`:X(tw);
+    e.style.cssText=`left:${X(t0)};top:${yy}px;width:${w};height:${hh}px`;return e;
+  };
   const midiName=(m,flat)=>noteName(m,flat)+(Math.floor(m/12)-1);
   let grid=null, scroller=null;
 
   function render(){
-    const song=ctx.song(), tl=ctx.tl(), px=ppt(), W=Math.max(1,Math.ceil(tl.total*px)), H=ROWS*ROW;
+    const song=ctx.song(), tl=ctx.tl(), px=ppt(), W=X(tl.total), H=ROWS*ROW;
     if(scroller){scrollX=scroller.scrollLeft;scrollY=scroller.scrollTop;}
-    root.innerHTML='';
-    scroller=h('div','rs');const inner=h('div','ri');inner.style.width=KEYW+W+'px';inner.style.height=HEAD+H+'px';
+    clearTimeout(zoomTimer);
+    root.innerHTML='';root.style.setProperty('--ppt',px);
+    scroller=h('div','rs');const inner=h('div','ri');inner.style.width=`calc(var(--ppt) * ${tl.total}px + ${KEYW}px)`;inner.style.height=HEAD+H+'px';
     scroller.appendChild(inner);root.appendChild(scroller);
     const flat=isFlatKey(song.key.idx);
 
     /* 上の帯：セクション・小節番号（押すとカーソル）・コード */
-    const head=h('div','rh');head.style.width=KEYW+W+'px';
+    const head=h('div','rh');head.style.width=inner.style.width;
     const corner=h('div','rc');corner.append(h('span','',''));
-    const hg=h('div','rhg');hg.style.width=W+'px';
+    const hg=h('div','rhg');hg.style.width=W;
     tl.secRanges.forEach(({from,to},si)=>{
       if(from===to)return;
-      const s=song.sections[si], x0=tl.bars[from].start*px, x1=(tl.bars[to-1].start+tl.bars[to-1].ticks)*px;
-      const e=box('rsec',x0,0,x1-x0,18);e.style.setProperty('--c',SECTION_COLORS[s.color]||SECTION_COLORS[0]);
+      const s=song.sections[si], t0=tl.bars[from].start, t1=tl.bars[to-1].start+tl.bars[to-1].ticks;
+      const e=tbox('rsec',t0,0,t1-t0,18);e.style.setProperty('--c',SECTION_COLORS[s.color]||SECTION_COLORS[0]);
       e.append(h('span','',s.name));e.title=s.name;hg.appendChild(e);
     });
     const rg0=ctx.range();
     for(const b of tl.bars){
       const on=rg0&&b.gi>=rg0.from&&b.gi<rg0.to;
-      const e=box('rbar'+(on?' on':''),b.start*px,18,b.ticks*px,16);e.append(h('span','',String(b.gi+1)));
+      const e=tbox('rbar'+(on?' on':''),b.start,18,b.ticks,16);e.append(h('span','',String(b.gi+1)));
       e.dataset.gi=b.gi;e.title='押すとカーソルをここに置く・横にドラッグで小節の範囲を選ぶ';hg.appendChild(e);
     }
     const pcs=placedChords(song,tl);
     for(const p of pcs){
-      const e=box('rchord',p.start*px,36,Math.max(2,(p.end-p.start)*px-2),24);e.dataset.id=p.c.id;
+      const e=tbox('rchord',p.start,36,p.end-p.start,24,2,2);e.dataset.id=p.c.id;
       e.append(h('span','',ctx.chordName(p)));e.title=ctx.chordName(p);hg.appendChild(e);
     }
     hg.addEventListener('pointerdown',e=>{
       if(e.button!==0)return;
-      const r=hg.getBoundingClientRect(), k=r.width/hg.offsetWidth, abs=(e.clientX-r.left)/k/px;
+      const r=hg.getBoundingClientRect(), k=r.width/hg.offsetWidth, abs=(e.clientX-r.left)/k/ppt();
       if(e.target.closest('.rbar'))return barRange(e,abs,k);
       ctx.setCursorAbs(Math.max(0,Math.min(tl.total-1,snapFloor(abs))));
     });
@@ -92,20 +99,20 @@ export function createRoll(root,ctx){
     inner.appendChild(keys);
 
     /* ピアノロール */
-    grid=h('div','rg');grid.style.width=W+'px';grid.style.height=H+'px';
+    grid=h('div','rg');grid.style.width=W;grid.style.height=H+'px';
     // 行：スケールのガイドがオフなら黒鍵の行を少し暗く。オンならスケールの外の行を灰色にする（スケールの音の行は白いまま）
     const gs=ctx.ui.guideScale;
-    for(let m=HIGH;m>=LOW;m--)grid.appendChild(box('rrow'+(!gs&&BLACK.has(m%12)?' black':''),0,y(m),W,ROW));
+    for(let m=HIGH;m>=LOW;m--){const e=box('rrow'+(!gs&&BLACK.has(m%12)?' black':''),0,y(m),0,ROW);e.style.width='100%';grid.appendChild(e);}
     if(gs){
       let i=0;
       while(i<tl.bars.length){   // キーが続く範囲ごと
         const k=tl.bars[i].key;let j=i+1;
         while(j<tl.bars.length&&tl.bars[j].key===k)j++;
         const t=tonicOf(k.idx,k.mode), iv=new Set(scaleById(keyScale(k)).iv.map(x=>mod12(t+x)));
-        const x0=tl.bars[i].start*px, x1=(tl.bars[j-1].start+tl.bars[j-1].ticks)*px;
+        const t0=tl.bars[i].start, t1=tl.bars[j-1].start+tl.bars[j-1].ticks;
         for(let m=LOW;m<=HIGH;m++){
-          if(!iv.has(m%12))grid.appendChild(box('gout',x0,y(m),x1-x0,ROW));
-          else if(m%12===t)grid.appendChild(box('gtonic',x0,y(m),x1-x0,ROW));
+          if(!iv.has(m%12))grid.appendChild(tbox('gout',t0,y(m),t1-t0,ROW));
+          else if(m%12===t)grid.appendChild(tbox('gtonic',t0,y(m),t1-t0,ROW));
         }
         i=j;
       }
@@ -114,33 +121,33 @@ export function createRoll(root,ctx){
     if(ctx.ui.guideChord)for(const p of pcs){
       const ch=p.ch, tones=new Map((CHORD[ch.q]?.iv||[]).map(x=>[mod12(ch.root+x),TONE_LABEL[mod12(x)]]));
       if(ch.bass!=null&&!tones.has(ch.bass))tones.set(ch.bass,'B');
-      const x0=p.start*px, w=(p.end-p.start)*px;
+      const w=(p.end-p.start)*px;
       for(let m=LOW;m<=HIGH;m++){
         const lb=tones.get(m%12);if(lb==null)continue;
-        const e=box('gtone'+(m%12===ch.root?' root':''),x0,y(m),w,ROW);
+        const e=tbox('gtone'+(m%12===ch.root?' root':''),p.start,y(m),p.end-p.start,ROW);
         if(w>=22)e.append(h('span','',lb));
         grid.appendChild(e);
       }
     }
     // 小節線・拍の線
     for(const b of tl.bars){
-      const e=box('gbar',b.start*px,0,b.ticks*px,H);
-      const beat=PPQ*4/b.meter[1]*px;e.style.setProperty('--beat',beat+'px');
+      const e=tbox('gbar',b.start,0,b.ticks,H);
+      e.style.setProperty('--beat',X(PPQ*4/b.meter[1]));
       grid.appendChild(e);
     }
     // 音
     for(const x of placedNotes(song,tl)){
       const w=Math.max(3,(x.end-x.start)*px-1);
-      const e=box('note'+(nsel.has(x.m.id)?' sel':''),x.start*px,y(x.midi),w,ROW-1);
+      const e=tbox('note'+(nsel.has(x.m.id)?' sel':''),x.start,y(x.midi),x.end-x.start,ROW-1,1,3);
       e.dataset.id=x.m.id;
       if(w>=30)e.append(h('span','',midiName(x.midi,flat)));
       e.title=`${midiName(x.midi,flat)}・${ctx.fmtPos(x.start)}`;
       grid.appendChild(e);
     }
     // 選んでいる小節の範囲
-    if(rg0){const a=tl.bars[rg0.from], z=tl.bars[rg0.to-1];if(a&&z)grid.appendChild(box('rrange',a.start*px,0,(z.start+z.ticks-a.start)*px,H));}
+    if(rg0){const a=tl.bars[rg0.from], z=tl.bars[rg0.to-1];if(a&&z)grid.appendChild(tbox('rrange',a.start,0,z.start+z.ticks-a.start,H));}
     // カーソル
-    const cur=box('rcursor',ctx.cursorAbs()*px,0,2,H);grid.appendChild(cur);
+    const cur=box('rcursor',0,0,2,H);cur.style.left=X(ctx.cursorAbs());grid.appendChild(cur);
     playhead=box('rplay',0,0,2,H);playhead.hidden=true;grid.appendChild(playhead);
     inner.appendChild(grid);
     grid.addEventListener('pointerdown',onDown);
@@ -151,27 +158,26 @@ export function createRoll(root,ctx){
     scroller.addEventListener('scroll',()=>{scrollX=scroller.scrollLeft;scrollY=scroller.scrollTop;});
   }
 
-  // 横の拡大を z（4分音符あたりの px）にする。anchorX（画面の x）の下の位置がずれないようにスクロールを合わせる（省くと見えている範囲の左端）
-  let zoomFrame=0, pendingZoom=null;
+  // 横の拡大を z（4分音符あたりの px）にする。anchorX（画面の x）の下の位置がずれないようにスクロールを合わせる（省くと見えている範囲の左端）。
+  // --ppt を変えるだけで並べ直す（ピンチがなめらかになるように描き直さない）。止まって 200ms たったら描き直す（音名・度数を出す幅の判定）
+  let zoomTimer=0;
   function setZoom(z,anchorX=null){
-    pendingZoom={z:clampZoom(z),anchorX};
-    if(zoomFrame)return;
-    zoomFrame=setTimeout(()=>{   // 続けて届く拡大をまとめて1回だけ描き直す
-      zoomFrame=0;const {z,anchorX}=pendingZoom;pendingZoom=null;
-      if(!scroller||Math.abs(z-clampZoom(ctx.ui.mZoom))<.01)return;
-      const r=scroller.getBoundingClientRect(), k=r.width/(scroller.offsetWidth||1);
-      const off=anchorX==null?0:Math.max(0,(anchorX-r.left)/k-KEYW);   // 鍵盤の右からの距離（px）
-      const tick=(scroller.scrollLeft+off)/ppt();
-      ctx.ui.mZoom=z;ctx.zoomChanged?.();
-      render();
-      scroller.scrollLeft=Math.max(0,tick*ppt()-off);scrollX=scroller.scrollLeft;
-    },16);
+    z=clampZoom(z);
+    if(!scroller||Math.abs(z-clampZoom(ctx.ui.mZoom))<.01)return;
+    const r=scroller.getBoundingClientRect(), k=r.width/(scroller.offsetWidth||1);
+    const off=anchorX==null?0:Math.max(0,(anchorX-r.left)/k-KEYW);   // 鍵盤の右からの距離（px）
+    const tick=(scroller.scrollLeft+off)/ppt();
+    ctx.ui.mZoom=z;
+    root.style.setProperty('--ppt',ppt());
+    scroller.scrollLeft=Math.max(0,tick*ppt()-off);scrollX=scroller.scrollLeft;
+    ctx.zoomChanged?.();
+    clearTimeout(zoomTimer);zoomTimer=setTimeout(render,200);
   }
   // トラックパッドの2本指で広げる・つまむ：Chrome・WebView2 は ctrl 付きのホイール、Safari・WKWebView はジェスチャー
   root.addEventListener('wheel',e=>{
     if(!e.ctrlKey)return;
     e.preventDefault();
-    setZoom((pendingZoom?.z??clampZoom(ctx.ui.mZoom))*Math.exp(-e.deltaY*.01),e.clientX);
+    setZoom(clampZoom(ctx.ui.mZoom)*Math.exp(-e.deltaY*.01),e.clientX);
   },{passive:false});
   let gestureZ=null;
   root.addEventListener('gesturestart',e=>{e.preventDefault();gestureZ=clampZoom(ctx.ui.mZoom);});
@@ -418,7 +424,7 @@ export function createRoll(root,ctx){
     if(!playhead||!scroller)return;
     if(abs==null){playhead.hidden=true;grid?.querySelectorAll('.note.playing').forEach(n=>n.classList.remove('playing'));return;}
     const x=abs*ppt();
-    playhead.hidden=false;playhead.style.left=x+'px';
+    playhead.hidden=false;playhead.style.left=X(abs);
     const view=scroller.clientWidth-KEYW;
     if(x<scroller.scrollLeft||x>scroller.scrollLeft+view-20)scroller.scrollLeft=Math.max(0,x-view*.15);
     const on=new Set(noteData().filter(n=>abs>=n.start&&abs<n.end).map(n=>n.m.id));
