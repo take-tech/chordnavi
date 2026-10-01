@@ -172,3 +172,10 @@ button,svg{-webkit-user-drag:none}
 .detail-head .actions{flex-shrink:0}
 .detail.longdeg .detail-head{flex-wrap:wrap;row-gap:0;margin-bottom:6px}
 .detail.longdeg .detail-head .deg{order:3;flex:1 1 100%;white-space:normal;overflow:visible}
+
+/* ギターのチューニング：指板の左の弦の欄の − ＋ で弦ごとに半音ずつ、見出しの右で弦の数 */
+.tune-reset{font:inherit;font-size:11px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:4px;padding:1px 8px;cursor:pointer}
+.tune-reset:disabled{opacity:.4;cursor:default}
+#fb .tune{fill:transparent;cursor:pointer}
+#fb .tune:hover{fill:rgba(30,39,66,.08)}
+#fb .tune:active{fill:rgba(30,39,66,.18)}
