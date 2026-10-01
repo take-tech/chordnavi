@@ -145,7 +145,7 @@ juce_add_binary_data(ChordSketchUIData
 )
 
 juce_add_plugin(ChordSketch
-    VERSION                     0.1.0
+    VERSION                     0.9.0
     COMPANY_NAME                Ranze
     PLUGIN_MANUFACTURER_CODE    Rnze
     PLUGIN_CODE                 Cdsk
