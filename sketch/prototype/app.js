@@ -306,6 +306,56 @@ $('progPlay').onclick=()=>{
     onPos:()=>{},onEnd:()=>{progPreview=false;render();}});
   render();
 };
+// プリセットの進行をシートへドラッグ：小節の上なら、その小節から上書きで入れる（「挿入」と同じ）。
+// 何もないところ（セクションの外）なら、その進行の小節数で新しいセクションを作って入れる（名前は、直前のセクションの次の定番の名前）
+$('progNames').title='シートへドラッグ：小節の上ならそこから入れる、何もないところなら新しいセクションを作る';
+$('progNames').addEventListener('pointerdown',e=>{
+  if(e.button!==0)return;
+  e.preventDefault();
+  const x0=e.clientX,y0=e.clientY, bars=curBars(), label=`${curProg().name}（${bars.length}小節）`;
+  let dragging=false,target=null,last=null;
+  const addSec=()=>sheet.querySelector('.add-sec');
+  // シートの上下の端に近いあいだは自動でスクロール（下の何もないところ・「セクションを追加」まで届くように）
+  const timer=setInterval(()=>{
+    if(!dragging||!last)return;
+    const r=sheet.getBoundingClientRect(), k=r.height/(sheet.offsetHeight||1), edge=40*k;
+    const d=last.clientY>r.bottom-edge?14:last.clientY<r.top+edge&&last.clientY>r.top-60?-14:0;
+    if(d&&last.clientX>r.left&&last.clientX<r.right){const t0=sheet.scrollTop;sheet.scrollTop+=d;if(sheet.scrollTop!==t0)move(last);}
+  },30);
+  const clear=()=>{showDrop(null);addSec()?.classList.remove('drop-new');};
+  const move=ev=>{
+    if(!dragging&&Math.hypot(ev.clientX-x0,ev.clientY-y0)<4)return;
+    dragging=true;last=ev;
+    ghost.hidden=false;ghost.textContent=label;ghost.style.left=ev.clientX+10+'px';ghost.style.top=ev.clientY+8+'px';
+    clear();target=null;
+    const hit=hitBar(ev.clientX,ev.clientY);
+    if(hit){target={gi:hit.b.gi};showDrop(hit.b.gi,0,hit.b.ticks);ghost.textContent=label+' → '+(hit.b.gi+1)+'小節目から';return;}
+    const el=document.elementFromPoint(ev.clientX,ev.clientY);
+    if(el&&sheet.contains(el)&&!el.closest('.sec')){target={add:true};addSec()?.classList.add('drop-new');ghost.textContent=label+' → 新しいセクション';}
+  };
+  const up=()=>{
+    removeEventListener('pointermove',move);removeEventListener('pointerup',up);clearInterval(timer);
+    ghost.hidden=true;clear();
+    if(!dragging||!target)return;
+    stopProgPreview();
+    let r=null;
+    if(target.add){
+      // 名前：直前のセクションの次の定番の名前（Aメロ → Bメロ → サビ…）。使い終わっていれば、まだ使っていない名前（Intro は除く）
+      const used=new Set(song.sections.map(x=>x.name)), li=SECTION_PRESETS.findIndex(x=>x.name===song.sections.at(-1)?.name);
+      const pr=SECTION_PRESETS.slice(li+1).find(x=>!used.has(x.name))||SECTION_PRESETS.slice(1).find(x=>!used.has(x.name));
+      commit(()=>{
+        const from=timeline(song).bars.length;
+        song.sections.push(newSection(pr?pr.name:`セクション${song.sections.length+1}`,pr?pr.color:song.sections.length%SECTION_COLORS.length,bars.length));
+        r=insertProgression(song,from,bars);
+      });
+      toast(`「${song.sections.at(-1).name}」を作りました`);
+    }else commit(()=>{r=insertProgression(song,target.gi,bars);});
+    if(!r)return;
+    sel=null;range=r;cursor={gi:r.from,pos:0};
+    render();scrollToBar(r.from);
+  };
+  addEventListener('pointermove',move);addEventListener('pointerup',up);
+});
 $('progIns').onclick=()=>{
   stopProgPreview();
   const gi=cursor.gi;let r;

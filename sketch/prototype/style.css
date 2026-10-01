@@ -466,3 +466,7 @@ body.grabbing,body.grabbing *{cursor:grabbing!important}
 .vfoot{display:flex;gap:6px;padding:6px 8px;justify-content:space-between}
 .blk.custom::after{content:'✎';position:absolute;right:3px;bottom:1px;font-size:9px;color:var(--live)}
 .chip-edit button.on{border-color:var(--live);color:var(--live)}
+
+/* プリセットの進行のドラッグ：何もないところに落とすと新しいセクション */
+#progNames{cursor:grab}
+.add-sec.drop-new{outline:2px dashed var(--live);outline-offset:4px;border-radius:4px;background:var(--sel)}
