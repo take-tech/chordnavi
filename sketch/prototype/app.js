@@ -1009,14 +1009,14 @@ function playRange(){
   if(range)return range;
   return {from:cursor.gi,to:tl.bars.length};
 }
-function startPlay(){
+// r：再生する小節の範囲（省くとカーソル・選択範囲から）、countIn：カウントインの小節数（省くと設定どおり）
+function startPlay(r=playRange(),countIn=ui.countIn?ui.countBars:0){
   if(!tl.bars.length)return;
   progPreview=false;
-  const r=playRange();
   playFrom=rangeTicks(tl,r).from;
   player.play({
     render:()=>audible(renderSong(song,rangeTicks(tl,r))),
-    loop:()=>ui.loop, countIn:ui.countIn?ui.countBars:0, metronome:()=>ui.metroOn?ui.metro:'off', timbre:()=>ui.timbre,melodyTimbre:()=>ui.mTimbre,
+    loop:()=>ui.loop, countIn, metronome:()=>ui.metroOn?ui.metro:'off', timbre:()=>ui.timbre,melodyTimbre:()=>ui.mTimbre,
     onPos:(t,counting,cnt)=>onPos(t==null?null:playFrom+t,counting,cnt),
     onEnd:()=>{finishRec();playTick=null;playingId=null;render();}
   });
@@ -1025,27 +1025,29 @@ function startPlay(){
 function togglePlay(){if(player.isPlaying()){player.stop();finishRec();progPreview=false;playTick=null;playingId=null;render();}else startPlay();}
 
 /* ---------- リアルタイム録音（メロディー） ----------
-   ● を押すと、カウントイン（設定どおり）のあとカーソルの小節（範囲があれば範囲）から再生しながら、MIDI 鍵盤で弾いた音を録る。
+   ● を押すと、録る位置（カーソルの小節、範囲があれば範囲の頭）の1小節前から再生し（プリロール）、録る位置から MIDI 鍵盤で弾いた音を録る。
+   曲の1小節目から録るときは前の小節が無いので、カウントイン（設定の小節数、オフなら1小節）。ループでは1小節前も含めて繰り返す。
    今ある音には重ねる。止めたら（●・■・Space・曲の終わり）まとめて入れる（⌘Z 1回で戻せる）。クオンタイズはあとで（Q）。
    時刻：JUCE 版は C++ が MIDI を受けた瞬間の曲の位置（recNotes）、ブラウザは受けたときの WebAudio の時計 */
-let rec=null;   // {from, to, tempos, notes:[{abs,len,n,v}], open:Map(音 → {abs,v})}
+let rec=null;   // {from, to（録る範囲）, playFrom, playLen（再生する範囲）, tempos, notes:[{abs,len,n,v}], open:Map(音 → {abs,v})}
 const nSetRec=nativeFn('setRecording');
 function startRec(){
   if(player.isPlaying()){player.stop();finishRec();}
   if(ui.view!=='melody'){ui.view='melody';persist();}
-  const rr=rangeTicks(tl,playRange());
-  rec={from:rr.from,to:rr.to,tempos:renderSong(song,rr).tempos,notes:[],open:new Map()};
+  const r=playRange(), pre=r.from>0?{from:r.from-1,to:r.to}:r;
+  const rr=rangeTicks(tl,r), pr=rangeTicks(tl,pre);
+  rec={from:rr.from,to:rr.to,playFrom:pr.from,playLen:pr.to-pr.from,tempos:renderSong(song,pr).tempos,notes:[],open:new Map()};
   nSetRec?.(true).catch(e=>console.error(e));
   roll.clearSelection();
-  startPlay();
+  startPlay(pre,pre===r?(ui.countIn?ui.countBars:1):0);
 }
-// 周の頭からの秒 → 曲の tick（ループなら周の中に折り返す。カウントイン中の負の時刻は範囲の頭より前）
+// 周の頭（プリロールの頭）からの秒 → 曲の tick（ループなら周の中に折り返す。カウントイン中の負の時刻は再生の頭より前）
 function recAbs(sec){
-  const len=rec.to-rec.from;
-  if(sec<0)return rec.from+Math.round(sec*rec.tempos[0].bpm/60*PPQ);
+  const len=rec.playLen;
+  if(sec<0)return rec.playFrom+Math.round(sec*rec.tempos[0].bpm/60*PPQ);
   let t=secToTick(rec.tempos,sec);
   if(ui.loop&&len>0)t%=len;else t=Math.min(t,len);
-  return rec.from+Math.round(t);
+  return rec.playFrom+Math.round(t);
 }
 function recEvent(sec,n,v,on){
   if(!rec)return;
@@ -1063,7 +1065,7 @@ function finishRec(){
   const cur=playTick??rec.to;
   for(const n of [...rec.open.keys()])recOff(n,Math.max(cur,(rec.open.get(n)?.abs??0)+20));
   nSetRec?.(false).catch(e=>console.error(e));
-  // 範囲の頭より前（カウントイン中）に弾き始めた音は頭から。頭より前で終わった音は捨てる
+  // 録る位置より前（プリロール・カウントイン中）に弾き始めた音は録る位置から。それより前で終わった音は捨てる
   const got=rec.notes.map(x=>({...x,s:Math.max(x.abs,rec.from)})).filter(x=>x.abs+x.len>x.s);
   const r=rec;rec=null;
   roll.setRecNotes([]);
@@ -1084,7 +1086,7 @@ onNative('recNotes',({events})=>{
 function recDisplay(abs){
   const list=rec.notes.map(x=>({start:Math.max(x.abs,rec.from),end:x.abs+x.len,midi:x.n}));
   for(const [n,o] of rec.open)list.push({start:Math.max(o.abs,rec.from),end:Math.max(abs,o.abs+20),midi:n});
-  return list;
+  return list.filter(x=>x.end>x.start);   // プリロール中だけの音は出さない
 }
 // カウントインの「•」：大きな拍（6/8 なら付点4分）で数える。8つを超えるなら今の小節の分だけ並べ、前に「2/2」のように小節を出す
 function renderCountDots(disp,cnt,m){
