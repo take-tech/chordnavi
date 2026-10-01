@@ -935,6 +935,20 @@ function deleteRangeBars(){
 }
 
 /* ---------- キーボード ---------- */
+// Space は、文字を入れる欄（曲名・小節数など）以外なら、どこにフォーカスがあっても再生／停止（録音中は録音を止める）。
+// ボタン・選択欄・五度圏を押したあとでも効くように、ほかより先（capture）で受けて、ボタンが押される既定の動きは止める
+const typing=t=>!!t?.matches?.('textarea,[contenteditable=true],input:not([type=checkbox]):not([type=radio]):not([type=button])');
+addEventListener('keydown',e=>{
+  if(e.key!==' '||e.metaKey||e.ctrlKey||e.altKey||typing(e.target))return;
+  if(document.querySelector('.dialog-wrap')||!$('printWrap').hidden)return;   // 確認のダイアログ・コード譜のプレビューではそちらに任せる
+  e.preventDefault();e.stopPropagation();
+  const a=document.activeElement;if(a&&a!==document.body&&a!==sheet&&a!==$('roll'))a.blur();
+  if(e.repeat)return;
+  rec?toggleRec():togglePlay();
+},true);
+addEventListener('keyup',e=>{if(e.key===' '&&!typing(e.target)&&!document.querySelector('.dialog-wrap'))e.preventDefault();},true);
+// 選択欄（キー・スケール・音色など）は選んだらフォーカスを外す（そのあとのキー操作をすぐ使えるように）
+document.addEventListener('change',e=>{if(e.target.matches?.('select'))e.target.blur();});
 addEventListener('keydown',e=>{
   if((e.metaKey||e.ctrlKey)&&(e.key.toLowerCase()==='s'||e.key.toLowerCase()==='o')){
     e.preventDefault();
