@@ -15,7 +15,11 @@ import {CHORD,mod12,noteName,scaleById,tonicOf,isFlatKey} from '../../shared/ui/
 export const M_SNAPS=[{id:'4',name:'4分',t:480},{id:'8',name:'8分',t:240},{id:'16',name:'16分',t:120},{id:'8t',name:'3連8分',t:160}];
 export const M_LENS=[{id:'1',name:'全音符',t:1920},{id:'2',name:'2分',t:960},{id:'4.',name:'付点4分',t:720},{id:'4',name:'4分',t:480},
   {id:'8.',name:'付点8分',t:360},{id:'8',name:'8分',t:240},{id:'8t',name:'3連8分',t:160},{id:'16',name:'16分',t:120}];
-export const M_ZOOMS=[22,34,52];   // 4分音符あたりの横幅（px）
+// 横の拡大：4分音符あたりの横幅（px）。表示のスライダー（0〜100）とは対数でつなぐ
+export const ZOOM_MIN=10, ZOOM_MAX=150, ZOOM_DEFAULT=34;
+export const clampZoom=z=>Math.max(ZOOM_MIN,Math.min(ZOOM_MAX,+z||ZOOM_DEFAULT));
+export const zoomToSlider=z=>Math.round(Math.log(clampZoom(z)/ZOOM_MIN)/Math.log(ZOOM_MAX/ZOOM_MIN)*100);
+export const sliderToZoom=v=>ZOOM_MIN*Math.pow(ZOOM_MAX/ZOOM_MIN,v/100);
 const ROW=14, KEYW=46, HEAD=62, LOW=MELODY_LOW, HIGH=MELODY_HIGH, ROWS=HIGH-LOW+1;
 const BLACK=new Set([1,3,6,8,10]);
 // コードの構成音の、ルートからの度数の書き方（半音の数 → 表記）。分数コードのベースは B
@@ -29,7 +33,7 @@ export function createRoll(root,ctx){
   let playhead=null, lastClick={id:null,t:0};
   const snapT=()=>(M_SNAPS.find(x=>x.id===ctx.ui.mSnap)||M_SNAPS[1]).t;
   const lenT=()=>(M_LENS.find(x=>x.id===ctx.ui.mLen)||M_LENS[5]).t;
-  const ppt=()=>M_ZOOMS[ctx.ui.mZoom??1]/PPQ;   // 1 tick あたりの px
+  const ppt=()=>clampZoom(ctx.ui.mZoom)/PPQ;   // 1 tick あたりの px
   const y=midi=>(HIGH-midi)*ROW;
   const barAt=abs=>{const tl=ctx.tl();return tl.bars.find(b=>abs>=b.start&&abs<b.start+b.ticks)||tl.bars.at(-1);};
   // 小節の頭を基準にスナップ（7/8 などでも拍の頭がずれない）
@@ -146,6 +150,33 @@ export function createRoll(root,ctx){
     if(first){first=false;scroller.scrollTop=scrollY;}
     scroller.addEventListener('scroll',()=>{scrollX=scroller.scrollLeft;scrollY=scroller.scrollTop;});
   }
+
+  // 横の拡大を z（4分音符あたりの px）にする。anchorX（画面の x）の下の位置がずれないようにスクロールを合わせる（省くと見えている範囲の左端）
+  let zoomFrame=0, pendingZoom=null;
+  function setZoom(z,anchorX=null){
+    pendingZoom={z:clampZoom(z),anchorX};
+    if(zoomFrame)return;
+    zoomFrame=setTimeout(()=>{   // 続けて届く拡大をまとめて1回だけ描き直す
+      zoomFrame=0;const {z,anchorX}=pendingZoom;pendingZoom=null;
+      if(!scroller||Math.abs(z-clampZoom(ctx.ui.mZoom))<.01)return;
+      const r=scroller.getBoundingClientRect(), k=r.width/(scroller.offsetWidth||1);
+      const off=anchorX==null?0:Math.max(0,(anchorX-r.left)/k-KEYW);   // 鍵盤の右からの距離（px）
+      const tick=(scroller.scrollLeft+off)/ppt();
+      ctx.ui.mZoom=z;ctx.zoomChanged?.();
+      render();
+      scroller.scrollLeft=Math.max(0,tick*ppt()-off);scrollX=scroller.scrollLeft;
+    },16);
+  }
+  // トラックパッドの2本指で広げる・つまむ：Chrome・WebView2 は ctrl 付きのホイール、Safari・WKWebView はジェスチャー
+  root.addEventListener('wheel',e=>{
+    if(!e.ctrlKey)return;
+    e.preventDefault();
+    setZoom((pendingZoom?.z??clampZoom(ctx.ui.mZoom))*Math.exp(-e.deltaY*.01),e.clientX);
+  },{passive:false});
+  let gestureZ=null;
+  root.addEventListener('gesturestart',e=>{e.preventDefault();gestureZ=clampZoom(ctx.ui.mZoom);});
+  root.addEventListener('gesturechange',e=>{e.preventDefault();if(gestureZ!=null)setZoom(gestureZ*e.scale,e.clientX);});
+  root.addEventListener('gestureend',e=>{e.preventDefault();gestureZ=null;});
 
   // 画面上の点 → 曲の tick・音の高さ（画面の拡大縮小を戻す）
   function hit(ev){
@@ -471,5 +502,5 @@ export function createRoll(root,ctx){
   // 休符：カーソルを入力の長さだけ進める
   function stepRest(){const tl=ctx.tl();ctx.setCursorAbs(Math.min(tl.total-1,ctx.cursorAbs()+lenT()));reveal(ctx.cursorAbs());}
 
-  return {render,onKey,setPlayhead,reveal,selection,clearSelection,deleteSelection,selectRange,joinSelection,splitSelection,quantizeSelection,setRecNotes,stepInput,stepRest,newNote};
+  return {render,setZoom,onKey,setPlayhead,reveal,selection,clearSelection,deleteSelection,selectRange,joinSelection,splitSelection,quantizeSelection,setRecNotes,stepInput,stepRest,newNote};
 }

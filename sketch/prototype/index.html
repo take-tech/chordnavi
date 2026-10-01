@@ -104,7 +104,7 @@
       <label class="fld only-melody" title="クリック・MIDI 鍵盤のステップ入力で置く音の長さ">長さ <select id="mLen"></select></label>
       <span class="lbl" title="1行に並べる小節の数">表示</span>
       <div class="seg small only-chords" id="rowSeg" title="1行に並べる小節の数"><button data-v="4" title="1行に4小節">4</button><button data-v="8" title="1行に8小節">8</button></div>
-      <div class="seg small only-melody" id="zoomSeg" title="横の拡大"><button data-v="0" title="縮小">小</button><button data-v="1">中</button><button data-v="2" title="拡大">大</button></div>
+      <input type="range" id="zoomBar" class="only-melody zoom-bar" min="0" max="100" step="1" aria-label="横の拡大" title="横の拡大（ピアノロールの上でトラックパッドを2本指で広げる・つまむでも）">
       <span class="spacer"></span>
       <select id="midiParts" aria-label="MIDI に入れるもの" title="MIDI のドラッグ・保存に入れるもの（両方なら、コードとメロディーの2トラック）">
         <option value="both">コード＋メロ</option><option value="chords">コードのみ</option><option value="melody">メロのみ</option></select>

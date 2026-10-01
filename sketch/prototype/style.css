@@ -371,7 +371,7 @@ body.grabbing,body.grabbing *{cursor:grabbing!important}
 /* メロディー（ピアノロール）。.main.melody のときだけ .only-melody を出し、.only-chords を隠す */
 .main:not(.melody) .only-melody,.main.melody .only-chords{display:none!important}
 .view-seg button{font-weight:700;padding:2px 12px}
-#mSnap{width:78px}#mLen{width:86px}#midiParts{width:108px}
+#mSnap{width:78px}.zoom-bar{width:96px;accent-color:var(--ink2)}#mLen{width:86px}#midiParts{width:108px}
 .roll{flex:1;min-height:0;position:relative;outline:none;overflow:hidden}
 .roll[hidden]{display:none}
 .roll .rs{position:absolute;inset:0;overflow:auto}

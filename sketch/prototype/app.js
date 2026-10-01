@@ -6,7 +6,7 @@ import {PPQ,METERS,SNAPS,snapTicks,barTicksOf,beatTicksOf,SECTION_COLORS,SECTION
   newSong,demoSong,newSection,newChord,cloneSection,timeline,placedChords,placeChord,removeChord,resizeChord,
   setSectionBars,insertBars,appendSectionFrom,stretchChord,stretchChordStart,pruneMarks,mergeSections,splitSection,insertProgression,setMark,rangeTicks,copyRange,pasteAt,renderSong,buildSmf,safeFileName,
   songTonic,songFlat,nameOf,tempoAt,PATTERN_GROUPS,NEW_TITLE,SKETCH_SCALES,keyScale,defaultScale,meterAt,tickToSec,withExtension,keyTonic,sameKey,setKeyMark,keyRegion,transposeBars,voicingOf,patternById,VOICINGS,GUITAR_AREAS,melodyBase,addNote,secToTick} from './song.js';
-import {createRoll,M_SNAPS,M_LENS} from './roll.js';
+import {createRoll,M_SNAPS,M_LENS,ZOOM_DEFAULT,clampZoom,zoomToSlider,sliderToZoom} from './roll.js';
 import * as player from './player.js';
 import {hasNative,nativeFn,onNative} from '../../shared/ui/juce-bridge.js';
 
@@ -14,7 +14,7 @@ import {hasNative,nativeFn,onNative} from '../../shared/ui/juce-bridge.js';
 const STORE='chordsketch.v1';
 const UI_DEFAULT={snap:'beat',perRow:4,insLen:'bar',dia:'7',timbre:'piano',metro:'click',metroOn:true,countIn:false,countBars:1,loop:false,keepNames:false,step:false,theme:'light',prog:{major:0,minor:13},progVar:0,
   // メロディー（ピアノロール）：表示・スナップ・入力の長さ・横の拡大・音色・鳴らすもの・ガイド、MIDI に入れるもの
-  view:'chords',mSnap:'8',mLen:'8',mZoom:1,mTimbre:'square',hearChords:true,hearMelody:true,guideChord:true,guideScale:true,midiParts:'both',mTimbreSet:false,mTool:'draw',
+  view:'chords',mSnap:'8',mLen:'8',mZoom:ZOOM_DEFAULT,mTimbre:'square',hearChords:true,hearMelody:true,guideChord:true,guideScale:true,midiParts:'both',mTimbreSet:false,mTool:'draw',
   scaleMode:'zoom'};   // ウィンドウを広げたとき：zoom＝全体を拡大、expand＝大きさはそのままで広げる
 let song, ui={...UI_DEFAULT};
 let tl;                     // timeline(song) のキャッシュ（changed() で更新）
@@ -64,6 +64,9 @@ try{
 if(ui.metro==='off'){ui.metro='click';ui.metroOn=false;}
 // メロディーの既定の音色をリードから矩形波に変えた（2026-10-01）。前の既定のままなら矩形波にする（一度だけ）
 if(!ui.mTimbreSet){if(ui.mTimbre==='lead')ui.mTimbre='square';ui.mTimbreSet=true;}
+// 前の保存形式：横の拡大が 小・中・大（0・1・2）だったら px に
+if(ui.mZoom>=0&&ui.mZoom<=2&&Number.isInteger(ui.mZoom))ui.mZoom=[22,34,52][ui.mZoom];
+ui.mZoom=clampZoom(ui.mZoom);
 song=song||demoSong();
 if(!docs.length)docs=[{song,file:''}];
 docs[active].song=song;
@@ -1658,6 +1661,7 @@ const roll=createRoll($('roll'),{
   setCursorAbs:(abs,redraw=true)=>{const b=tl.bars.find(x=>abs>=x.start&&abs<x.start+x.ticks)||tl.bars.at(-1);cursor={gi:b.gi,pos:Math.max(0,abs-b.start)};range=null;sel=null;if(redraw)render();},
   fmtPos:abs=>{const b=tl.bars.find(x=>abs>=x.start&&abs<x.start+x.ticks);return b?fmtPos(b.gi,abs-b.start):'';},
   playingChord:()=>playingId,
+  zoomChanged:()=>{$('zoomBar').value=zoomToSlider(ui.mZoom);persist();},
   range:()=>range,
   // 小節の範囲を選ぶ（null で外す）。コードの画面と同じ range なので、再生・MIDI のドラッグにも使う
   setRange:r=>{range=r?{...r,anchor:r.from}:null;if(r)cursor={gi:r.from,pos:0};sel=null;render();},
@@ -1672,7 +1676,8 @@ $('mSnap').addEventListener('change',e=>uiSet('mSnap',e.target.value));
 $('mLen').addEventListener('change',e=>uiSet('mLen',e.target.value));
 $('mTimbre').addEventListener('change',e=>{uiSet('mTimbre',e.target.value);player.setLiveTimbre(liveTimbre());player.refresh();player.playNotes([melodyBase(curKey())+7],ui.mTimbre,.5);});
 $('midiParts').addEventListener('change',e=>uiSet('midiParts',e.target.value));
-document.querySelectorAll('#zoomSeg button').forEach(b=>b.onclick=()=>uiSet('mZoom',+b.dataset.v));
+// 横の拡大のスライダー（見えている範囲の真ん中を中心に）
+$('zoomBar').addEventListener('input',e=>{const r=$('roll').getBoundingClientRect();roll.setZoom(sliderToZoom(+e.target.value),r.left+r.width/2);});
 document.querySelectorAll('#viewSeg button').forEach(b=>b.onclick=()=>{
   if(ui.view===b.dataset.v)return;
   if(rec){player.stop();finishRec();playTick=null;}
@@ -1784,7 +1789,7 @@ function render(){
   document.querySelectorAll('#viewSeg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.v===ui.view));
   sheet.hidden=mel;$('roll').hidden=!mel;
   $('mSnap').value=ui.mSnap;$('mLen').value=ui.mLen;$('mTimbre').value=ui.mTimbre;$('midiParts').value=ui.midiParts;
-  document.querySelectorAll('#zoomSeg button').forEach(b=>b.setAttribute('aria-pressed',+b.dataset.v===ui.mZoom));
+  $('zoomBar').value=zoomToSlider(ui.mZoom);
   renderTool();
   pressed('hearChords',ui.hearChords);pressed('hearMelody',ui.hearMelody);pressed('guideChord',ui.guideChord);pressed('guideScale',ui.guideScale);
   renderPalette();renderProg();
