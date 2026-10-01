@@ -189,7 +189,7 @@ scaleSel.addEventListener('change',()=>{
 function paletteChip(item){
   const b=h('button','pchip'+(outOfScale(item)?' out':''));
   b.append(h('span','n',nameOfItem(item)),h('span','d',degOfItem(item)));
-  b.title='クリックで試聴、ダブルクリックでカーソル位置に入力、シートへドラッグで配置'+(outOfScale(item)?'（スケールの外の音を含む）':'');
+  b.title='クリックで試聴、ダブルクリックでカーソル位置に入力、コードビューへドラッグで配置'+(outOfScale(item)?'（スケールの外の音を含む）':'');
   b.addEventListener('pointerdown',e=>startPaletteDrag(e,item));
   b.addEventListener('dblclick',()=>insertAtCursor(item));
   return b;
@@ -289,7 +289,7 @@ function renderProg(){
     names.appendChild(cell);
   }
   names.querySelectorAll('.pb').forEach(cell=>fitText(cell,7.5));
-  names.title=`ドラッグでコードのシートに入れる（小節の上ならその小節から上書き、何もないところなら新しいセクションを作る）　${progressionDegrees(bars)}`;
+  names.title=`ドラッグでコードビューに入れる（小節の上ならその小節から上書き、何もないところなら新しいセクションを作る）　${progressionDegrees(bars)}`;
   $('progPlay').textContent=progPreview&&player.isPlaying()?'停止':'試聴';
   $('progIns').title=`カーソルのある小節（${cursor.gi+1}小節目）から${bars.length}小節を上書きで入れる（1コード＝1小節）`;
 }

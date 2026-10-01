@@ -61,7 +61,7 @@
         <div class="menu-sep" role="separator"></div>
         <span class="menu-lbl">ウィンドウを広げたとき</span>
         <button data-scale="zoom" aria-checked="false" role="menuitemradio" title="画面全体を拡大する（文字やボタンも大きくなる）">全体を拡大</button>
-        <button data-scale="expand" aria-checked="false" role="menuitemradio" title="文字やボタンの大きさは 100% のまま、シート・ピアノロールを広げる">広げる（大きさはそのまま）</button>
+        <button data-scale="expand" aria-checked="false" role="menuitemradio" title="文字やボタンの大きさは 100% のまま、コードビュー・メロディービューを広げる">広げる（大きさはそのまま）</button>
       </div>
     </div>
     <input id="fileInput" type="file" accept=".chordsketch,.json" hidden>
@@ -76,7 +76,7 @@
     <div class="keyrow">
       <select id="scaleSel" aria-label="スケール" title="スケール：7音のスケールでは、ダイアトニックとプリセットをそのスケールで作り直す"></select>
     </div>
-    <div class="sub-head" title="クリックで試聴、ダブルクリックでカーソル位置に入力、シートへドラッグで配置。数字キー 1〜7 でも入力">ダイアトニックコード<span class="spacer"></span>
+    <div class="sub-head" title="クリックで試聴、ダブルクリックでカーソル位置に入力、コードビューへドラッグで配置。数字キー 1〜7 でも入力">ダイアトニックコード<span class="spacer"></span>
       <div class="seg small" id="diaSeg"><button data-v="7" aria-pressed="true">4和音</button><button data-v="3" aria-pressed="false">3和音</button></div></div>
     <div class="palette" id="dia"></div>
     <div class="sub-head">コード作成</div>
@@ -96,7 +96,7 @@
   <main class="main panel">
     <div class="tabs" id="tabs" role="tablist" aria-label="開いている曲"></div>
     <div class="toolbar">
-      <div class="seg view-seg" id="viewSeg" role="tablist" aria-label="表示"><button data-v="chords" title="コードのシート">コード</button><button data-v="melody" title="メロディーのピアノロール">メロディー</button></div>
+      <div class="seg view-seg" id="viewSeg" role="tablist" aria-label="表示"><button data-v="chords" title="コードビュー（Tab で切り替え）">コード</button><button data-v="melody" title="メロディービュー（Tab で切り替え）">メロディー</button></div>
       <span class="lbl">スナップ</span>
       <div class="seg small only-chords" id="snapSeg"><button data-v="bar">1小節</button><button data-v="beat">1拍</button><button data-v="half" title="シンコペーション・食いのコード用">半拍</button></div>
       <select id="mSnap" class="only-melody" aria-label="メロディーのスナップ" title="音を置く・動かす位置の単位"></select>
@@ -104,7 +104,7 @@
       <label class="fld only-melody" title="クリック・MIDI 鍵盤のステップ入力で置く音の長さ">長さ <select id="mLen"></select></label>
       <span class="lbl" title="1行に並べる小節の数">表示</span>
       <div class="seg small only-chords" id="rowSeg" title="1行に並べる小節の数"><button data-v="4" title="1行に4小節">4</button><button data-v="8" title="1行に8小節">8</button></div>
-      <input type="range" id="zoomBar" class="only-melody zoom-bar" min="0" max="100" step="1" aria-label="横の拡大" title="横の拡大（ピアノロールの上でトラックパッドを2本指で広げる・つまむでも）">
+      <input type="range" id="zoomBar" class="only-melody zoom-bar" min="0" max="100" step="1" aria-label="横の拡大" title="横の拡大（メロディービューの上でトラックパッドを2本指で広げる・つまむでも）">
       <span class="spacer"></span>
       <select id="midiParts" aria-label="MIDI に入れるもの" title="MIDI のドラッグ・保存に入れるもの（両方なら、コードとメロディーの2トラック）">
         <option value="both">コード＋メロ</option><option value="chords">コードのみ</option><option value="melody">メロのみ</option></select>
@@ -131,15 +131,15 @@
       <label class="fld" title="メロディーの試聴の音色（MIDI には影響しない）">音色 <select id="mTimbre"></select></label>
       <span class="sep"></span>
       <span class="lbl">鳴らす</span>
-      <button id="hearChords" class="tg small" aria-pressed="true" title="メロディーの画面で再生するとき、コード（伴奏）も鳴らす">コード</button>
-      <button id="hearMelody" class="tg small" aria-pressed="true" title="メロディーの画面で再生するとき、メロディーも鳴らす（オフにすると伴奏だけで歌える）">メロディー</button>
+      <button id="hearChords" class="tg small" aria-pressed="true" title="メロディービューで再生するとき、コード（伴奏）も鳴らす">コード</button>
+      <button id="hearMelody" class="tg small" aria-pressed="true" title="メロディービューで再生するとき、メロディーも鳴らす（オフにすると伴奏だけで歌える）">メロディー</button>
       <span class="sep"></span>
-      <span class="lbl" title="ピアノロールの行に色を付ける">ガイド</span>
+      <span class="lbl" title="メロディービューの行に色を付ける">ガイド</span>
       <button id="guideChord" class="tg small" aria-pressed="true" title="そこで鳴っているコードの構成音の行に色を付ける（ルートは濃く）">コードの音</button>
       <button id="guideScale" class="tg small" aria-pressed="true" title="キーのスケールの音の行に色を付ける">スケール</button>
     </div>
-    <div class="sheet" id="sheet" tabindex="0" aria-label="コード譜"></div>
-    <div class="roll" id="roll" tabindex="0" aria-label="メロディーのピアノロール" hidden></div>
+    <div class="sheet" id="sheet" tabindex="0" aria-label="コードビュー"></div>
+    <div class="roll" id="roll" tabindex="0" aria-label="メロディービュー" hidden></div>
     <aside class="vpanel" id="vpanel" aria-label="コード編集（鳴らす音）" hidden></aside>
     <div class="footer" id="footer"></div>
   </main>
