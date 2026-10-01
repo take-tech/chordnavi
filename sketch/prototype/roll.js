@@ -73,7 +73,7 @@ export function createRoll(root,ctx){
     for(const b of tl.bars){
       const on=rg0&&b.gi>=rg0.from&&b.gi<rg0.to;
       const e=tbox('rbar'+(on?' on':''),b.start,18,b.ticks,16);e.append(h('span','',String(b.gi+1)));
-      e.dataset.gi=b.gi;e.title='押すとカーソルをここに置く・横にドラッグで小節の範囲を選ぶ';hg.appendChild(e);
+      e.dataset.gi=b.gi;e.title='押してカーソル・横にドラッグで範囲';hg.appendChild(e);
     }
     const pcs=placedChords(song,tl);
     for(const p of pcs){
