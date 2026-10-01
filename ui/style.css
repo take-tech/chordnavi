@@ -192,8 +192,9 @@ button,svg{-webkit-user-drag:none}
 .detail-head h3{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:0 1 auto}
 .detail-head .deg{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1 1 0}
 .detail-head .actions{flex-shrink:0}
-.detail.longdeg .detail-head{flex-wrap:wrap;row-gap:0;margin-bottom:6px}
-.detail.longdeg .detail-head .deg{order:3;flex:1 1 100%;white-space:normal;overflow:visible}
+/* ディグリーはいつも進行名の下の段に（長さで 1 段・2 段が変わらないように。長すぎれば省略して title で全体） */
+.detail-head{flex-wrap:wrap;row-gap:0;margin-bottom:6px}
+.detail-head .deg{order:3;flex:1 1 100%}
 
 /* ギターのチューニング：指板の左の弦の欄の − ＋ で弦ごとに半音ずつ、見出しの右で弦の数 */
 .tune-reset{font:inherit;font-size:11px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:4px;padding:1px 8px;cursor:pointer}
