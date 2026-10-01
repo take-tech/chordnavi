@@ -106,10 +106,14 @@
       <div class="seg small only-chords" id="rowSeg" title="1行に並べる小節の数"><button data-v="4" title="1行に4小節">4</button><button data-v="8" title="1行に8小節">8</button></div>
       <input type="range" id="zoomBar" class="only-melody zoom-bar" min="0" max="100" step="1" aria-label="横の拡大" title="横の拡大（2本指で広げる・つまむでも）">
       <span class="spacer"></span>
-      <select id="midiParts" aria-label="MIDI に入れるもの" title="MIDI に入れるもの（両方なら2トラック）">
-        <option value="both">コード＋メロ</option><option value="chords">コードのみ</option><option value="melody">メロのみ</option></select>
-      <button class="handle" id="dragSel" title="選択範囲（なければ曲全体）を DAW へドラッグ">⠿ <span id="dragLabel">曲全体</span>をドラッグ</button>
-      <button id="saveMidi">MIDI保存</button>
+      <!-- MIDI の書き出し：入れるもの → ドラッグ（つまみに範囲） → 保存 の順に、ひとつの枠にまとめる -->
+      <div class="midi-box" role="group" aria-label="MIDI の書き出し">
+        <span class="midi-lbl">MIDI</span>
+        <select id="midiParts" aria-label="MIDI に入れるもの" title="入れるもの（両方なら2トラック）">
+          <option value="both">コード＋メロ</option><option value="chords">コードのみ</option><option value="melody">メロのみ</option></select>
+        <button class="handle" id="dragSel" title="ドラッグで DAW へ（範囲を選んでいればその範囲）">⠿ <span id="dragLabel">曲全体</span></button>
+        <button id="saveMidi" title="MIDI ファイルに保存">保存…</button>
+      </div>
     </div>
     <div class="toolbar out only-chords" role="toolbar" aria-label="サウンドバー">
       <label class="fld" title="コードの試聴の音色（MIDI には影響しない）">音色 <select id="timbre"></select></label>
