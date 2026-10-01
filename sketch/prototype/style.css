@@ -552,3 +552,292 @@ body.grabbing,body.grabbing *{cursor:grabbing!important}
   --lcd-bg:#2C2318; --lcd-hi:#F0D9A6; --lcd-lo:#D2B884; --lcd-dim:#7C6A4E; --lcd-line:#3E3225;
   --font-head:"Hiragino Mincho ProN","Yu Mincho","Noto Serif JP",serif;
 }
+
+/* ---------- スキンの素材（色だけでなく、面の質感・段差・部品の形を変える） ----------
+   Luxury：黒い鉄のラック機材（参考：Vooster の EQ）。鉄板の粒子と縦のグラデーション、四隅のビス、
+   刻印のプレートの見出し、押し込み式のボタン（オンは中から琥珀色に光る）、表示部は VU メーターの暖かいバックライト */
+:root[data-skin=luxury]{
+  --page:#0D0D0C; --bg:#161615; --panel:#232321; --card:#2B2B28; --ink:#DCD6C8; --ink2:#B9B1A0; --muted:#8E887B; --line:#3A3935;
+  --faint:#6A665D; --faint2:#4C4A45; --grid:#2E2E2B; --grid2:#262624;
+  --wheel-outer:#262624; --wheel-inner:#34332F;
+  --roll-row:#2E2D2A; --roll-row-edge:#272724; --roll-row-black:#242422; --roll-bar:#4A4840; --roll-beat:#2B2B28;
+  --pressed-bg:#D98A3A; --pressed-fg:#2A1606;
+  --note:#4F7FB8; --note-edge:#2C4E78; --note-hi:#6E98CC;   /* 音は青いつまみの色にして、琥珀のガイドと見分ける */
+  --font-head:"DIN Condensed","Avenir Next Condensed","Bahnschrift","Hiragino Sans","Yu Gothic UI",sans-serif;
+  --lux-grain:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .07 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+  /* ビス：中心が明るい丸に、マイナスの溝 */
+  --lux-screw:radial-gradient(circle at 45% 40%,#77736A 0 1.2px,#3E3C37 2.6px,#1A1A18 3.6px,transparent 4.2px);
+}
+[data-skin=luxury] .stage{background:var(--lux-grain),linear-gradient(#1B1B1A,#121211)}
+[data-skin=luxury] .panel{
+  border:1px solid #0A0A09;border-radius:3px;
+  background:
+    var(--lux-screw) 4px 4px/11px 11px no-repeat,var(--lux-screw) calc(100% - 4px) 4px/11px 11px no-repeat,
+    var(--lux-screw) 4px calc(100% - 4px)/11px 11px no-repeat,var(--lux-screw) calc(100% - 4px) calc(100% - 4px)/11px 11px no-repeat,
+    var(--lux-grain),linear-gradient(#2A2A27,#1F1F1D);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.07),inset 0 -1px 0 rgba(0,0,0,.6),0 2px 6px rgba(0,0,0,.55)}
+[data-skin=luxury] .main.panel{background:var(--lux-grain),linear-gradient(#272725,#1E1E1C)}   /* 編集面はビスを打たない */
+[data-skin=luxury] .left{padding:12px 16px}
+/* 刻印のプレート（ブロックの見出し） */
+[data-skin=luxury] .sub-head{border-top:0;margin-top:10px;padding:0;color:#BDB5A4;font-size:11.5px;font-weight:700;letter-spacing:.14em}
+/* エリア名：枠で囲まず、文字の右に彫った溝の線を引く（入力欄と見分ける） */
+[data-skin=luxury] .sub-head::after{content:'';flex:1;order:1;height:0;border-top:1px solid #0B0B0A;border-bottom:1px solid rgba(255,255,255,.07);margin-left:4px}
+[data-skin=luxury] .sub-head>.spacer{display:none}
+[data-skin=luxury] .sub-head>:not(.spacer){order:2}
+[data-skin=luxury] .sub-head>.midi-st{order:0}
+[data-skin=luxury] .top h1{font-size:20px;font-weight:600;letter-spacing:.1em;color:#D8D1C0;text-shadow:0 1px 0 #000}
+/* 押し込み式のボタン */
+[data-skin=luxury] button:not(.lcd button):not(.menu-pop button):not(.tclose):not(.x):not(.rs){
+  background:linear-gradient(#3C3B37,#2A2927);border:1px solid #0B0B0A;border-radius:3px;color:#D6CFBF;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 1px 2px rgba(0,0,0,.6)}
+[data-skin=luxury] button:not(.lcd button):not(.menu-pop button):hover{background:linear-gradient(#45443F,#302F2C)}
+[data-skin=luxury] .seg{border:1px solid #0B0B0A;border-radius:3px;box-shadow:0 1px 2px rgba(0,0,0,.6);gap:1px;background:#0B0B0A}
+[data-skin=luxury] .seg button{border:0!important;border-radius:0!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.1)!important}
+/* オン：押し込まれて文字が琥珀色に灯る。中から光らせるのは再生ボタンだけ（まぶしくしない） */
+[data-skin=luxury] .tg[aria-pressed=true],[data-skin=luxury] .seg button[aria-pressed=true]{
+  background:linear-gradient(#1B1B19,#242422)!important;color:#F0B062!important;border-color:#0B0B0A!important;
+  text-shadow:0 0 6px rgba(240,160,80,.45);box-shadow:inset 0 2px 4px rgba(0,0,0,.75),inset 0 -1px 0 rgba(255,255,255,.05)!important}
+[data-skin=luxury] .play{
+  background:radial-gradient(ellipse at 50% 45%,#F0B062,#C8742C 70%,#9A541E)!important;color:#2A1606!important;border-color:#3A1E08!important;
+  box-shadow:inset 0 1px 0 rgba(255,230,190,.45),inset 0 -2px 4px rgba(80,30,0,.45),0 0 7px rgba(232,140,60,.35)!important}
+[data-skin=luxury] .play.on{background:radial-gradient(ellipse at 50% 45%,#E8726A,#B23A34 70%,#7E221E)!important;color:#2A0806!important;box-shadow:inset 0 1px 0 rgba(255,200,190,.4),0 0 8px rgba(220,80,70,.4)!important}
+[data-skin=luxury] #muteBtn{color:#E07A6E!important}
+[data-skin=luxury] #muteBtn[aria-pressed=true]{background:radial-gradient(ellipse at 50% 45%,#E8726A,#B23A34 70%,#7E221E)!important;color:#2A0806!important}
+/* 入力欄は板に彫った凹み */
+[data-skin=luxury] select,[data-skin=luxury] input[type=number],[data-skin=luxury] input[type=text],[data-skin=luxury] .title{
+  background:#141413;border:1px solid #0A0A09;border-bottom-color:#45443E;border-radius:2px;color:#DCD6C8;box-shadow:inset 0 1px 3px rgba(0,0,0,.8)}
+/* 表示部：VU メーターのクリーム色の盤面と暖かい明かり（文字は濃い茶） */
+[data-skin=luxury] .lcd{
+  --lcd-hi:#2E2416; --lcd-lo:#4A3C28; --lcd-dim:#8A7656; --lcd-line:rgba(70,50,25,.25);
+  background:radial-gradient(ellipse at 50% 120%,#F2D9A0,#D9BE84 55%,#B89C64);border:2px solid #0A0A09;border-radius:3px;
+  box-shadow:inset 0 2px 5px rgba(60,35,5,.55),inset 0 0 0 1px rgba(255,240,200,.25),0 1px 0 rgba(255,255,255,.06)}
+[data-skin=luxury] .lcd button:hover{color:#8A4A10}
+/* 編集面 */
+[data-skin=luxury] .tabs{background:linear-gradient(#1C1C1A,#181817);border-bottom-color:#0A0A09}
+[data-skin=luxury] .tab{background:linear-gradient(#2E2D2A,#252523);border-color:#0B0B0A}
+[data-skin=luxury] .tab.on{background:#2B2B28;box-shadow:inset 0 2px 0 #E0973E}
+[data-skin=luxury] .toolbar{border-bottom-color:#0B0B0A;box-shadow:0 1px 0 rgba(255,255,255,.04)}
+[data-skin=luxury] .toolbar.out{background:linear-gradient(#1D1D1B,#191918)}
+[data-skin=luxury] .midi-box{border-color:#45443E;background:rgba(0,0,0,.25)}
+[data-skin=luxury] .lane{background:linear-gradient(#2E2E2B,#282826)}
+[data-skin=luxury] .blk{background:linear-gradient(#3B3A36,#2E2D2A);border-color:#0B0B0A;box-shadow:inset 0 1px 0 rgba(255,255,255,.1),0 1px 2px rgba(0,0,0,.5)}
+[data-skin=luxury] .blk.playing{background:radial-gradient(ellipse at 50% 30%,#5A3E1E,#3A2A16);border-color:#C8742C;box-shadow:0 0 8px rgba(232,140,60,.3)}
+[data-skin=luxury] .pchip{background:linear-gradient(#34332F,#2A2927);border-color:#0B0B0A;box-shadow:inset 0 1px 0 rgba(255,255,255,.09)}
+[data-skin=luxury] .footer{border-top-color:#0B0B0A;background:linear-gradient(#1A1A19,#161615);box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}
+[data-skin=luxury] .menu-pop{background:#252523;border-color:#0B0B0A;box-shadow:0 8px 24px rgba(0,0,0,.6)}
+/* コード名は細身の書体だと細く小さく見えるので、本文の太いゴシックに戻す */
+[data-skin=luxury] .chip-edit .ce-name{font-family:inherit;font-size:20px;font-weight:800}
+[data-skin=luxury] .vname b{font-family:inherit;font-weight:800}
+
+/* Cyber：シンセの画面（参考：Serum 2・Avenger）。青みのあるスレートのモジュールを細い溝で区切り、
+   見出しは明るい帯に細身の大文字。差し色のシアンは「オン・値・線」だけで、面は染めない */
+:root[data-skin=cyber]{
+  --page:#15191E; --bg:#1B2026; --panel:#2A3038; --card:#20262D; --ink:#D2DAE2; --ink2:#AEB9C5; --muted:#8793A1; --line:#3A424D;
+  --faint:#5F6A77; --faint2:#47505B; --grid:#2C333C; --grid2:#232930;
+  --root:#E0A63A; --tone:#2FA6B8; --chord:#D2588E; --chord-tint:#3A2333;
+  --wheel-outer:#252B33; --wheel-inner:#313842; --wheel-text:#D2DAE2;
+  --sel:rgba(64,190,240,.14); --live:#40BEF0; --pressed-bg:#1A2530; --pressed-fg:#56C8F5;
+  --note:#3AA9DE; --note-edge:#1F7AA8; --note-hi:#62C0EA;
+  --roll-key:#A9B3BE; --roll-key-edge:#86919D; --roll-key-black:#14181D; --roll-key-label:#2A3038;
+  --roll-row:#252B33; --roll-row-edge:#1F242B; --roll-row-black:#1D2228; --roll-bar:#3E4752; --roll-beat:#2A3038; --roll-out:rgba(5,8,12,.42);
+  --lcd-bg:#14181D; --lcd-hi:#56C8F5; --lcd-lo:#3FA3CF; --lcd-dim:#3D5566; --lcd-line:#252D36;
+  --font-head:"DIN Condensed","Avenir Next Condensed","Bahnschrift","Hiragino Sans","Yu Gothic UI",sans-serif;
+}
+[data-skin=cyber] .stage{background:#15191E;gap:6px;padding:10px}
+[data-skin=cyber] .panel{border:1px solid #0F1215;border-radius:2px;background:linear-gradient(#2E353E,#272D35);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.06)}
+/* 見出しの帯 */
+[data-skin=cyber] .sub-head{border-top:0;margin:8px -12px 2px;padding:4px 12px;background:#3A424D;color:#E2E8EE;font-size:13px;letter-spacing:.07em;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 1px 0 #0F1215}
+[data-skin=cyber] .sub-head .seg{margin-right:-4px}
+[data-skin=cyber] .top h1{font-size:21px;font-weight:600;letter-spacing:.14em;color:#E2E8EE}
+/* ボタン：平らなスレートの板、縁は細く暗い */
+[data-skin=cyber] button:not(.lcd button):not(.menu-pop button):not(.tclose):not(.x):not(.rs){
+  background:linear-gradient(#3A424C,#323942);border:1px solid #14181C;border-radius:2px;color:#D2DAE2;box-shadow:inset 0 1px 0 rgba(255,255,255,.07)}
+[data-skin=cyber] button:not(.lcd button):not(.menu-pop button):hover{background:linear-gradient(#434C57,#3A424C)}
+[data-skin=cyber] .seg{border:1px solid #14181C;border-radius:2px;gap:1px;background:#14181C}
+[data-skin=cyber] .seg button{border:0!important;border-radius:0!important}
+/* オン：暗く沈んでシアンの文字。下にシアンの細い線（Serum のタブの点灯） */
+[data-skin=cyber] .tg[aria-pressed=true],[data-skin=cyber] .seg button[aria-pressed=true]{
+  background:#1A2028!important;color:#56C8F5!important;border-color:#14181C!important;box-shadow:inset 0 -2px 0 #40BEF0,inset 0 1px 3px rgba(0,0,0,.5)!important}
+[data-skin=cyber] .play{background:linear-gradient(#45C4F2,#2A9DD0)!important;color:#0D1A22!important;border-color:#0F1215!important;box-shadow:0 0 8px rgba(64,190,240,.3)!important}
+[data-skin=cyber] .play.on{background:linear-gradient(#E06C9C,#B8467A)!important;color:#22081A!important;box-shadow:0 0 8px rgba(210,88,142,.35)!important}
+[data-skin=cyber] #muteBtn{color:#E07A9C!important}
+[data-skin=cyber] #muteBtn[aria-pressed=true]{background:#B8467A!important;color:#22081A!important;box-shadow:none!important}
+/* 入力欄・表示面は暗い窓 */
+[data-skin=cyber] select,[data-skin=cyber] input[type=number],[data-skin=cyber] input[type=text],[data-skin=cyber] .title{
+  background:#1A1F25;border:1px solid #14181C;border-radius:2px;color:#D2DAE2}
+[data-skin=cyber] .lcd{border:1px solid #0B0E11;border-radius:2px;
+  background:linear-gradient(rgba(64,190,240,.05) 1px,transparent 1px) 0 0/100% 6px,#14181D;box-shadow:inset 0 1px 4px rgba(0,0,0,.6)}
+[data-skin=cyber] .lcd .l1,[data-skin=cyber] .lcd .r1{text-shadow:0 0 6px rgba(86,200,245,.35)}
+[data-skin=cyber] .tabs{background:#20262D;border-bottom-color:#0F1215;border-radius:2px 2px 0 0}
+[data-skin=cyber] .tab{background:#2A3038;border-color:#14181C;border-radius:2px 2px 0 0}
+[data-skin=cyber] .tab.on{background:#323942;box-shadow:inset 0 2px 0 #40BEF0}
+[data-skin=cyber] .toolbar{border-bottom-color:#14181C}
+[data-skin=cyber] .toolbar.out{background:#262C34}
+[data-skin=cyber] .midi-box{border-color:#14181C;background:#20262D;border-radius:2px}
+[data-skin=cyber] .sheet{background:#1E2329}
+[data-skin=cyber] .lane{background:#262C34;border-color:#1A1F25}
+[data-skin=cyber] .lane::after{background:#20262D;border-top-color:#2C333C}
+[data-skin=cyber] .blk{background:linear-gradient(#384049,#30373F);border-color:#14181C;border-radius:2px;box-shadow:inset 0 1px 0 rgba(255,255,255,.07)}
+[data-skin=cyber] .blk.playing{background:#1A2A36;border-color:#40BEF0;box-shadow:inset 0 0 0 1px #40BEF0}
+[data-skin=cyber] .pchip{background:linear-gradient(#384049,#30373F);border-color:#14181C;border-radius:2px}
+[data-skin=cyber] .footer{border-top-color:#14181C;background:#232930}
+[data-skin=cyber] .menu-pop{background:#2A3038;border-color:#14181C;border-radius:3px;box-shadow:0 8px 24px rgba(0,0,0,.55)}
+[data-skin=cyber] .chip-edit .ce-name{font-family:inherit;font-size:20px;font-weight:800}
+[data-skin=cyber] .vname b{font-family:inherit;font-weight:800}
+
+/* Old：70〜80年代のアナログシンセ（参考：UAD PolyMAX）。明るい塗装のグレーの面（ザラつき）、左右に木のサイド板、
+   見出しは一段濃い帯に太い大文字。ボタンはクリーム色のプラスチック、オンはオレンジのランプ */
+:root[data-skin=old]{
+  --page:#3A2A1E; --bg:#C4C6C4; --panel:#D3D5D2; --card:#E6E6E1; --ink:#2B2E30; --ink2:#44494C; --muted:#61676B; --line:#A7ABAB;
+  --faint:#868C8F; --faint2:#A3A8A9; --grid:#C3C6C4; --grid2:#CBCDCA;
+  --root:#E4962A; --tone:#2E7F8F; --chord:#C2483E; --chord-tint:#EBCDC6;
+  --wheel-outer:#3D4448; --wheel-inner:#566065;
+  --sel:rgba(46,127,143,.14); --live:#2E7F8F; --pick:#6A5A90; --pressed-bg:#E89A30; --pressed-fg:#3A2208;
+  --note:#2E7F8F; --note-edge:#1E5A66; --note-hi:#4A9AAA;
+  --lcd-bg:#1E2220; --lcd-hi:#F2B04A; --lcd-lo:#D29640; --lcd-dim:#6C5E44; --lcd-line:#323632;
+  --font-head:"Avenir Next Condensed","DIN Condensed","Bahnschrift","Hiragino Sans","Yu Gothic UI",sans-serif;
+  --old-grain:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.1' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .2 0 0 0 0 .2 0 0 0 0 .2 0 0 0 .09 0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+  /* 木目：濃淡の縦縞を重ねる */
+  --old-wood:repeating-linear-gradient(90deg,rgba(0,0,0,.12) 0 1px,transparent 1px 3px,rgba(255,220,170,.06) 3px 4px,transparent 4px 7px),
+             linear-gradient(90deg,#5A3820,#8A5A34 30%,#7A4C2A 60%,#5E3C22);
+}
+[data-skin=old] .stage{background:var(--old-grain),linear-gradient(#CBCDCA,#BDC0BE);padding:16px 30px}
+[data-skin=old] .stage::before,[data-skin=old] .stage::after{content:'';position:absolute;top:0;bottom:0;width:16px;background:var(--old-wood);pointer-events:none}
+[data-skin=old] .stage::before{left:0;box-shadow:inset -2px 0 3px rgba(0,0,0,.35)}
+[data-skin=old] .stage::after{right:0;box-shadow:inset 2px 0 3px rgba(0,0,0,.35)}
+[data-skin=old] .panel{border:1px solid #9A9E9E;border-radius:3px;background:var(--old-grain),#D3D5D2;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.55),0 1px 2px rgba(0,0,0,.18)}
+/* 見出しの帯 */
+[data-skin=old] .sub-head{border-top:0;margin:8px -12px 3px;padding:3px 12px;background:#B9BCBA;color:#2B2E30;font-size:14px;font-weight:700;letter-spacing:.06em;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.4),inset 0 -1px 0 rgba(0,0,0,.12)}
+[data-skin=old] .top h1{font-size:20px;font-weight:700;letter-spacing:.02em;color:#2E7F8F}
+/* ボタン：クリーム色のプラスチック（丸みと影） */
+[data-skin=old] button:not(.lcd button):not(.menu-pop button):not(.tclose):not(.x):not(.rs){
+  background:linear-gradient(#F4F3EE,#D9D8D1);border:1px solid #8E9292;border-radius:4px;color:#2B2E30;
+  box-shadow:inset 0 1px 0 #fff,0 1px 2px rgba(0,0,0,.25)}
+[data-skin=old] button:not(.lcd button):not(.menu-pop button):hover{background:linear-gradient(#FAF9F5,#E2E1DA)}
+[data-skin=old] .seg{border:1px solid #8E9292;border-radius:4px;gap:1px;background:#8E9292;box-shadow:0 1px 2px rgba(0,0,0,.2)}
+[data-skin=old] .seg button{border:0!important;border-radius:0!important;box-shadow:inset 0 1px 0 #fff!important}
+/* オン：オレンジのランプ */
+[data-skin=old] .tg[aria-pressed=true],[data-skin=old] .seg button[aria-pressed=true],[data-skin=old] .play{
+  background:radial-gradient(ellipse at 50% 35%,#F8BC5E,#E2902C 75%)!important;color:#3A2208!important;border-color:#9A5E1C!important;
+  box-shadow:inset 0 1px 0 rgba(255,240,200,.6),inset 0 -1px 2px rgba(120,60,0,.35)!important}
+[data-skin=old] .play.on{background:radial-gradient(ellipse at 50% 35%,#E8786C,#C2483E 75%)!important;color:#2E0A06!important;border-color:#7E2A22!important}
+[data-skin=old] #muteBtn{color:#C2483E!important}
+[data-skin=old] #muteBtn[aria-pressed=true]{background:radial-gradient(ellipse at 50% 35%,#E8786C,#C2483E 75%)!important;color:#2E0A06!important}
+[data-skin=old] select,[data-skin=old] input[type=number],[data-skin=old] input[type=text],[data-skin=old] .title{
+  background:#ECECE7;border:1px solid #8E9292;border-radius:3px;box-shadow:inset 0 1px 2px rgba(0,0,0,.15)}
+/* 表示部：黒い窓にオレンジの数字 */
+[data-skin=old] .lcd{border:2px solid #8E9292;border-radius:3px;box-shadow:inset 0 2px 4px rgba(0,0,0,.7)}
+[data-skin=old] .tabs{background:#C6C8C5;border-bottom-color:#9A9E9E}
+[data-skin=old] .tab{background:linear-gradient(#DADBD6,#C9CBC7);border-color:#9A9E9E}
+[data-skin=old] .tab.on{background:#E6E6E1;box-shadow:inset 0 3px 0 #E4962A}
+[data-skin=old] .toolbar{border-bottom-color:#A7ABAB}
+[data-skin=old] .toolbar.out{background:#C9CBC8}
+[data-skin=old] .midi-box{border-color:#9A9E9E;background:#C9CBC8}
+[data-skin=old] .lane{background:#E2E2DD}
+[data-skin=old] .blk{background:linear-gradient(#F4F3EE,#E0DFD8);border-color:#7E8484;box-shadow:inset 0 1px 0 #fff,0 1px 1px rgba(0,0,0,.15)}
+[data-skin=old] .pchip{background:linear-gradient(#F4F3EE,#DCDBD4);border-color:#8E9292;box-shadow:inset 0 1px 0 #fff,0 1px 1px rgba(0,0,0,.15)}
+[data-skin=old] .footer{border-top-color:#A7ABAB;background:#C9CBC8}
+[data-skin=old] .menu-pop{background:#E6E6E1;border-color:#8E9292;box-shadow:0 6px 18px rgba(0,0,0,.25)}
+[data-skin=old] .chip-edit .ce-name{font-family:inherit;font-size:20px;font-weight:800}
+[data-skin=luxury] .sub-head,[data-skin=cyber] .sub-head,[data-skin=old] .sub-head{font-family:inherit}
+
+/* Kawaii：ぬいぐるみ・おもちゃ。水玉の背景、点線のステッチで縫ったフェルトのパネル、
+   下に厚みのあるぷっくりした押しボタン（押すと沈む）、表示部はたまごっち風の液晶。どれも丸く、色はパステル */
+:root[data-skin=kawaii]{
+  --page:#F6DCE6; --bg:#FBEAF0; --panel:#FFF6F9; --card:#FFFDFE; --ink:#4E3149; --ink2:#6E4C66; --muted:#93778C; --line:#EDCBDB;
+  --root:#F2A65A; --tone:#5DBFA8; --chord:#E2669A; --chord-tint:#FBDDE9; --live:#C468A0; --pick:#9A7BD6;
+  --pressed-bg:#F28DB2; --pressed-fg:#4A1830; --note:#9D7BE0; --note-edge:#7759B8; --note-hi:#B79BEA;
+  --wheel-outer:#7E5F98; --wheel-inner:#9D80B4;
+  --lcd-bg:#D9E8C8; --lcd-hi:#3E4A33; --lcd-lo:#55634A; --lcd-dim:#8FA07E; --lcd-line:rgba(62,74,51,.18);
+  --kw-btn:#E9C3D4;   /* ボタンの厚み */
+}
+[data-skin=kawaii] .stage{background:radial-gradient(circle,#F7D3E1 2.2px,transparent 2.8px) 0 0/22px 22px,radial-gradient(circle,#E8E0FA 2.2px,transparent 2.8px) 11px 11px/22px 22px,#FBEAF0}
+[data-skin=kawaii] .panel{border:0;border-radius:18px;background:#FFF6F9;outline:1.5px dashed #EDB8CD;outline-offset:-6px;
+  box-shadow:0 0 0 3px #FFF6F9,0 0 0 4.5px #F1C9D9,0 4px 0 4.5px #EBC0D2}
+[data-skin=kawaii] .main.panel{outline-offset:-5px}
+[data-skin=kawaii] .left{padding:14px 18px}
+/* エリア名：リボンのような丸いラベル（線を引かない） */
+[data-skin=kawaii] .sub-head{border-top:0;margin-top:8px;padding:0;color:#B45F8A;font-weight:700;font-size:12.5px}
+[data-skin=kawaii] .sub-head::before{content:'♡';color:#F28DB2;font-size:11px;margin-right:-2px}
+[data-skin=kawaii] .top h1{font-size:19px;color:#D45A8E;letter-spacing:.03em}
+/* ぷっくりした押しボタン */
+[data-skin=kawaii] button:not(.lcd button):not(.menu-pop button):not(.tclose):not(.x):not(.rs){
+  background:#FFFDFE;border:1.5px solid #E7BCD0;border-radius:999px;color:#5A3A53;box-shadow:0 2px 0 var(--kw-btn);transform:translateY(-1px)}
+[data-skin=kawaii] button:not(.lcd button):not(.menu-pop button):not(.tclose):not(.x):not(.rs):active{transform:translateY(1px);box-shadow:0 0 0 var(--kw-btn)}
+[data-skin=kawaii] button:not(.lcd button):not(.menu-pop button):hover{background:#FFF0F6}
+[data-skin=kawaii] .seg{border:1.5px solid #E7BCD0;border-radius:999px;background:#FFFDFE;box-shadow:0 2px 0 var(--kw-btn);overflow:hidden}
+[data-skin=kawaii] .seg button{border:0!important;border-radius:999px!important;box-shadow:none!important;transform:none!important}
+[data-skin=kawaii] .tg[aria-pressed=true],[data-skin=kawaii] .seg button[aria-pressed=true],[data-skin=kawaii] .play{
+  background:#F7A9C6!important;border-color:#E07FA6!important;color:#4A1830!important;box-shadow:0 2px 0 #D9789F!important}
+[data-skin=kawaii] .seg button[aria-pressed=true]{box-shadow:none!important}
+[data-skin=kawaii] .play.on{background:#9ED9C8!important;border-color:#62B7A0!important;color:#16443A!important;box-shadow:0 2px 0 #62B7A0!important}
+[data-skin=kawaii] #muteBtn{color:#D9547E!important}
+[data-skin=kawaii] #muteBtn[aria-pressed=true]{background:#F58FA8!important;color:#4A1020!important}
+[data-skin=kawaii] select,[data-skin=kawaii] input[type=number],[data-skin=kawaii] input[type=text],[data-skin=kawaii] .title{
+  background:#FFFDFE;border:1.5px solid #EDCBDB;border-radius:10px}
+/* たまごっち風の液晶：うすい緑の画面に濃い文字、ピンクのふち */
+[data-skin=kawaii] .lcd{border:3px solid #F4B6CC;border-radius:14px;box-shadow:inset 0 2px 4px rgba(62,74,51,.25),0 2px 0 #E59AB8;
+  background:radial-gradient(circle,rgba(62,74,51,.06) .8px,transparent 1px) 0 0/3px 3px,#D9E8C8}
+[data-skin=kawaii] .lcd button:hover{color:#1E2618}
+[data-skin=kawaii] .tabs{background:transparent;border-bottom:1.5px dashed #EDB8CD;border-radius:16px 16px 0 0}
+[data-skin=kawaii] .tab{border-radius:12px 12px 0 0;border:1.5px solid #EDCBDB;border-bottom:0;background:#FBEAF0}
+[data-skin=kawaii] .tab.on{background:#FFFDFE;box-shadow:inset 0 3px 0 #F28DB2}
+[data-skin=kawaii] .toolbar{border-bottom:1.5px dashed #F1D2DF}
+[data-skin=kawaii] .toolbar.out{background:#FFF0F5}
+[data-skin=kawaii] .midi-box{border:1.5px solid #EDCBDB;border-radius:999px;background:#FFF0F5}
+[data-skin=kawaii] .blk{border-radius:12px;border:1.5px solid #E3B2C8;background:#FFFDFE;box-shadow:0 2px 0 #F0CFDD}
+[data-skin=kawaii] .blk.playing{background:#FCDDE9;border-color:#E2669A}
+[data-skin=kawaii] .pchip{border-radius:12px;border:1.5px solid #EDCBDB;background:#FFFDFE;box-shadow:0 2px 0 #F3D6E2}
+[data-skin=kawaii] .footer{border-top:1.5px dashed #F1D2DF}
+[data-skin=kawaii] .menu-pop{border:1.5px solid #EDB8CD;border-radius:14px;box-shadow:0 6px 18px rgba(180,95,138,.18)}
+[data-skin=kawaii] .chip-edit{border-radius:16px}
+
+/* Modern：プロ向けの道具（参考：Ableton Live・Apple のアプリ）。枠線もグラデーションも使わず、面の塗り分けと余白で区切る。
+   エリア名は小さく字間の広い灰色のラベル、ボタンはうすい灰色の塗り、オンは黒。表示部も明るく平らに */
+:root[data-skin=modern]{
+  --page:#E4E4E7; --bg:#E4E4E7; --panel:#F4F4F5; --card:#FFFFFF; --ink:#18181B; --ink2:#3F3F46; --muted:#71717A; --line:#E4E4E7;
+  --faint:#A1A1AA; --faint2:#D4D4D8; --grid:#ECECEE; --grid2:#F4F4F5;
+  --live:#2563EB; --sel:rgba(37,99,235,.10); --pressed-bg:#18181B; --pressed-fg:#FAFAFA; --note:#2563EB; --note-edge:#1D4ED8; --note-hi:#3B82F6;
+  --wheel-outer:#27272A; --wheel-inner:#3F3F46;
+  --lcd-hi:#18181B; --lcd-lo:#3F3F46; --lcd-dim:#A1A1AA; --lcd-line:#E4E4E7;
+  --font-head:"SF Pro Display","Helvetica Neue","Segoe UI Variable Display","Segoe UI","Hiragino Sans",sans-serif;
+}
+[data-skin=modern] body{font-family:-apple-system,"SF Pro Text","Segoe UI Variable Text","Segoe UI","Hiragino Sans","Yu Gothic UI",sans-serif}
+[data-skin=modern] .stage{gap:8px;padding:8px}
+[data-skin=modern] .panel{border:0;border-radius:10px;background:#F4F4F5}
+[data-skin=modern] .left{padding:14px 16px;gap:6px}
+[data-skin=modern] .sub-head{border-top:0;margin-top:12px;padding:0;color:#71717A;font-size:10.5px;font-weight:600;letter-spacing:.12em}
+[data-skin=modern] .top h1{font-size:16px;font-weight:700;letter-spacing:-.01em}
+[data-skin=modern] button:not(.lcd button):not(.menu-pop button):not(.tclose):not(.x):not(.rs){
+  background:#E4E4E7;border:0;border-radius:6px;color:#18181B;padding:4px 10px}
+[data-skin=modern] button:not(.lcd button):not(.menu-pop button):hover{background:#D4D4D8}
+[data-skin=modern] .seg{border:0;border-radius:7px;background:#E4E4E7;padding:2px;gap:2px}
+[data-skin=modern] .seg button{border:0!important;border-radius:5px!important;background:transparent!important;padding:2px 9px!important}
+[data-skin=modern] .seg button[aria-pressed=true]{background:#FFFFFF!important;color:#18181B!important;box-shadow:0 1px 2px rgba(0,0,0,.12)!important}
+[data-skin=modern] .tg[aria-pressed=true],[data-skin=modern] .play{background:#18181B!important;color:#FAFAFA!important}
+[data-skin=modern] .play.on{background:#2563EB!important}
+[data-skin=modern] #muteBtn{color:#DC2626!important;background:#FEE2E2!important}
+[data-skin=modern] #muteBtn[aria-pressed=true]{background:#DC2626!important;color:#fff!important}
+[data-skin=modern] select,[data-skin=modern] input[type=number],[data-skin=modern] input[type=text],[data-skin=modern] .title{
+  background:#FFFFFF;border:0;border-radius:6px;box-shadow:inset 0 0 0 1px #E4E4E7}
+[data-skin=modern] .lcd{background:#FFFFFF;border:0;border-radius:8px;box-shadow:inset 0 0 0 1px #E4E4E7}
+[data-skin=modern] .lcd .r1{color:#2563EB}
+[data-skin=modern] .lcd button:hover{color:#2563EB}
+[data-skin=modern] .main.panel{background:#FFFFFF}
+[data-skin=modern] .tabs{background:#F4F4F5;border-bottom:0;border-radius:10px 10px 0 0}
+[data-skin=modern] .tab{border:0;border-radius:7px 7px 0 0;background:transparent}
+[data-skin=modern] .tab.on{background:#FFFFFF;box-shadow:none}
+[data-skin=modern] .toolbar{border-bottom:1px solid #F4F4F5}
+[data-skin=modern] .toolbar.out{background:#FAFAFA}
+[data-skin=modern] .midi-box{border:0;background:#F4F4F5;border-radius:8px}
+[data-skin=modern] .lane{background:#F4F4F5;border-color:#ECECEE}
+[data-skin=modern] .blk{background:#FFFFFF;border:1px solid #C4C4CC;border-radius:6px;box-shadow:0 1px 2px rgba(0,0,0,.06)}   /* 帯の灰色に白いチップと細い線で、コードの境目を見せる */
+[data-skin=modern] .blk.sel{border-color:var(--chord);box-shadow:inset 0 0 0 1px var(--chord)}
+[data-skin=modern] .blk.playing{background:#DBEAFE;border-color:#2563EB}
+[data-skin=modern] .pchip{background:#FFFFFF;border:0;border-radius:6px;box-shadow:0 0 0 1px #E4E4E7}
+[data-skin=modern] .footer{border-top:1px solid #F4F4F5;background:#FAFAFA;border-radius:0 0 10px 10px}
+[data-skin=modern] .menu-pop{border:0;border-radius:10px;box-shadow:0 0 0 1px rgba(0,0,0,.06),0 10px 30px rgba(0,0,0,.12)}
