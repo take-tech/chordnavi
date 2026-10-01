@@ -5,7 +5,7 @@ import {createWheel} from '../../shared/ui/wheel.js';
 import {PPQ,METERS,SNAPS,snapTicks,barTicksOf,beatTicksOf,SECTION_COLORS,SECTION_PRESETS,PATTERNS,MIN_BPM,MAX_BPM,
   newSong,demoSong,newSection,newChord,cloneSection,timeline,placedChords,placeChord,removeChord,resizeChord,
   setSectionBars,insertBars,appendSectionFrom,stretchChord,stretchChordStart,pruneMarks,mergeSections,splitSection,insertProgression,setMark,rangeTicks,copyRange,pasteAt,renderSong,buildSmf,safeFileName,
-  songTonic,songFlat,nameOf,tempoAt,PATTERN_GROUPS,NEW_TITLE,SKETCH_SCALES,keyScale,defaultScale,meterAt,tickToSec,withExtension,keyTonic,sameKey,setKeyMark,keyRegion,transposeBars,voicingOf,patternById,VOICINGS,GUITAR_AREAS,melodyBase,addNote,secToTick} from './song.js';
+  songTonic,songFlat,nameOf,tempoAt,PATTERN_GROUPS,NEW_TITLE,SKETCH_SCALES,keyScale,defaultScale,meterAt,tickToSec,withExtension,keyTonic,sameKey,setKeyMark,keyRegion,transposeBars,voicingOf,patternById,VOICINGS,GUITAR_AREAS,melodyBase,addNote,secToTick,placedNotes} from './song.js';
 import {createRoll,M_SNAPS,M_LENS,ZOOM_DEFAULT,clampZoom,zoomToSlider,sliderToZoom} from './roll.js';
 import * as player from './player.js';
 import {hasNative,nativeFn,onNative} from '../../shared/ui/juce-bridge.js';
@@ -365,9 +365,13 @@ function scrollToBar(gi){
   if(r.top<s.top+4||r.bottom>s.bottom-4)e.scrollIntoView({block:'nearest'});
 }
 
+// シートに出すメロディー（曲にメロディーがあるときだけ）：小節ごとの音と、曲全体の高さの範囲
+let sheetMelody=null;
 function renderSheet(){
   const scroll=sheet.scrollTop;
   sheet.innerHTML='';
+  const pn=placedNotes(song,tl);
+  sheetMelody=pn.length?{notes:pn,lo:Math.min(...pn.map(x=>x.midi))-1,hi:Math.max(...pn.map(x=>x.midi))+1}:null;
   const pcs=placedChords(song,tl), laneW=(sheet.clientWidth-40)/ui.perRow;
   song.sections.forEach((s,si)=>{
     const {from,to}=tl.secRanges[si], color=SECTION_COLORS[s.color%SECTION_COLORS.length];
@@ -465,6 +469,27 @@ function barCell(b,rowEnd,songEnd){
     const l=h('div',t%bt===0?'beat':'half');l.style.left=t/b.ticks*100+'%';lane.appendChild(l);
   }
   bar.append(no,lane);
+  // メロディーの帯：その小節で鳴っている音を、曲全体の高さの範囲に合わせて細い線で（小節をまたぐ音は小節ごとに切る）。押すとメロディーの画面のその位置へ
+  if(sheetMelody){
+    const ml=h('div','mlane'), end=b.start+b.ticks, {lo,hi}=sheetMelody;
+    for(const x of sheetMelody.notes){
+      if(x.end<=b.start||x.start>=end)continue;
+      const s0=Math.max(x.start,b.start), e0=Math.min(x.end,end);
+      const n=h('div','mnote');
+      n.style.cssText=`left:${(s0-b.start)/b.ticks*100}%;width:${(e0-s0)/b.ticks*100}%;top:${2+(hi-x.midi)/Math.max(1,hi-lo)*11}px`;
+      ml.appendChild(n);
+    }
+    ml.title='メロディー（押すとメロディーの画面のこの位置へ）';
+    ml.addEventListener('pointerdown',e=>{
+      e.stopPropagation();
+      const r=ml.getBoundingClientRect(), st=snapTicks('beat',b.meter);
+      const pos=Math.min(b.ticks-1,Math.floor((e.clientX-r.left)/r.width*b.ticks/st)*st);
+      cursor={gi:b.gi,pos};range=null;sel=null;
+      $('viewSeg').querySelector('[data-v=melody]').click();
+      roll.reveal(b.start+pos);
+    });
+    bar.appendChild(ml);
+  }
   return bar;
 }
 function sectionHead(s,si){

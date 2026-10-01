@@ -191,6 +191,9 @@ body.grabbing,body.grabbing *{cursor:grabbing!important}
 .lane{position:relative;height:55px;background:var(--card);border-top:1px solid var(--grid);border-bottom:1px solid var(--grid);cursor:crosshair}
 .lane .beat{position:absolute;top:0;bottom:0;width:0;border-left:1px solid var(--grid)}
 .lane .half{position:absolute;top:28px;bottom:0;width:0;border-left:1px dotted var(--grid)}
+.mlane{position:relative;height:16px;background:var(--grid2);border-bottom:1px solid var(--grid);cursor:pointer;overflow:hidden}
+.mlane:hover{background:var(--sel)}
+.mlane .mnote{position:absolute;height:2px;background:#3D7CC9;border-radius:1px;min-width:2px}
 .bar.insel .lane{background:linear-gradient(var(--sel),var(--sel)),var(--card)}
 .bar.insel .bar-no{color:var(--live);font-weight:700}
 .bar.play .bar-no{color:var(--chord);font-weight:700}
