@@ -115,8 +115,13 @@ public:
         resetState,
         themeLight = 11,
         themeDark,
-        themeAuto
+        themeAuto,
+        skinFirst = 21   // スキン（kSkins の順）
     };
+
+    // スキン：UI の名前（data-skin）と表示名
+    static constexpr const char* kSkins[][2] = { { "kawaii", "Kawaii" }, { "cyber", "Cyber" }, { "modern", "Modern" },
+                                                 { "luxury", "Luxury" }, { "old", "Old" } };
 
     std::function<void (int)> onItem;
     std::function<juce::String()> currentTheme;   // チェックを付けるため
@@ -133,6 +138,9 @@ public:
         themes.addItem (themeLight, String::fromUTF8 ("ライト"), true, theme == "light");
         themes.addItem (themeDark,  String::fromUTF8 ("ダーク"), true, theme == "dark");
         themes.addItem (themeAuto,  String::fromUTF8 ("自動（システムに合わせる）"), true, theme == "auto");
+        themes.addSeparator();
+        for (int i = 0; i < (int) std::size (kSkins); ++i)
+            themes.addItem (skinFirst + i, kSkins[i][1], true, theme == kSkins[i][0]);
         m.addSubMenu (String::fromUTF8 ("テーマ"), themes);
         m.addSeparator();
         m.addItem (saveState, String::fromUTF8 ("状態を保存…"));
@@ -191,7 +199,10 @@ public:
                 case OptionsMenu::themeLight:    setTheme ("light");                 break;
                 case OptionsMenu::themeDark:     setTheme ("dark");                  break;
                 case OptionsMenu::themeAuto:     setTheme ("auto");                  break;
-                default: break;
+                default:
+                    if (item >= OptionsMenu::skinFirst && item < OptionsMenu::skinFirst + (int) std::size (OptionsMenu::kSkins))
+                        setTheme (OptionsMenu::kSkins[item - OptionsMenu::skinFirst][0]);
+                    break;
             }
         };
 

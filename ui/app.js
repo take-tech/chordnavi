@@ -7,7 +7,7 @@ import {
   CHORD,spellScaleTone,spellChordInterval,convertChordSize
 } from '../shared/ui/theory.js';
 import {renderStaff} from './staff.js';
-import {threePositions,nearestVoicing,TAB_AREAS} from '../shared/ui/guitar.js';
+import {threePositions,nearestVoicing,TAB_AREAS,OPEN_MIDI} from '../shared/ui/guitar.js';
 import {createWheel} from '../shared/ui/wheel.js';
 import {attachMidiDrag,saveMidi} from './midi.js';
 import {playChord as play1,playProgression as playN,playNote,playNotes,stopPreview,setLiveTimbre,setMuted,nativeClock,TIMBRES} from './audio.js';
@@ -15,7 +15,10 @@ import {getHostInfo,onHostTempo,onMidiNotes,onPreviewPos,onSetTheme,reportTheme}
 import {loadState,saveState,onStateRestored} from './persist.js';
 
 /* ---------- 状態 ---------- */
-const state={idx:0,mode:'major',scale:'major',label:'name',view:'kb',dia:'7',sel:null,prog:{major:0,minor:0},vari:{major:0,minor:0},timbre:'organ',loop:false,syncTempo:false,half:false,pick:false,editIdx:null,fbView:'fb',tabArea:'low',conform:false,theme:'light'};
+const state={idx:0,mode:'major',scale:'major',label:'name',view:'kb',dia:'7',sel:null,prog:{major:0,minor:0},vari:{major:0,minor:0},timbre:'organ',loop:false,syncTempo:false,half:false,pick:false,editIdx:null,fbView:'fb',tabArea:'low',tuning:null,conform:false,theme:'light'};
+// ギターのチューニング：開放弦の音（MIDI）の並び。添字 0＝1弦（いちばん高い弦）。null はレギュラー（6弦）
+const tuningStrings=()=>state.tuning||OPEN_MIDI;
+const octName=m=>noteName(mod12(m),isFlatKey(state.idx))+(Math.floor(m/12)-1);
 // 「スケールに沿う」が効いているか（対象の 7 音のスケールのときだけ）
 const conformOn=()=>state.conform&&CONFORM_SCALES.includes(state.scale);
 const conformed=(bars,mode=state.mode)=>conformOn()?conformBars(bars,mode,state.scale):bars;
@@ -24,7 +27,7 @@ const picks=new Map();
 const pickedNotes=()=>[...new Set(picks.values())];
 const isPicked=midi=>[...picks.values()].includes(midi);
 const stringPick=s=>picks.get('s'+s);
-const MAX_PICK=8, PICK_COLOR='#6B4FBB';
+const MAX_PICK=8, PICK_COLOR='var(--pick)';
 const tonic=()=>tonicOf(state.idx,state.mode);
 const playChord=ch=>{stopPlayback(false);play1(ch,state.timbre);};
 
@@ -94,7 +97,6 @@ const syncing=()=>state.syncTempo&&hostBpm>0;
 const bpm=()=>syncing()?Math.min(300,Math.max(20,hostBpm)):inputBpm();
 const host=await getHostInfo();
 if(!host.standalone){
-  document.getElementById('themeBtn').hidden=false;   // DAW 上はメニューが無いのでタイトル横にボタン
   hostBpm=host.bpm||0;
   state.syncTempo=true;
   document.getElementById('bpmSync').hidden=false;
@@ -147,19 +149,33 @@ bindSeg('labelSeg','label',()=>{renderKeyPanel();renderFretPanel();});
 bindSeg('viewSeg','view',()=>render());
 bindSeg('fbViewSeg','fbView',()=>render());
 
-/* ---------- テーマ（ライト／ダーク／自動＝OS の外観に合わせる） ---------- */
-// Standalone はメニューの「オプション → テーマ」、DAW 上はタイトル横のボタンで切り替える
-const THEMES=['light','dark','auto'], THEME_LABEL={light:'☀ ライト',dark:'☾ ダーク',auto:'◐ 自動'};
+/* ---------- テーマ（ライト／ダーク／自動＝OS の外観に合わせる）とスキン ---------- */
+// タイトルの右の歯車のボタンのメニューで切り替える（Standalone はメニューの「オプション → テーマ」でも）。
+// スキンは明るい／暗い土台（data-theme）の上に data-skin で色と素材を上書きする（ChordSketch と同じ考え方）
+const THEMES={light:{base:'light',label:'☀ ライト'},dark:{base:'dark',label:'☾ ダーク'},auto:{base:null,label:'◐ 自動'},
+  kawaii:{base:'light',skin:'kawaii',label:'Kawaii'},cyber:{base:'dark',skin:'cyber',label:'Cyber'},modern:{base:'light',skin:'modern',label:'Modern'},
+  luxury:{base:'dark',skin:'luxury',label:'Luxury'},old:{base:'light',skin:'old',label:'Old'}};
 const darkQuery=matchMedia('(prefers-color-scheme: dark)');
+const themeBtn=document.getElementById('themeBtn'), themePop=document.getElementById('themePop');
 function applyTheme(){
-  const dark=state.theme==='dark'||(state.theme==='auto'&&darkQuery.matches);
-  document.documentElement.dataset.theme=dark?'dark':'light';
-  document.getElementById('themeBtn').textContent=THEME_LABEL[state.theme];
+  const th=THEMES[state.theme]||THEMES.light, base=th.base||(darkQuery.matches?'dark':'light');
+  document.documentElement.dataset.theme=base;
+  if(th.skin)document.documentElement.dataset.skin=th.skin;else delete document.documentElement.dataset.skin;
+  themeBtn.title=`設定（テーマ：${th.label}）`;
+  themePop.querySelectorAll('button').forEach(b=>b.setAttribute('aria-checked',b.dataset.v===state.theme));
   reportTheme(state.theme);
 }
-function setTheme(name){if(!THEMES.includes(name))return;state.theme=name;applyTheme();persist();}
+function setTheme(name){if(!(name in THEMES))return;state.theme=name;applyTheme();persist();render();}
 darkQuery.addEventListener('change',()=>{if(state.theme==='auto')applyTheme();});
-document.getElementById('themeBtn').onclick=()=>setTheme(THEMES[(THEMES.indexOf(state.theme)+1)%THEMES.length]);
+for(const [id,th] of Object.entries(THEMES)){
+  const b=document.createElement('button');b.dataset.v=id;b.textContent=th.label;b.setAttribute('role','menuitemradio');
+  b.onclick=()=>{themePop.hidden=true;themeBtn.setAttribute('aria-expanded','false');setTheme(id);};
+  if(id==='kawaii')themePop.append(Object.assign(document.createElement('div'),{className:'menu-sep'}));
+  themePop.append(b);
+}
+themePop.prepend(Object.assign(document.createElement('span'),{className:'menu-lbl',textContent:'テーマ'}));
+themeBtn.onclick=e=>{e.stopPropagation();themePop.hidden=!themePop.hidden;themeBtn.setAttribute('aria-expanded',!themePop.hidden);};
+document.addEventListener('pointerdown',e=>{if(!themePop.hidden&&!e.target.closest('#themePop,#themeBtn')){themePop.hidden=true;themeBtn.setAttribute('aria-expanded','false');}});
 onSetTheme(setTheme);
 bindSeg('tabAreaSeg','tabArea',()=>render());
 // 選択中のコードも3和音／4和音の対応する和音に切り替えて、鍵盤・指板の着色に反映し、試聴する
@@ -200,12 +216,12 @@ function noteInfo(pc){
 }
 function dotStyle(n){
   if(n.chordMode){
-    if(n.inChord)return {fill:n.chordRoot?'#8E2346':'#C4456A',op:1};
-    if(n.inScale)return {fill:n.isRoot?'#E3A21A':'#2E8C80',op:.25};
+    if(n.inChord)return {fill:n.chordRoot?'var(--chord-root)':'var(--chord)',op:1};
+    if(n.inScale)return {fill:n.isRoot?'var(--root)':'var(--tone)',op:.25};
     return null;
   }
   if(!n.inScale)return null;
-  return {fill:n.isRoot?'#E3A21A':'#2E8C80',op:1};
+  return {fill:n.isRoot?'var(--root)':'var(--tone)',op:1};
 }
 
 /* ---------- 鍵盤 ---------- */
@@ -224,7 +240,7 @@ function renderKeyboard(){
   }
   for(let o=0;o<octs;o++)for(const pc in BLK){
     const midi=BASE+o*12+(+pc), x=(o*7+BLK[pc]+1)*W-BW/2, {n,ds,on,live}=keyStyle(midi);
-    el('rect',{x,y:0,width:BW,height:BH,fill:live?'#1F4FA8':on?'#4B3590':n.inChord?'#8E2346':'var(--key-black)',rx:2,'data-note':midi},g);
+    el('rect',{x,y:0,width:BW,height:BH,fill:live?'var(--live-deep)':on?'var(--pick-deep)':n.inChord?'var(--chord-root)':'var(--key-black)',rx:2,'data-note':midi},g);
     if(ds){el('circle',{cx:x+BW/2,cy:BH-14,r:10.5,fill:ds.fill,opacity:ds.op,stroke:'#fff','stroke-width':1.5},g);
       txt(g,x+BW/2,BH-14,n.label,{fill:'#fff','font-size':9,'font-weight':700,opacity:ds.op===1?1:.6});}
   }
@@ -234,14 +250,16 @@ function renderKeyboard(){
 /* ---------- MIDI キーボード入力 ---------- */
 // 弾いている音（MIDI 番号）。表示できる範囲の外の音はオクターブを折り返して見せる
 let liveNotes=[];
-const LIVE_COLOR='#2F6FD6';
-const KB_RANGE=[48,84], FB_RANGE=[40,79];   // 鍵盤 C3〜C6、指板 E2〜G5
+const LIVE_COLOR='var(--live)';
+const KB_RANGE=[48,84];   // 鍵盤 C3〜C6
+// 指板：いちばん低い開放弦〜いちばん高い弦の 15 フレット（レギュラーなら E2〜G5）
+const fbRange=()=>{const t=tuningStrings();return [Math.min(...t),Math.max(...t)+15];};
 const fold=(n,[lo,hi])=>{while(n<lo)n+=12;while(n>hi)n-=12;return n;};
 let liveKb=new Set(), liveFb=new Set();
 onMidiNotes(info=>{
   liveNotes=[...(info.notes||[])].sort((a,b)=>a-b);
   liveKb=new Set(liveNotes.map(n=>fold(n,KB_RANGE)));
-  liveFb=new Set(liveNotes.map(n=>fold(n,FB_RANGE)));
+  liveFb=new Set(liveNotes.map(n=>fold(n,fbRange())));
   // 弾くたびに全体は描き直さず、鍵盤・指板・五線譜と見出しだけ
   renderKeyPanel();renderFretPanel();renderLive();
 });
@@ -316,42 +334,72 @@ function renderKeyPanel(){
   if(staff)renderStaffView();else renderKeyboard();
 }
 
+/* ---------- ギターのチューニング ---------- */
+// 指板の左の弦の欄の − ＋ で弦ごとに半音ずつ（23〜76）。弦の数は見出しの右（増やすといちばん低い弦の 4 度下に足す、減らすといちばん低い弦を外す）
+const TUNE_MIN=23, TUNE_MAX=76;
+const STANDARD={6:OPEN_MIDI,7:[...OPEN_MIDI,35],8:[...OPEN_MIDI,35,30]};
+const sameArr=(a,b)=>a.length===b.length&&a.every((x,i)=>x===b[i]);
+// 弦の数ごとのレギュラーと同じなら、6弦のレギュラーは null で持つ
+function setTuning(t){
+  state.tuning=sameArr(t,OPEN_MIDI)?null:t;
+  for(const k of [...picks.keys()])if(k.startsWith('s'))picks.delete(k);   // 指板で選んだ音（弦ごと）は外す
+  render();
+}
+function tuneString(s,d){
+  const t=[...tuningStrings()];t[s]=Math.min(TUNE_MAX,Math.max(TUNE_MIN,t[s]+d));
+  setTuning(t);playNote(t[s],state.timbre);
+}
+function setStringCount(n){
+  let t=[...tuningStrings()];
+  while(t.length<n)t.push(Math.max(TUNE_MIN,t[t.length-1]-5));
+  t=t.slice(0,n);setTuning(t);
+}
+document.querySelectorAll('#stringSeg button').forEach(b=>b.addEventListener('click',()=>setStringCount(+b.dataset.v)));
+document.getElementById('tuneReset').onclick=()=>setTuning([...STANDARD[tuningStrings().length]]);
+function syncTuning(){
+  const t=tuningStrings();
+  document.querySelectorAll('#stringSeg button').forEach(b=>b.setAttribute('aria-pressed',+b.dataset.v===t.length));
+  document.getElementById('tuneReset').disabled=sameArr(t,STANDARD[t.length]);
+}
+
 /* ---------- 指板 ---------- */
 /* ---------- TAB譜 ---------- */
 // 選んだコード：3ポジション（6弦・5弦・4弦ルート）。選んでいない・試聴中：進行を選んだエリア（ロー／ミドル／ハイ）で
 function tabColumns(){
   const ch=playback||state.pick?null:state.sel;
-  if(ch)return {mode:'chord',cols:threePositions(ch).map(v=>({title:chordName(ch),
+  if(ch)return {mode:'chord',cols:threePositions(ch,tuningStrings()).map(v=>({title:chordName(ch),
     sub:`${v.bassString+1}弦ルート・${v.open||!v.lo?'開放':v.lo+'フレット'}`,v}))};
   let prev=null;
-  return {mode:'prog',cols:progChords.map((c,i)=>{const v=nearestVoicing(c,TAB_AREAS[state.tabArea],prev);prev=v;
+  return {mode:'prog',cols:progChords.map((c,i)=>{const v=nearestVoicing(c,TAB_AREAS[state.tabArea],prev,tuningStrings());prev=v;
     return {title:chordName(c),sub:'',v,playing:!!playback&&playback.index===i};})};
 }
 function renderTab(){
   const svg=document.getElementById('tab');svg.innerHTML='';
-  const W=895,H=180,L=50,R=885,TOP=46,GAP=20;
+  // 弦の本数が変わっても高さは同じ（線の間隔を詰める）
+  const NS=tuningStrings().length, W=895,H=180,L=50,R=885,TOP=46,GAP=100/(NS-1), BOT=TOP+100;
   svg.setAttribute('viewBox',`0 0 ${W} ${H}`);
   const {mode,cols}=tabColumns();
-  for(let s=0;s<6;s++)el('line',{x1:L,y1:TOP+s*GAP,x2:R,y2:TOP+s*GAP,stroke:'var(--faint)','stroke-width':1.2},svg);
+  for(let s=0;s<NS;s++)el('line',{x1:L,y1:TOP+s*GAP,x2:R,y2:TOP+s*GAP,stroke:'var(--faint)','stroke-width':1.2},svg);
   ['T','A','B'].forEach((c,i)=>txt(svg,26,TOP+18+i*32,c,{fill:'var(--ink)','font-size':15,'font-weight':900}));
-  el('line',{x1:L,y1:TOP,x2:L,y2:TOP+5*GAP,stroke:'var(--ink)','stroke-width':2},svg);
-  el('line',{x1:R,y1:TOP,x2:R,y2:TOP+5*GAP,stroke:'var(--ink)','stroke-width':2},svg);
-  if(!cols.length){txt(svg,W/2,TOP+2.5*GAP,'このコードの形が見つかりません',{fill:'var(--muted)','font-size':13});return;}
+  el('line',{x1:L,y1:TOP,x2:L,y2:BOT,stroke:'var(--ink)','stroke-width':2},svg);
+  el('line',{x1:R,y1:TOP,x2:R,y2:BOT,stroke:'var(--ink)','stroke-width':2},svg);
+  if(!cols.length){txt(svg,W/2,TOP+50,'このコードの形が見つかりません',{fill:'var(--muted)','font-size':13});return;}
   const cw=(R-L)/cols.length, small=cols.length>8;
   cols.forEach((c,i)=>{
     const x0=L+i*cw, cx=x0+cw/2;
     const g=el('g',{class:'col'},svg);
     el('rect',{class:'colbg',x:x0,y:0,width:cw,height:H,fill:c.playing?'var(--chord-tint)':'transparent'},g);
-    if(i>0)el('line',{x1:x0,y1:TOP,x2:x0,y2:TOP+5*GAP,stroke:mode==='prog'?'var(--ink)':'var(--line)','stroke-width':mode==='prog'?1.2:1},g);
-    txt(g,cx,14,c.title,{fill:c.playing?'#C4456A':'var(--ink)','font-size':small?11:14,'font-weight':700});
+    if(i>0)el('line',{x1:x0,y1:TOP,x2:x0,y2:BOT,stroke:mode==='prog'?'var(--ink)':'var(--line)','stroke-width':mode==='prog'?1.2:1},g);
+    txt(g,cx,14,c.title,{fill:c.playing?'var(--chord)':'var(--ink)','font-size':small?11:14,'font-weight':700});
     if(c.sub)txt(g,cx,30,c.sub,{fill:'var(--muted)','font-size':10});
     if(!c.v)return;
-    for(let s=0;s<6;s++){
+    const fs=Math.min(small?12:14,GAP*.75), bh=Math.min(16,GAP-1);
+    for(let s=0;s<NS;s++){
       const f=c.v.frets[s], y=TOP+s*GAP;
       if(f==null){txt(g,cx,y,'×',{fill:'var(--faint2)','font-size':10});continue;}
       const label=String(f);
-      el('rect',{x:cx-(label.length>1?10:7),y:y-8,width:label.length>1?20:14,height:16,fill:c.playing?'var(--chord-tint)':'var(--panel)'},g);
-      txt(g,cx,y,label,{fill:s===c.v.bassString?'#E3A21A':'var(--ink)','font-size':small?12:14,'font-weight':700});
+      el('rect',{x:cx-(label.length>1?10:7),y:y-bh/2,width:label.length>1?20:14,height:bh,fill:c.playing?'var(--chord-tint)':'var(--panel)'},g);
+      txt(g,cx,y,label,{fill:s===c.v.bassString?'var(--root)':'var(--ink)','font-size':fs,'font-weight':700});
     }
     if(mode==='chord')txt(g,cx,H-12,'クリックで試聴',{fill:'var(--faint)','font-size':9});
     g.addEventListener('pointerdown',e=>{e.preventDefault();playNotes(c.v.notes,state.timbre);});
@@ -366,13 +414,13 @@ function renderChart(){
   if(!cols.length){txt(svg,W/2,H/2,'このコードの形が見つかりません',{fill:'var(--muted)','font-size':13});return;}
   const cw=(R-L)/cols.length, small=cols.length>8;
   // 表示するフレット数・弦の間隔・1フレットの幅（コードが少ないほど大きく描く）
-  const FRETS=4, SG=19;
+  const NS=tuningStrings().length, FRETS=4, SG=95/(NS-1);   // 弦の本数が変わっても高さは同じ
   const top=mode==='chord'?44:38;
   const fw=Math.min(mode==='chord'?42:small?14:34,(cw-(small?14:40))/FRETS);
   cols.forEach((c,i)=>{
     const x0=L+i*cw, cx=x0+cw/2, g=el('g',{class:'col'},svg);
     el('rect',{class:'colbg',x:x0,y:0,width:cw,height:H,fill:c.playing?'var(--chord-tint)':'transparent'},g);
-    txt(g,cx,14,c.title,{fill:c.playing?'#C4456A':'var(--ink)','font-size':small?11:14,'font-weight':700});
+    txt(g,cx,14,c.title,{fill:c.playing?'var(--chord)':'var(--ink)','font-size':small?11:14,'font-weight':700});
     if(c.sub)txt(g,cx,30,c.sub,{fill:'var(--muted)','font-size':10});
     if(!c.v)return;
     const v=c.v, fretted=v.frets.filter(f=>f!=null&&f>0);
@@ -380,13 +428,14 @@ function renderChart(){
     const start=hi<=FRETS?1:lo;                        // ローポジションはナットから
     const gx=cx-fw*FRETS/2+(small?3:6), sy=s=>top+s*SG;
     // 地・フレット・弦（6弦ほど太く）
-    el('rect',{x:gx,y:sy(0),width:fw*FRETS,height:sy(5)-sy(0),fill:'var(--card)'},g);
-    for(let k=0;k<=FRETS;k++)el('line',{x1:gx+k*fw,y1:sy(0),x2:gx+k*fw,y2:sy(5),stroke:k===0&&start===1?'var(--ink)':'var(--faint)',
+    const last=NS-1;
+    el('rect',{x:gx,y:sy(0),width:fw*FRETS,height:sy(last)-sy(0),fill:'var(--card)'},g);
+    for(let k=0;k<=FRETS;k++)el('line',{x1:gx+k*fw,y1:sy(0),x2:gx+k*fw,y2:sy(last),stroke:k===0&&start===1?'var(--ink)':'var(--faint)',
       'stroke-width':k===0&&start===1?(small?3:5):1.2},g);
-    for(let s=0;s<6;s++)el('line',{x1:gx,y1:sy(s),x2:gx+fw*FRETS,y2:sy(s),stroke:'var(--string)','stroke-width':.8+s*.28},g);
-    if(start>1)txt(g,gx+fw/2,sy(5)+(small?11:14),`${start}fr`,{fill:'var(--ink)','font-size':small?9:12,'font-weight':700});
+    for(let s=0;s<NS;s++)el('line',{x1:gx,y1:sy(s),x2:gx+fw*FRETS,y2:sy(s),stroke:'var(--string)','stroke-width':.8+s*1.4/last},g);
+    if(start>1)txt(g,gx+fw/2,sy(last)+(small?11:14),`${start}fr`,{fill:'var(--ink)','font-size':small?9:12,'font-weight':700});
     // 開放（○）・ミュート（×）
-    for(let s=0;s<6;s++){
+    for(let s=0;s<NS;s++){
       const f=v.frets[s], x=gx-(small?6:9);
       if(f==null)txt(g,x,sy(s),'×',{fill:'var(--muted)','font-size':small?9:11});
       else if(f===0)el('circle',{cx:x,cy:sy(s),r:small?2.6:3.5,fill:'none',stroke:'var(--ink)','stroke-width':1.2},g);
@@ -401,7 +450,7 @@ function renderChart(){
     }
     v.frets.forEach((f,s)=>{
       if(f==null||f===0||(barre&&f===lo&&s!==v.bassString))return;
-      el('circle',{cx:fx(f),cy:sy(s),r,fill:s===v.bassString?'#E3A21A':'var(--ink)',stroke:s===v.bassString&&barre&&f===lo?'var(--card)':'none','stroke-width':1},g);
+      el('circle',{cx:fx(f),cy:sy(s),r,fill:s===v.bassString?'var(--root)':'var(--ink)',stroke:s===v.bassString&&barre&&f===lo?'var(--card)':'none','stroke-width':1},g);
     });
     if(mode==='chord')txt(g,cx,H-8,'クリックで試聴',{fill:'var(--faint)','font-size':9});
     g.addEventListener('pointerdown',e=>{e.preventDefault();playNotes(v.notes,state.timbre);});
@@ -414,7 +463,8 @@ function renderFretPanel(){
   document.getElementById('tab').toggleAttribute('hidden',!tab);
   const showArea=tab&&!(state.sel&&!playback&&!state.pick);
   document.getElementById('tabAreaSeg').toggleAttribute('hidden',!showArea);
-  document.getElementById('fbLegend').textContent=tab?'上が1弦・オレンジはベース（最低音）':'レギュラーチューニング・上が1弦';
+  document.getElementById('fbLegend').textContent=tab?'上が1弦・オレンジはベース（最低音）':'上が1弦';
+  syncTuning();
   // 見出し（進行名は renderProgs の後で確定している）
   const label=state.fbView==='chart'?'コード図':'TAB';
   document.getElementById('fbTitle').textContent=tab
@@ -425,26 +475,33 @@ function renderFretPanel(){
 
 function renderFretboard(){
   const svg=document.getElementById('fb');svg.innerHTML='';
-  const FR=15,FW=55,SS=26,L=60,T=14,strings=[4,11,7,2,9,4];
-  const Wd=L+FR*FW+10,Hd=T+SS*5+36;
+  // 弦の本数が変わっても高さは同じ（6弦の 26 の間隔を詰める。丸も小さく）
+  const OPEN=tuningStrings(), NS=OPEN.length, H5=26*5;
+  // 左の弦の欄：− 開放弦の音名 ＋（押すと半音ずつ変える）
+  const FR=15,L=118,FW=(895-10-L)/FR,SS=H5/(NS-1),T=14, R=Math.min(12,SS*.46), mid=T+H5/2;
+  const Wd=L+FR*FW+10,Hd=T+H5+36;
   svg.setAttribute('viewBox',`0 0 ${Wd} ${Hd}`);
-  el('rect',{x:L,y:T-8,width:FR*FW,height:SS*5+16,fill:'var(--wood)',rx:2},svg);
-  for(const f of [3,5,7,9,15])el('circle',{cx:L+(f-.5)*FW,cy:T+SS*2.5,r:6,fill:'var(--inlay)'},svg);
-  el('circle',{cx:L+11.5*FW,cy:T+SS*1.5,r:6,fill:'var(--inlay)'},svg);el('circle',{cx:L+11.5*FW,cy:T+SS*3.5,r:6,fill:'var(--inlay)'},svg);
+  el('rect',{x:L,y:T-8,width:FR*FW,height:H5+16,fill:'var(--wood)',rx:2},svg);
+  for(const f of [3,5,7,9,15])el('circle',{cx:L+(f-.5)*FW,cy:mid,r:6,fill:'var(--inlay)'},svg);
+  el('circle',{cx:L+11.5*FW,cy:mid-26,r:6,fill:'var(--inlay)'},svg);el('circle',{cx:L+11.5*FW,cy:mid+26,r:6,fill:'var(--inlay)'},svg);
   for(let f=0;f<=FR;f++){
-    el('line',{x1:L+f*FW,y1:T-8,x2:L+f*FW,y2:T+SS*5+8,stroke:f===0?'var(--nut)':'var(--fret)','stroke-width':f===0?6:2},svg);
-    if(f>0)txt(svg,L+(f-.5)*FW,T+SS*5+22,f,{fill:'var(--muted)','font-size':12});
+    el('line',{x1:L+f*FW,y1:T-8,x2:L+f*FW,y2:T+H5+8,stroke:f===0?'var(--nut)':'var(--fret)','stroke-width':f===0?6:2},svg);
+    if(f>0)txt(svg,L+(f-.5)*FW,T+H5+22,f,{fill:'var(--muted)','font-size':12});
   }
-  const OPEN=[64,59,55,50,45,40];   // 上が1弦＝E4
-  strings.forEach((open,s)=>{
+  OPEN.forEach((open,s)=>{
     const y=T+s*SS;
-    el('line',{x1:L,y1:y,x2:L+FR*FW,y2:y,stroke:'var(--string)','stroke-width':1+s*.35},svg);
-    txt(svg,13,y,(s+1)+'弦',{fill:'var(--muted)','font-size':10});
+    el('line',{x1:L,y1:y,x2:L+FR*FW,y2:y,stroke:'var(--string)','stroke-width':1+s*1.75/(NS-1)},svg);
+    const fs=NS>6?10:11, bh=Math.min(22,SS-2);
+    txt(svg,12,y,'−',{fill:'var(--ink2)','font-size':14,'font-weight':700});
+    txt(svg,40,y,octName(open),{fill:'var(--ink)','font-size':fs+1,'font-weight':700});
+    txt(svg,68,y,'＋',{fill:'var(--ink2)','font-size':12,'font-weight':700});
+    el('rect',{class:'tune',x:1,y:y-bh/2,width:22,height:bh,rx:3,'data-tune':-1,'data-string':s},svg).append(Object.assign(document.createElementNS('http://www.w3.org/2000/svg','title'),{textContent:`${s+1}弦を半音下げる`}));
+    el('rect',{class:'tune',x:57,y:y-bh/2,width:22,height:bh,rx:3,'data-tune':1,'data-string':s},svg).append(Object.assign(document.createElementNS('http://www.w3.org/2000/svg','title'),{textContent:`${s+1}弦を半音上げる`}));
     for(let f=0;f<=FR;f++){
       const {n,ds}=fretStyle(s,OPEN[s]+f); if(!ds)continue;
-      const x=f===0?L-18:L+(f-.5)*FW;
-      el('circle',{cx:x,cy:y,r:12,fill:ds.fill,opacity:ds.op,stroke:'#fff','stroke-width':1.5},svg);
-      txt(svg,x,y,n.label,{fill:'#fff','font-size':n.label.length>2?9:11,'font-weight':700,opacity:ds.op===1?1:.6});
+      const x=f===0?L-18:L+(f-.5)*FW, k=R/12;
+      el('circle',{cx:x,cy:y,r:R,fill:ds.fill,opacity:ds.op,stroke:'#fff','stroke-width':1.5},svg);
+      txt(svg,x,y,n.label,{fill:'#fff','font-size':(n.label.length>2?9:11)*Math.max(k,.85),'font-weight':700,opacity:ds.op===1?1:.6});
     }
   });
   // クリック判定用の透明な枠（弦×フレット）
@@ -459,6 +516,8 @@ function renderFretboard(){
 // 鍵盤・指板を押したらその音を鳴らす。コード判別中は音の選択／解除
 for(const id of ['kb','fb'])
   document.getElementById(id).addEventListener('pointerdown',e=>{
+    const tune=e.target.dataset&&e.target.dataset.tune;
+    if(tune!=null){e.preventDefault();tuneString(+e.target.dataset.string,+tune);return;}
     const note=e.target.dataset&&e.target.dataset.note;
     if(note==null)return;
     e.preventDefault();
@@ -789,7 +848,7 @@ function render(){
 function persist(){
   saveState({idx:state.idx,mode:state.mode,scale:state.scale,label:state.label,view:state.view,dia:state.dia,
     prog:state.prog,vari:state.vari,timbre:state.timbre,loop:state.loop,half:state.half,
-    syncTempo:!!state.syncTempo,bpm:inputBpm(),fbView:state.fbView,tabArea:state.tabArea,conform:state.conform,theme:state.theme});
+    syncTempo:!!state.syncTempo,bpm:inputBpm(),fbView:state.fbView,tabArea:state.tabArea,tuning:state.tuning,conform:state.conform,theme:state.theme});
 }
 // 読み込んだ値は1つずつ確かめてから使う（古い・壊れたデータでも落ちないように）
 function applySaved(saved){
@@ -805,9 +864,10 @@ function applySaved(saved){
   pick('dia',oneOf(['7','3']));
   pick('fbView',oneOf(['fb','chart','tab']));
   pick('tabArea',oneOf(Object.keys(TAB_AREAS)));
+  pick('tuning',v=>v===null||Array.isArray(v)&&v.length>=6&&v.length<=8&&v.every(m=>Number.isInteger(m)&&m>=TUNE_MIN&&m<=TUNE_MAX));
   pick('timbre',oneOf(TIMBRES.map(t=>t.id)));
   pick('loop',bool);pick('half',bool);pick('conform',bool);
-  pick('theme',oneOf(['light','dark','auto']));
+  pick('theme',v=>typeof v==='string'&&v in THEMES);
   if(!host.standalone)pick('syncTempo',bool);
   for(const key of ['prog','vari'])
     for(const m of ['major','minor']){
