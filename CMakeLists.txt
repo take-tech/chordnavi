@@ -145,7 +145,7 @@ juce_add_binary_data(ChordSketchUIData
 )
 
 juce_add_plugin(ChordSketch
-    VERSION                     0.9.1
+    VERSION                     0.9.2
     COMPANY_NAME                Ranze
     PLUGIN_MANUFACTURER_CODE    Rnze
     PLUGIN_CODE                 Cdsk
@@ -160,6 +160,11 @@ juce_add_plugin(ChordSketch
     EDITOR_WANTS_KEYBOARD_FOCUS TRUE
     NEEDS_WEBVIEW2              TRUE
     DOCUMENT_EXTENSIONS         chordsketch   # Finder でダブルクリックしたら開く（Windows はインストーラーで登録）
+    # iOS（iPad・iPhone）：横向きだけ（時間軸の画面が中心のため）。全画面で、ステータスバーは隠す
+    IPHONE_SCREEN_ORIENTATIONS  UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
+    IPAD_SCREEN_ORIENTATIONS    UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
+    REQUIRES_FULL_SCREEN        TRUE
+    STATUS_BAR_HIDDEN           TRUE
 )
 
 target_sources(ChordSketch PRIVATE

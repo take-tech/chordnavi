@@ -9,6 +9,7 @@
 <body>
 <div class="stage" id="stage">
   <header class="top panel" aria-label="トップバー">
+    <button id="sideBtn" class="tg ic side-btn" aria-pressed="true" aria-label="サイドパネル" title="サイドパネルを隠す・出す"><svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><rect x="2.5" y="3.5" width="15" height="13" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 3.5v13" stroke="currentColor" stroke-width="1.6"/><path d="M4.5 7h1.8M4.5 10h1.8M4.5 13h1.8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg></button>
     <h1>ChordSketch</h1>
     <input id="title" class="title" maxlength="60" aria-label="曲名"><span id="fileState" class="file-state" hidden title="保存していない変更があります">●</span>
     <div class="transport" role="group" aria-label="トランスポート">
@@ -74,6 +75,7 @@
   </header>
 
   <aside class="left panel" aria-label="サイドパネル">
+    <button id="sidePin" class="tg side-pin" aria-pressed="false" aria-label="サイドパネルを固定" title="左に固定する"><svg viewBox="0 0 20 20" width="15" height="15" aria-hidden="true"><path d="M7 3h6l-1 5 3 3H5l3-3z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M10 11v6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
     <svg id="wheel" viewBox="-210 -215 420 425" role="group" aria-label="五度圏"></svg>
     <div class="keyrow">
       <select id="keySel" aria-label="キー"></select>
@@ -148,6 +150,9 @@
       <div class="seg small tg-pair" role="group" aria-label="コードトーン">
         <button id="guideChord" aria-pressed="true" title="コードトーンの行に色（ルートは濃く）">コードトーン</button><button id="rollDeg" aria-pressed="true" title="度数（R・3・5…）を出す・消す">度数</button></div>
       <button id="guideScale" class="tg small" aria-pressed="true" title="キーのスケールの音の行に色を付ける">スケール</button>
+      <span class="sep"></span>
+      <span class="lbl" title="縦の大きさ（行の高さ）">縦</span>
+      <input type="range" id="rowSize" class="zoom-bar row-bar" min="12" max="40" step="1" aria-label="縦の大きさ" title="縦の大きさ（行の高さ）">
     </div>
     <div class="sheet" id="sheet" tabindex="0" aria-label="コードビュー"></div>
     <div class="roll" id="roll" tabindex="0" aria-label="メロディービュー" hidden></div>

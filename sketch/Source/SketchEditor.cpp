@@ -241,8 +241,13 @@ SketchEditor::SketchEditor (SketchProcessor& p)
 {
     addAndMakeVisible (webView);
     // 縦横比は固定しない：縦長にすると画面が縦に伸びてシートが広がる（横長は左右に余白。UI 側の fit()）
+   #if JUCE_IOS
+    // iOS：画面いっぱい（iPad の縦向き・Split View でも小さくできるよう、大きさの制限は付けない）
+    setResizable (false, false);   // 右下の大きさを変えるつまみは出さない（ウィンドウが画面いっぱいなので）
+   #else
     setResizable (true, true);
     setResizeLimits (960, 585, maxWidth, maxHeight);
+   #endif
     setSize (baseWidth, baseHeight);
     webView.goToURL (juce::WebBrowserComponent::getResourceProviderRoot());
     startTimerHz (30);   // 再生位置と押している鍵盤

@@ -16,11 +16,17 @@ export const M_SNAPS=[{id:'4',name:'4分',t:480},{id:'8',name:'8分',t:240},{id:
 export const M_LENS=[{id:'1',name:'全音符',t:1920},{id:'2',name:'2分',t:960},{id:'4.',name:'付点4分',t:720},{id:'4',name:'4分',t:480},
   {id:'8.',name:'付点8分',t:360},{id:'8',name:'8分',t:240},{id:'8t',name:'3連8分',t:160},{id:'16',name:'16分',t:120}];
 // 横の拡大：4分音符あたりの横幅（px）。表示のスライダー（0〜100）とは対数でつなぐ
-export const ZOOM_MIN=10, ZOOM_MAX=150, ZOOM_DEFAULT=34;
+// 指で操作する端末（iPad・iPhone）は、音が押しやすいよう行を高く・横を広く始める
+export const COARSE=typeof matchMedia!=='undefined'&&(matchMedia('(pointer: coarse)').matches||/[?&]touch\b/.test(location.search));
+export const ZOOM_MIN=10, ZOOM_MAX=150, ZOOM_DEFAULT=COARSE?70:34;
 export const clampZoom=z=>Math.max(ZOOM_MIN,Math.min(ZOOM_MAX,+z||ZOOM_DEFAULT));
 export const zoomToSlider=z=>Math.round(Math.log(clampZoom(z)/ZOOM_MIN)/Math.log(ZOOM_MAX/ZOOM_MIN)*100);
 export const sliderToZoom=v=>ZOOM_MIN*Math.pow(ZOOM_MAX/ZOOM_MIN,v/100);
-const ROW=14, KEYW=46, HEAD=62, LOW=MELODY_LOW, HIGH=MELODY_HIGH, ROWS=HIGH-LOW+1;
+// 行の高さ（縦の大きさ）：ui.mRow（px の数の文字列。12〜40、縦のつまみ）。auto は端末に合わせる（指は大きめ）。前の s・m・l・xl も読む
+export const ROW_SIZES={s:14,m:20,l:28,xl:36}, ROW_MIN=12, ROW_MAX=40;
+export const rowOf=v=>{const n=parseFloat(v);return Number.isFinite(n)?Math.max(ROW_MIN,Math.min(ROW_MAX,Math.round(n))):ROW_SIZES[v]||(COARSE?28:14);};
+let ROW=COARSE?28:14;
+const KEYW=46, HEAD=62, LOW=MELODY_LOW, HIGH=MELODY_HIGH, ROWS=HIGH-LOW+1;
 const BLACK=new Set([1,3,6,8,10]);
 // コードの構成音の、ルートからの度数の書き方（半音の数 → 表記）。分数コードのベースは B
 const TONE_LABEL=['R','♭9','9','♭3','3','11','♭5','5','♯5','6','♭7','7'];
@@ -52,8 +58,11 @@ export function createRoll(root,ctx){
   let grid=null, scroller=null;
 
   function render(){
-    const song=ctx.song(), tl=ctx.tl(), px=ppt(), W=X(tl.total), H=ROWS*ROW;
     if(scroller){scrollX=scroller.scrollLeft;scrollY=scroller.scrollTop;}
+    // 縦の大きさが変わったら、見えている真ん中の音がずれないようにスクロールを合わせる
+    const want=rowOf(ctx.ui.mRow);
+    if(want!==ROW){const vh=scroller?scroller.clientHeight-HEAD:0;scrollY=Math.max(0,(scrollY+vh/2)*want/ROW-vh/2);ROW=want;}
+    const song=ctx.song(), tl=ctx.tl(), px=ppt(), W=X(tl.total), H=ROWS*ROW;
     clearTimeout(zoomTimer);
     root.innerHTML='';root.style.setProperty('--ppt',px);
     scroller=h('div','rs');const inner=h('div','ri');inner.style.width=`calc(var(--ppt) * ${tl.total}px + ${KEYW}px)`;inner.style.height=HEAD+H+'px';
@@ -156,6 +165,8 @@ export function createRoll(root,ctx){
       e.dataset.id=x.m.id;
       if(w>=30)e.append(h('span','',midiName(x.midi,flat)));
       if(deg!=null&&ctx.ui.rollDeg&&w>=44)e.append(h('b','deg',deg));
+      // 選んだ音の両端につまみ（左は頭、右は終わりを動かす。マウス・指とも）
+      if(nsel.has(x.m.id)&&w>=8)e.append(h('i','hd l'),h('i','hd r'));
       e.title=`${midiName(x.midi,flat)}・${ctx.fmtPos(x.start)}`+(deg!=null?`・コードトーン（${deg}）`:'');
       grid.appendChild(e);
     }
@@ -165,7 +176,7 @@ export function createRoll(root,ctx){
     const cur=box('rcursor',0,0,2,H);cur.style.left=X(ctx.cursorAbs());grid.appendChild(cur);
     playhead=box('rplay',0,0,2,H);playhead.hidden=true;grid.appendChild(playhead);
     inner.appendChild(grid);
-    grid.addEventListener('pointerdown',onDown);
+    grid.addEventListener('pointerdown',e=>e.pointerType==='touch'?onTouchDown(e):onDown(e));
     grid.addEventListener('contextmenu',e=>e.preventDefault());   // macOS の Ctrl＋クリック
 
     scroller.scrollLeft=scrollX;scroller.scrollTop=scrollY;
@@ -228,6 +239,35 @@ export function createRoll(root,ctx){
   }
   // 今の道具（⌘・Ctrl を押しているあいだは入れ替わる）
   const toolOf=e=>{const t=ctx.ui.mTool==='select'?'select':'draw';return e&&(e.metaKey||e.ctrlKey)?(t==='draw'?'select':'draw'):t;};
+
+  /* 指の操作：1本は編集（マウスと同じ）、2本でスクロール。押した直後は少し待って、2本目が来たら編集しない */
+  const touches=new Map();
+  let pend=null, pan=null;
+  function onTouchDown(e){
+    touches.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    if(touches.size>=2){
+      if(pend){clearTimeout(pend.t);pend=null;}
+      const pts=[...touches.values()];
+      pan={x:(pts[0].x+pts[1].x)/2,y:(pts[0].y+pts[1].y)/2};
+      return;
+    }
+    e.preventDefault();
+    const fire=()=>{const p=pend;pend=null;removeEventListener('pointerup',early);if(p)onDown(p.e);};
+    const early=ev=>{if(!pend||ev.pointerId!==e.pointerId)return;clearTimeout(pend.t);fire();
+      dispatchEvent(new PointerEvent('pointerup',{bubbles:true,clientX:ev.clientX,clientY:ev.clientY,pointerId:ev.pointerId,pointerType:'touch',button:0}));};
+    pend={e,t:setTimeout(fire,110)};
+    addEventListener('pointerup',early);
+  }
+  addEventListener('pointermove',e=>{
+    if(e.pointerType!=='touch'||!touches.has(e.pointerId))return;
+    touches.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    if(!pan||touches.size<2||!scroller)return;
+    const pts=[...touches.values()], m={x:(pts[0].x+pts[1].x)/2,y:(pts[0].y+pts[1].y)/2};
+    const r=scroller.getBoundingClientRect(), k=r.width/(scroller.offsetWidth||1);
+    scroller.scrollLeft-=(m.x-pan.x)/k;scroller.scrollTop-=(m.y-pan.y)/k;pan=m;
+  });
+  const touchEnd=e=>{touches.delete(e.pointerId);if(touches.size<2)pan=null;};
+  addEventListener('pointerup',touchEnd);addEventListener('pointercancel',touchEnd);
 
   function onDown(e){
     if(e.button!==0)return;
@@ -320,7 +360,9 @@ export function createRoll(root,ctx){
     if(!nsel.has(id))nsel=new Set([id]);
     const all=noteData(), me=all.find(x=>x.m.id===id);if(!me)return;
     ctx.preview(me.midi);
-    const r=el.getBoundingClientRect(), resize=e.clientX>r.right-6, copy=!resize&&e.altKey;
+    // 長さ：マウスは右端、指は選んだ音の両端のつまみ（左のつまみは頭を動かして終わりはそのまま）
+    const r=el.getBoundingClientRect(), hd=e.target.closest?.('.hd');
+    const resizeL=!!hd?.classList.contains('l'), resize=hd?hd.classList.contains('r'):(e.pointerType!=='touch'&&e.clientX>r.right-6), copy=!resize&&!resizeL&&e.altKey;
     const picked=all.filter(x=>nsel.has(x.m.id));
     let els=[...grid.querySelectorAll('.note')].filter(n=>nsel.has(n.dataset.id));
     els.forEach(n=>n.classList.add('sel'));
@@ -333,6 +375,12 @@ export function createRoll(root,ctx){
       if(!moved&&Math.hypot((p.abs-p0.abs)*ppt(),(p.midi-p0.midi)*ROW)<4)return;
       if(!moved&&copy)startCopy();
       moved=true;
+      if(resizeL){   // 頭を動かす（終わりはそのまま、長さは1スナップ以上、曲の頭より前へは行かない）
+        const ns=Math.max(0,Math.min(me.end-st,snapRound(me.start+(p.abs-p0.abs))));
+        dt=ns-me.start;dt=Math.max(-Math.min(...picked.map(x=>x.start)),dt);
+        els.forEach(n=>{const x=picked.find(q=>q.m.id===n.dataset.id);n.style.transform=`translateX(${dt*ppt()}px)`;n.style.width=Math.max(3,Math.max(st,x.end-x.start-dt)*ppt()-1)+'px';});
+        return;
+      }
       if(resize){
         dl=Math.max(st,snapRound(me.end+(p.abs-p0.abs))-me.start)-(me.end-me.start);
         els.forEach(n=>{const x=picked.find(q=>q.m.id===n.dataset.id);n.style.width=Math.max(3,Math.max(st,x.end-x.start+dl)*ppt()-1)+'px';});
@@ -353,7 +401,8 @@ export function createRoll(root,ctx){
         const song=ctx.song(), tl=ctx.tl();
         if(!copy)removeNotes(song,new Set(picked.map(x=>x.m.id)));
         for(const x of picked){
-          const n=addNote(song,tl,x.start+dt,resize?Math.max(st,x.end-x.start+dl):x.end-x.start,x.midi+dp,{v:x.m.v,...(copy?{}:{id:x.m.id})});
+          const len=resizeL?Math.max(st,x.end-x.start-dt):resize?Math.max(st,x.end-x.start+dl):x.end-x.start;
+          const n=addNote(song,tl,x.start+dt,len,x.midi+dp,{v:x.m.v,...(copy?{}:{id:x.m.id})});
           if(n)ids.push(n.id);
         }
       });

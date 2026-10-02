@@ -6,15 +6,40 @@ import {PPQ,METERS,SNAPS,snapTicks,barTicksOf,beatTicksOf,SECTION_COLORS,SECTION
   newSong,demoSong,newSection,newChord,cloneSection,timeline,placedChords,placeChord,removeChord,resizeChord,
   setSectionBars,insertBars,appendSectionFrom,stretchChord,stretchChordStart,pruneMarks,mergeSections,splitSection,insertProgression,setMark,rangeTicks,copyRange,pasteAt,renderSong,buildSmf,safeFileName,
   songTonic,songFlat,nameOf,tempoAt,PATTERN_GROUPS,NEW_TITLE,SKETCH_SCALES,keyScale,defaultScale,meterAt,tickToSec,withExtension,keyTonic,sameKey,setKeyMark,keyRegion,transposeBars,voicingOf,patternById,VOICINGS,GUITAR_AREAS,melodyBase,addNote,secToTick,placedNotes,chordVoicingNotes} from './song.js';
-import {createRoll,M_SNAPS,M_LENS,ZOOM_DEFAULT,clampZoom,zoomToSlider,sliderToZoom} from './roll.js';
+import {createRoll,rowOf,M_SNAPS,M_LENS,ZOOM_DEFAULT,clampZoom,zoomToSlider,sliderToZoom} from './roll.js';
 import * as player from './player.js';
 import {hasNative,nativeFn,onNative} from '../../shared/ui/juce-bridge.js';
+// 指で操作する端末（iPad・iPhone）：タッチ用のレイアウト（html.touch。部品を大きく、拡大縮小せず画面の大きさで並べる）。確かめるときは ?touch
+const TOUCH=matchMedia('(pointer: coarse)').matches||/[?&]touch\b/.test(location.search);
+if(TOUCH)document.documentElement.classList.add('touch');
+// タッチ用：説明の言葉を指の操作に合わせる（クリック → タップ、キーボードのショートカットの書き添えは外す）。
+// 説明（title）・インフォバーのヒント・ポップアップの注意書きを、出るたびに書き換える
+const touchText=s=>s.replace(/。?⌘＋クリックでその位置/g,'').replace(/（[^（）]*(⌘|⇧|⌥|Space|Tab)[^（）]*）/g,'').replace(/（[A-Z]）/g,'')
+  .replace(/ダブルクリック/g,'2回タップ').replace(/クリック/g,'タップ');
+if(TOUCH){
+  const fix=root=>{
+    if(root.nodeType===3){if(/クリック|⌘|⇧|⌥/.test(root.data)){const u=touchText(root.data);if(u!==root.data)root.data=u;}return;}
+    if(root.nodeType===1){for(const el of [root,...root.querySelectorAll('[title]')]){const t=el.getAttribute?.('title');if(t){const u=touchText(t);if(u!==t)el.setAttribute('title',u);}}}
+    const w=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);let n;
+    while((n=w.nextNode()))if(/クリック|⌘|⇧|⌥/.test(n.data)){const u=touchText(n.data);if(u!==n.data)n.data=u;}
+  };
+  new MutationObserver(ms=>{for(const m of ms){if(m.type==='attributes')fix(m.target);else m.addedNodes.forEach(fix);}})
+    .observe(document.documentElement,{subtree:true,childList:true,attributes:true,attributeFilter:['title']});
+  addEventListener('DOMContentLoaded',()=>fix(document.body));fix(document.body);
+}
+
+/* ---------- タッチ（iPad・iPhone） ----------
+   指の操作は、押した要素にポインタが自動でつかまれる（暗黙のキャプチャ）。ドラッグ中に描き直して押した要素が消えると、
+   指を離した pointerup が届かず、ドラッグが終わらない。押した直後にキャプチャを外して、window の pointermove・pointerup で受ける。
+   ジェスチャーに取られた（pointercancel）ときも、pointerup として終わらせる */
+addEventListener('pointerdown',e=>{if(e.pointerType==='touch'&&e.target.hasPointerCapture?.(e.pointerId))e.target.releasePointerCapture(e.pointerId);},true);
+addEventListener('pointercancel',e=>{if(e.pointerType!=='mouse')dispatchEvent(new PointerEvent('pointerup',{bubbles:true,clientX:e.clientX,clientY:e.clientY,pointerId:e.pointerId,pointerType:e.pointerType,button:0}));},true);
 
 /* ---------- 状態 ---------- */
 const STORE='chordsketch.v1';
 const UI_DEFAULT={snap:'beat',perRow:4,insLen:'bar',dia:'7',timbre:'piano',metro:'click',metroOn:true,countIn:false,countBars:1,loop:false,keepNames:false,step:false,theme:'light',prog:{major:0,minor:13},progVar:0,
   // メロディー（ピアノロール）：表示・スナップ・入力の長さ・横の拡大・音色・鳴らすもの・ガイド、MIDI に入れるもの
-  view:'chords',mSnap:'8',mLen:'8',mZoom:ZOOM_DEFAULT,mTimbre:'square',hearChords:true,hearMelody:true,guideChord:true,guideScale:true,rollDeg:true,midiParts:'both',mTimbreSet:false,mTool:'draw',
+  view:'chords',mSnap:'8',mLen:'8',mZoom:ZOOM_DEFAULT,mTimbre:'square',hearChords:true,hearMelody:true,guideChord:true,guideScale:true,rollDeg:true,mRow:'auto',sideHidden:false,sideOpen:false,sidePinned:false,midiParts:'both',mTimbreSet:false,mTool:'draw',
   scaleMode:'zoom',   // ウィンドウを広げたとき：zoom＝全体を拡大、expand＝大きさはそのままで広げる
   uiSize:1};   // 「広げる」のときの画面の大きさ（1〜1.75。その倍率までは全体を拡大し、それより大きいウィンドウでは広げる）
 let song, ui={...UI_DEFAULT};
@@ -188,12 +213,17 @@ scaleSel.addEventListener('change',()=>{
 });
 
 /* ---------- パレット（ダイアトニック・コードを作る） ---------- */
+let lastPalTap={k:'',t:0};
 function paletteChip(item){
   const b=h('button','pchip'+(outOfScale(item)?' out':''));
   b.append(h('span','n',nameOfItem(item)),h('span','d',degOfItem(item)));
   b.title='クリックで試聴・ダブルクリックで入力・ドラッグで配置'+(outOfScale(item)?'（スケールの外の音を含む）':'');
   b.addEventListener('pointerdown',e=>startPaletteDrag(e,item));
   b.addEventListener('dblclick',()=>insertAtCursor(item));
+  // 指：2回タップで入力（iOS では dblclick が届かないことがある）
+  // （1回目のタップでパレットが描き直されて要素が替わるので、最後のタップはコード名で覚える）
+  if(TOUCH)b.addEventListener('pointerup',e=>{if(e.pointerType!=='touch')return;const t=performance.now(), k=nameOfItem(item);
+    if(lastPalTap.k===k&&t-lastPalTap.t<350){lastPalTap={k:'',t:0};insertAtCursor(item);}else lastPalTap={k,t};});
   return b;
 }
 const diaItems=()=>scaleConforms()
@@ -583,6 +613,17 @@ function sectionHead(s,si){
   const split=h('button','','分割');split.disabled=!canSplit;
   split.title=canSplit?`${cursor.gi+1}小節目の頭で2つに分ける`:'分ける小節にカーソルを置いてから押す';
   split.onclick=()=>splitAtCursor();
+  if(TOUCH){   // タッチ用：小さいボタンの列は「…」のメニューにまとめる（MIDI のドラッグは iOS では使えないので出さない）
+    const more=h('div','menu sec-more'), mb=h('button','more-btn','…'), pop=h('div','menu-pop');
+    mb.title='セクションの操作';mb.setAttribute('aria-haspopup','true');pop.hidden=true;
+    up.textContent='↑ 前へ';down.textContent='↓ 後ろへ';
+    pop.append(dup,split,merge,up,down,del);
+    pop.addEventListener('click',()=>{pop.hidden=true;});
+    mb.onclick=e=>{e.stopPropagation();const open=pop.hidden;document.querySelectorAll('.sec-more .menu-pop').forEach(p=>p.hidden=true);pop.hidden=!open;};
+    more.append(mb,pop);
+    head.append(sw,name,nb,h('span','n','小節'),pat,pick,more);
+    return head;
+  }
   head.append(sw,name,nb,h('span','n','小節'),pat,pick,drag,dup,split,merge,up,down,del);
   return head;
 }
@@ -1066,8 +1107,10 @@ function renderFooter(){
       ...(s.count>=2?[btn('結合','選んだ音を1つにする（いちばん前の音の高さで、最初から最後まで）',()=>roll.joinSelection())]:[]),
       btn('クオンタイズ','選んだ音の頭と終わりをスナップ（'+(M_SNAPS.find(x=>x.id===ui.mSnap)?.name||'')+'）にそろえる（Q）',()=>roll.quantizeSelection()),
       btn('分割','選んだ音を2つに分ける（カーソルが音の中ならカーソルで、外なら真ん中で。⌘＋クリックでその位置）',()=>roll.splitSelection()),
+      btn('複製','選んだ音をすぐ後ろに複製（⌘D）',()=>roll.onKey(new KeyboardEvent('keydown',{key:'d',metaKey:true}))),
       btn('選択を外す','（Esc）',()=>roll.onKey(new KeyboardEvent('keydown',{key:'Escape'})))));
-    f.appendChild(h('span','fhint',ui.mTool==='select'
+    f.appendChild(h('span','fhint',TOUCH?(ui.mTool==='select'?'なぞって囲んで選ぶ・2本指でスクロール':'タップで音を置く（右へ引くと長さ）・2本指でスクロール')
+      :ui.mTool==='select'
       ?'ドラッグで囲んで選ぶ（⇧で追加）・⌘ドラッグで音を置く・⌥ドラッグで複製・⌘クリックで分割'
       :'クリックで音を置く（右へ引くと長さ）・⌘ドラッグで囲んで選ぶ・⌥ドラッグで複製・⌘クリックで分割'));
     return;
@@ -1842,6 +1885,60 @@ $('title').addEventListener('change',e=>commit(()=>{song.title=e.target.value.tr
 $('title').addEventListener('keydown',e=>{if(e.key==='Enter')e.target.blur();});
 $('pattern').addEventListener('change',e=>commit(()=>{song.pattern=e.target.value;}));
 const uiSet=(k,v)=>{ui[k]=v;render();persist();};
+// サイドパネルを隠す・出す（iPad など画面が狭いとき、コードビュー・メロディービューを広く使う）
+// タッチ用のレイアウトでは、サイドパネルは上に重なる引き出し（ui.sideOpen。外を押すと閉じる）
+$('sideBtn').onclick=e=>{e.stopPropagation();
+  if(TOUCH){uiSet('sideOpen',!ui.sideOpen);return;}
+  ui.sideHidden=!ui.sideHidden;$('stage').classList.toggle('noside',ui.sideHidden);fit();uiSet('sideHidden',ui.sideHidden);};
+// タッチ用：編集バー・サウンドバーが1段に入りきらないときだけ、あまり使わないもの（MIDI の書き出し・音色・鳴らす・縦の大きさ）を
+// 右端の「…」のメニューに移す（サイドパネルを固定してシートが狭いときなど）。入るときは元の場所に戻す。部品を動かすだけなので操作はそのまま
+const moreBars=[];
+if(TOUCH){
+  const lblOf=(bar,text)=>()=>[...bar.querySelectorAll(':scope>.lbl')].find(x=>x.textContent.trim()===text);
+  const sepBefore=f=>()=>{const e=f();const p=e?.previousElementSibling;return p?.classList.contains('sep')?p:null;};
+  const add=(bar,groups)=>{
+    const wrap=h('div','menu tb-more'), btn=h('button','more-btn','…'), pop=h('div','menu-pop tb-pop');
+    btn.title='そのほかの設定';btn.setAttribute('aria-haspopup','true');pop.hidden=true;wrap.hidden=true;
+    btn.onclick=e=>{e.stopPropagation();const open=pop.hidden;document.querySelectorAll('.tb-pop').forEach(p=>p.hidden=true);pop.hidden=!open;};
+    wrap.append(btn,pop);bar.append(wrap);
+    // 移すもの：まとまりごとに、元の場所の目印（コメント）を置いておく
+    const rows=groups.map(g=>g.map(f=>typeof f==='function'?f():document.querySelector(f)).filter(Boolean).map(el=>{const mark=document.createComment('');el.before(mark);return {el,mark};}));
+    moreBars.push({bar,wrap,pop,rows,collapsed:false});
+  };
+  const edit=document.querySelector('.toolbar:not(.out)'), sc=document.querySelector('.toolbar.out.only-chords'), sm=document.querySelector('.toolbar.out.only-melody');
+  const tim=()=>$('timbre').closest('.fld'), mtim=()=>$('mTimbre').closest('.fld');
+  add(edit,[['.midi-box']]);
+  add(sc,[[sepBefore(tim),tim],[sepBefore(lblOf(sc,'上声')),lblOf(sc,'上声'),'#octUp','#bassBtn','#octBass']]);   // ギターで Low／Mid／High が出ると幅が足りない
+  add(sm,[[sepBefore(mtim),mtim],[sepBefore(lblOf(sm,'鳴らす')),lblOf(sm,'鳴らす'),'#hearChords','#hearMelody'],[sepBefore(lblOf(sm,'縦')),lblOf(sm,'縦'),'#rowSize']]);
+  addEventListener('pointerdown',e=>{if(!e.target.closest('.tb-more'))document.querySelectorAll('.tb-pop').forEach(p=>p.hidden=true);},true);
+}
+function updateMoreBars(){
+  for(const m of moreBars){
+    if(!m.bar.offsetWidth)continue;   // 今は出ていないバー（コード／メロディーの片方）
+    // いったん全部元に戻して1段で入るか測る。入らなければ「…」へ
+    if(m.collapsed){for(const r of m.rows)for(const {el,mark} of r)mark.after(el);m.pop.innerHTML='';m.collapsed=false;}
+    m.wrap.hidden=true;
+    const ws=m.bar.style.flexWrap;m.bar.style.flexWrap='nowrap';
+    // 子の右端がバーの内側の右端を越えるか（WKWebView は scrollWidth があてにならないので位置で比べる）
+    const br=m.bar.getBoundingClientRect(), pr=parseFloat(getComputedStyle(m.bar).paddingRight)||0;
+    const over=[...m.bar.children].some(c=>c.offsetWidth&&c.getBoundingClientRect().right>br.right-pr*(br.width/(m.bar.offsetWidth||1))+1);
+    m.bar.style.flexWrap=ws;
+    if(!over)continue;
+    for(const r of m.rows){const row=h('div','tb-row');row.append(...r.map(x=>x.el));m.pop.append(row);}
+    m.wrap.hidden=false;m.collapsed=true;
+  }
+}
+addEventListener('resize',()=>requestAnimationFrame(updateMoreBars));
+// 起動直後（書体・スキン・画面の大きさが決まる前）に測ると入りきると見誤るので、メインの幅が変わるたび・書体の読み込み後にも測り直す
+if(TOUCH){let lastW=0;new ResizeObserver(()=>{const w=document.querySelector('.main').clientWidth;if(w!==lastW){lastW=w;requestAnimationFrame(updateMoreBars);}}).observe(document.querySelector('.main'));
+  document.fonts?.ready.then(()=>requestAnimationFrame(updateMoreBars));setTimeout(updateMoreBars,600);}
+if(TOUCH)addEventListener('pointerdown',e=>{if(ui.sideOpen&&!ui.sidePinned&&!e.target.closest('.left,#sideBtn,.pop,.ghost'))uiSet('sideOpen',false);},true);
+// 固定：引き出しをやめて、左に並べる（シートは狭くなる）。もう一度押すと引き出しに戻す
+$('sidePin').onclick=()=>{ui.sidePinned=!ui.sidePinned;ui.sideOpen=true;uiSet('sidePinned',ui.sidePinned);fit();};
+// メロディービューの縦の大きさ（行の高さ）
+// 動かしているあいだは描き直すだけ（まとめて1コマに1回）、離したら保存する
+{let raf=0;$('rowSize').addEventListener('input',e=>{ui.mRow=String(e.target.value);cancelAnimationFrame(raf);raf=requestAnimationFrame(()=>roll.render());});
+ $('rowSize').addEventListener('change',()=>persist());}
 $('metroBtn').onclick=()=>{uiSet('metroOn',!ui.metroOn);player.refresh();};
 $('metroKind').onclick=e=>{e.stopPropagation();fileMenu.hidden=true;$('themeMenu').hidden=true;$('countMenu').hidden=true;metroMenu.hidden=!metroMenu.hidden;};
 metroMenu.addEventListener('click',e=>{
@@ -1942,6 +2039,7 @@ function applyTheme(){
   const th=THEMES[ui.theme]||THEMES.light, t=th.base||(dark.matches?'dark':'light');
   document.documentElement.dataset.theme=t;
   if(th.skin)document.documentElement.dataset.skin=th.skin;else delete document.documentElement.dataset.skin;
+  if(TOUCH)requestAnimationFrame(()=>updateMoreBars());   // スキンで書体・余白が変わると、バーに入る幅も変わる
   $('themeBtn').title='設定（テーマ・ウィンドウの広げ方）';
   document.querySelectorAll('#themeMenu button[data-v]').forEach(b=>b.setAttribute('aria-checked',b.dataset.v===ui.theme));
   document.querySelectorAll('#themeMenu button[data-scale]').forEach(b=>b.setAttribute('aria-checked',b.dataset.scale===ui.scaleMode));
@@ -2009,6 +2107,11 @@ function render(){
   $('zoomBar').value=zoomToSlider(ui.mZoom);
   renderTool();
   pressed('hearChords',ui.hearChords);pressed('hearMelody',ui.hearMelody);pressed('guideChord',ui.guideChord);pressed('guideScale',ui.guideScale);pressed('rollDeg',ui.rollDeg);
+  $('rowSize').value=rowOf(ui.mRow);
+  $('stage').classList.toggle('noside',!TOUCH&&ui.sideHidden);$('stage').classList.toggle('drawer-open',TOUCH&&ui.sideOpen);$('stage').classList.toggle('side-pinned',TOUCH&&ui.sideOpen&&ui.sidePinned);
+  if(TOUCH)requestAnimationFrame(updateMoreBars);
+  $('sidePin').setAttribute('aria-pressed',ui.sidePinned);$('sidePin').title=ui.sidePinned?'固定を外す（上に重ねて出す）':'左に固定する';
+  $('sideBtn').setAttribute('aria-pressed',TOUCH?ui.sideOpen:!ui.sideHidden);
   renderPalette();renderProg();
   if(mel)roll.render();else renderSheet();
   renderVoicing();
@@ -2024,6 +2127,10 @@ function render(){
 // （左のパネルの幅はそのまま、シート・ピアノロールが広がる）。JUCE 版の macOS は C++ のページのズームも同じ決まり（setScaleMode）
 const BASE_W=1280, BASE_H=780;
 function fit(){
+  if(TOUCH){   // タッチ用：拡大縮小しないで画面の大きさで並べる（小さい画面だけ縮める）
+    const s=Math.min(1,innerWidth/1000,innerHeight/680), st=$('stage');
+    st.style.width=Math.floor(innerWidth/s)+'px';st.style.height=Math.floor(innerHeight/s)+'px';st.style.transform=`scale(${s})`;return;
+  }
   const expand=ui.scaleMode==='expand';
   let s=Math.min(innerWidth/BASE_W,innerHeight/BASE_H);
   if(expand)s=Math.min(ui.uiSize,s);   // 「広げる」：選んだ大きさまでは拡大し、それより大きいウィンドウでは広げる
