@@ -21,7 +21,7 @@
   --pressed-bg:#46527A; --pressed-fg:#D3D8E3;   /* 押されているボタンを白く光らせない */
   --wheel-text:#D8DCE6;
   /* メロディービュー（暗い土台）：ライトの見た目を反転させずに暗くした色 */
-  --roll-key:#B4BAC7; --roll-key-edge:#8F97A8; --roll-key-black:#1A1F2C; --roll-key-label:#3A4258;
+  --roll-key:#9AA1B0; --roll-key-edge:#7C8496; --roll-key-black:#1A1F2C; --roll-key-label:#3A4258;
   --roll-row:#353C51; --roll-row-edge:#2D3346; --roll-row-black:#2B3144; --roll-bar:#4A5270; --roll-beat:#2E3448;
   --roll-out:rgba(10,12,20,.38);
 }
@@ -83,7 +83,7 @@ h1{font-size:17px;font-weight:900;letter-spacing:.02em;margin:0 6px 0 0;white-sp
 .lcd #lcdKey:hover{color:#fff}
 .lcd #lcdTempo{cursor:ns-resize;touch-action:none}   /* つかんで上下でテンポ */
 body.tempo-drag,body.tempo-drag *{cursor:ns-resize!important}
-.lcd .l1::before{content:'♩';font-size:12px;color:var(--lcd-dim);margin-right:auto}
+.lcd .l1::before{content:'♩';font-size:13px;line-height:1;color:var(--lcd-dim);margin-right:-3px;transform:translateY(1px)}   /* テンポの数字のすぐ左に、数字と高さをそろえて */
 .lcd .l2::before{content:'';margin-right:auto}
 .lcd .pos.count{gap:5px}
 .lcd .pos.count.many{gap:1px}
@@ -107,6 +107,12 @@ body.tempo-drag,body.tempo-drag *{cursor:ns-resize!important}
 .theme-pop button[aria-checked=true]::after{content:' ✓'}
 .menu-sep{height:1px;background:var(--line);margin:4px 2px}
 .menu-lbl{font-size:11px;color:var(--muted);padding:2px 10px}
+/* 「広げる」のときの大きさ（100〜175%） */
+.menu-size{display:flex;align-items:center;gap:3px;padding:3px 10px 4px 14px;white-space:nowrap;font-size:11px;color:var(--muted)}
+.menu-size span{margin-right:4px;white-space:nowrap}
+.menu-size button{font-size:11px;padding:1px 6px;border-radius:4px}
+.menu-size button[aria-pressed=true]{background:var(--pressed-bg);border-color:var(--pressed-bg);color:var(--pressed-fg)}
+.menu-size button:disabled{opacity:.4;cursor:default}
 .swatch{display:inline-block;width:22px;height:12px;border-radius:6px;margin-right:6px;vertical-align:-1px;border:1px solid rgba(0,0,0,.15);
   background:linear-gradient(90deg,var(--s1) 0 40%,var(--s2) 40% 70%,var(--s3) 70%)}
 
@@ -417,18 +423,22 @@ body.grabbing,body.grabbing *{cursor:grabbing!important}
 .tool-seg svg{vertical-align:middle}
 .roll .rchord{position:absolute;margin-left:1px;border:1px solid var(--line);border-radius:4px;background:var(--card);font-size:12px;font-weight:700;padding:0 5px;line-height:22px;overflow:hidden;white-space:nowrap}
 .roll .rchord.playing{border-color:var(--chord);background:var(--chord-tint)}
-.roll .rk{position:sticky;left:0;width:46px;z-index:4;background:var(--card);border-right:1px solid var(--line)}
+.roll .rk{position:sticky;left:0;width:46px;z-index:4;background:var(--card)}   /* 右に線・影は付けない（鍵の右端に影のように見える） */
 .roll .rkey{position:absolute;background:var(--card);border-bottom:1px solid var(--grid);cursor:pointer}
 .roll .rkey.black{background:var(--ink2);width:30px!important;border-bottom-color:var(--ink2)}
 .roll .rkey.c{border-bottom-color:var(--line)}
 .roll .rkey span{position:absolute;right:3px;top:0;font-size:9px;line-height:13px;color:var(--muted)}
 .roll .rkey:active{background:var(--root)}
+/* スケールのガイド：鍵盤の右端のスケールの音に緑の帯（鍵盤の形・色は変えない） */
+.roll .rscale{position:absolute;background:var(--tone);pointer-events:none;z-index:1}
+.roll .rscale.tonic{background:color-mix(in srgb,var(--tone) 70%,#000)}   /* 主音は少し濃く */
 .roll .rg{position:absolute;left:46px;top:62px;cursor:crosshair}
 .roll .rg>div{position:absolute}
 .roll .rrow{background:var(--card);border-bottom:1px solid var(--grid2)}
 .roll .rrow.black{background:var(--grid2)}
-.roll .gout{background:rgba(30,39,66,.11)}
-.roll .gtonic{background:color-mix(in srgb,var(--tone) 16%,transparent)}
+.roll .gout{background:rgba(30,39,66,.10)}   /* スケールの外の行：暗く（左の鍵盤のスケールの外の鍵も暗くしてそろえる） */
+.roll .gin{background:color-mix(in srgb,var(--tone) 9%,transparent)}   /* スケールの中の行（Synthesizer V のように、うすい緑） */
+.roll .gtonic{background:color-mix(in srgb,var(--tone) 16%,transparent);box-shadow:inset 0 -1.5px 0 color-mix(in srgb,var(--tone) 55%,transparent)}   /* 主音：ごくうすい緑と下の細い線 */
 .roll .gtone{background:color-mix(in srgb,var(--root) 30%,transparent);box-shadow:inset 0 1px 0 color-mix(in srgb,var(--root) 50%,transparent)}
 .roll .gtone.root{background:color-mix(in srgb,var(--root) 55%,transparent)}
 .roll .gtone span{position:absolute;left:3px;top:0;font-size:9px;line-height:13px;font-weight:700;color:#8A5A00;pointer-events:none}
@@ -437,25 +447,35 @@ body.grabbing,body.grabbing *{cursor:grabbing!important}
 .roll .note{background:var(--note);border:1px solid var(--note-edge);border-radius:3px;color:#fff;font-size:9px;line-height:11px;padding-left:3px;overflow:hidden;white-space:nowrap;cursor:grab;z-index:2}
 .roll .note::after{content:"";position:absolute;right:0;top:0;bottom:0;width:6px;cursor:ew-resize}
 .roll .note.sel{background:#C4456A;border-color:#8E2E4B}
+/* コードの音に置いた音：右端に度数（行の色が音に隠れても、コードの音だとわかるように） */
+.roll .note .deg{position:absolute;right:2px;top:1px;font-size:8px;font-weight:800;padding:0 3px;border-radius:2px;background:var(--root);color:#2A1A00;line-height:9px}
 .roll .note.playing{box-shadow:0 0 0 2px var(--root)}
 .roll .note.drawing{opacity:.7}
 .roll .note.copy{opacity:.85;z-index:3}
-.roll .rcursor{background:var(--live);opacity:.7;pointer-events:none;z-index:3}
+.roll .rcursor{background:var(--ink);opacity:.55;pointer-events:none;z-index:3}   /* カーソル：色味のない色（鍵盤の右のスケールの緑の帯・音の青と見分ける。どのスキンでも） */
 .roll .rplay{background:var(--chord);pointer-events:none;z-index:3}
 .roll .rplay[hidden]{display:none}
 .roll .rband{border:1px dashed var(--live);background:var(--sel);z-index:4;pointer-events:none}
 /* ダーク：ライトの見た目を反転させずに暗くする（白鍵・スケールの中の行は明るめ、黒鍵・スケールの外の行は暗め） */
+:root[data-theme=dark] .roll .rk{background:var(--roll-key)}   /* 黒鍵の右は白鍵の色（黒鍵が端まで伸びて見えないように。明るい土台と同じ形） */
 :root[data-theme=dark] .roll .rkey{background:var(--roll-key);border-bottom-color:var(--roll-key-edge)}
 :root[data-theme=dark] .roll .rkey.black{background:var(--roll-key-black);border-bottom-color:var(--roll-key-black)}
 :root[data-theme=dark] .roll .rkey span{color:var(--roll-key-label)}
 :root[data-theme=dark] .roll .rrow{background:var(--roll-row);border-bottom-color:var(--roll-row-edge)}
 :root[data-theme=dark] .roll .rrow.black{background:var(--roll-row-black)}
 :root[data-theme=dark] .roll .gbar{border-left-color:var(--roll-bar);background-image:repeating-linear-gradient(to right,transparent 0 calc(var(--beat) - 1px),var(--roll-beat) calc(var(--beat) - 1px) var(--beat))}
-:root[data-theme=dark] .roll .gout{background:var(--roll-out)}
-:root[data-theme=dark] .roll .gtonic{background:color-mix(in srgb,var(--tone) 25%,transparent)}
-:root[data-theme=dark] .roll .gtone{background:color-mix(in srgb,var(--root) 22%,transparent);box-shadow:inset 0 1px 0 color-mix(in srgb,var(--root) 35%,transparent)}
-:root[data-theme=dark] .roll .gtone.root{background:color-mix(in srgb,var(--root) 42%,transparent)}
-:root[data-theme=dark] .roll .gtone span{color:#F0C060}
+:root[data-theme=dark] .roll .gout{background:rgba(0,0,0,.5)}
+:root[data-theme=dark] .roll .gin{background:color-mix(in srgb,var(--tone) 10%,transparent)}
+:root[data-theme=dark] .roll .gtonic{background:color-mix(in srgb,var(--tone) 18%,transparent);box-shadow:inset 0 -1.5px 0 color-mix(in srgb,var(--tone) 60%,transparent)}
+/* 暗い土台のコードの音のガイド：面はうすく塗るだけ（全オクターブに出るので濃いと縞だらけになる）。
+   どの音かは左端の度数（R・3・5…）と、行の左の細い線で示す。ルートだけ少し濃く */
+:root[data-theme=dark] .roll .gtone{background:color-mix(in srgb,var(--root) 11%,transparent);box-shadow:inset 2px 0 0 color-mix(in srgb,var(--root) 55%,transparent)}
+:root[data-theme=dark] .roll .gtone.root{background:color-mix(in srgb,var(--root) 20%,transparent);box-shadow:inset 3px 0 0 var(--root)}
+:root[data-theme=dark] .roll .gtone span{color:color-mix(in srgb,var(--root) 80%,#fff)}
+/* 暗い土台の音：明るめにして、暗い縁と上のハイライトで行の色から浮かせる */
+:root[data-theme=dark] .roll .note{background:color-mix(in srgb,var(--note) 78%,#fff);border-color:rgba(0,0,0,.55);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 1px 2px rgba(0,0,0,.5);color:#0E1626;font-weight:700}
+:root[data-theme=dark] .roll .note.sel{background:#E0708F;border-color:rgba(0,0,0,.55);color:#2A0A14}
 
 /* 録音ボタン（録音中は赤く点滅）と、録音中の音 */
 .transport .rec{color:#C4456A}
@@ -539,7 +559,7 @@ body.grabbing,body.grabbing *{cursor:grabbing!important}
   --faint:#6C5E4A; --faint2:#524638; --root:#C69E4A; --tone:#7AA08A; --chord:#B45468; --chord-tint:#3B1E25;
   --wheel-outer:#2A231B; --wheel-inner:#3A3025; --grid:#29231C; --grid2:#211C16; --sel:rgba(198,158,74,.15); --live:#C69E4A; --pick:#A48CC4;
   --pressed-bg:#5A4A2C; --pressed-fg:#F0E5CE; --note:#B08A42; --note-edge:#86682F; --note-hi:#C9A45E; --wheel-text:#E6DCC8;
-  --roll-key:#CBBFA8; --roll-key-edge:#A89A80; --roll-key-black:#14110D; --roll-key-label:#3A3024;
+  --roll-key:#D2CAB8; --roll-key-edge:#ACA390; --roll-key-black:#14110D; --roll-key-label:#3A3024;
   --roll-row:#2F2820; --roll-row-edge:#28221B; --roll-row-black:#241F19; --roll-bar:#4B3F31; --roll-beat:#2A241D; --roll-out:rgba(8,6,4,.42);
   --lcd-bg:#0B0907; --lcd-hi:#E2C27A; --lcd-lo:#C3A35E; --lcd-dim:#6A5A40; --lcd-line:#2A2219;
   --font-head:"Hiragino Mincho ProN","Yu Mincho","Noto Serif JP",serif;
@@ -557,7 +577,7 @@ body.grabbing,body.grabbing *{cursor:grabbing!important}
    Luxury：黒い鉄のラック機材（参考：Vooster の EQ）。鉄板の粒子と縦のグラデーション、四隅のビス、
    刻印のプレートの見出し、押し込み式のボタン（オンは中から琥珀色に光る）、表示部は VU メーターの暖かいバックライト */
 :root[data-skin=luxury]{
-  --page:#0D0D0C; --bg:#161615; --panel:#232321; --card:#2B2B28; --ink:#DCD6C8; --ink2:#B9B1A0; --muted:#8E887B; --line:#3A3935;
+  --page:#0D0D0C; --bg:#161615; --panel:#232321; --card:#2B2B28; --ink:#ECE7DC; --ink2:#CFC8B8; --muted:#9F998C; --line:#3A3935;
   --faint:#6A665D; --faint2:#4C4A45; --grid:#2E2E2B; --grid2:#262624;
   --wheel-outer:#262624; --wheel-inner:#34332F;
   --roll-row:#2E2D2A; --roll-row-edge:#272724; --roll-row-black:#242422; --roll-bar:#4A4840; --roll-beat:#2B2B28;
@@ -579,16 +599,17 @@ body.grabbing,body.grabbing *{cursor:grabbing!important}
 [data-skin=luxury] .main.panel{background:var(--lux-grain),linear-gradient(#272725,#1E1E1C)}   /* 編集面はビスを打たない */
 [data-skin=luxury] .left{padding:12px 16px}
 /* 刻印のプレート（ブロックの見出し） */
-[data-skin=luxury] .sub-head{border-top:0;margin-top:10px;padding:0;color:#BDB5A4;font-size:11.5px;font-weight:700;letter-spacing:.14em}
+[data-skin=luxury] .sub-head{border-top:0;margin-top:10px;padding:0;color:#D2CBBB;font-size:11.5px;font-weight:700;letter-spacing:.14em}
 /* エリア名：枠で囲まず、文字の右に彫った溝の線を引く（入力欄と見分ける） */
 [data-skin=luxury] .sub-head::after{content:'';flex:1;order:1;height:0;border-top:1px solid #0B0B0A;border-bottom:1px solid rgba(255,255,255,.07);margin-left:4px}
 [data-skin=luxury] .sub-head>.spacer{display:none}
 [data-skin=luxury] .sub-head>:not(.spacer){order:2}
 [data-skin=luxury] .sub-head>.midi-st{order:0}
-[data-skin=luxury] .top h1{font-size:20px;font-weight:600;letter-spacing:.1em;color:#D8D1C0;text-shadow:0 1px 0 #000}
+[data-skin=luxury] .top h1{font-size:20px;font-weight:600;letter-spacing:.1em;color:#EDE7DA;text-shadow:0 1px 0 #000}
+[data-skin=luxury] .top{padding:0 22px}   /* 四隅のビスと文字・ボタンが近すぎないように */
 /* 押し込み式のボタン */
 [data-skin=luxury] button:not(.lcd button):not(.menu-pop button):not(.tclose):not(.x):not(.rs){
-  background:linear-gradient(#3C3B37,#2A2927);border:1px solid #0B0B0A;border-radius:3px;color:#D6CFBF;
+  background:linear-gradient(#3C3B37,#2A2927);border:1px solid #0B0B0A;border-radius:3px;color:#E8E2D5;
   box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 1px 2px rgba(0,0,0,.6)}
 [data-skin=luxury] button:not(.lcd button):not(.menu-pop button):hover{background:linear-gradient(#45443F,#302F2C)}
 [data-skin=luxury] .seg{border:1px solid #0B0B0A;border-radius:3px;box-shadow:0 1px 2px rgba(0,0,0,.6);gap:1px;background:#0B0B0A}
@@ -605,7 +626,7 @@ body.grabbing,body.grabbing *{cursor:grabbing!important}
 [data-skin=luxury] #muteBtn[aria-pressed=true]{background:radial-gradient(ellipse at 50% 45%,#E8726A,#B23A34 70%,#7E221E)!important;color:#2A0806!important}
 /* 入力欄は板に彫った凹み */
 [data-skin=luxury] select,[data-skin=luxury] input[type=number],[data-skin=luxury] input[type=text],[data-skin=luxury] .title{
-  background:#141413;border:1px solid #0A0A09;border-bottom-color:#45443E;border-radius:2px;color:#DCD6C8;box-shadow:inset 0 1px 3px rgba(0,0,0,.8)}
+  background:#141413;border:1px solid #0A0A09;border-bottom-color:#45443E;border-radius:2px;color:#ECE7DC;box-shadow:inset 0 1px 3px rgba(0,0,0,.8)}
 /* 表示部：VU メーターのクリーム色の盤面と暖かい明かり（文字は濃い茶） */
 [data-skin=luxury] .lcd{
   --lcd-hi:#2E2416; --lcd-lo:#4A3C28; --lcd-dim:#8A7656; --lcd-line:rgba(70,50,25,.25);
@@ -638,7 +659,7 @@ body.grabbing,body.grabbing *{cursor:grabbing!important}
   --wheel-outer:#252B33; --wheel-inner:#313842; --wheel-text:#D2DAE2;
   --sel:rgba(64,190,240,.14); --live:#40BEF0; --pressed-bg:#1A2530; --pressed-fg:#56C8F5;
   --note:#3AA9DE; --note-edge:#1F7AA8; --note-hi:#62C0EA;
-  --roll-key:#A9B3BE; --roll-key-edge:#86919D; --roll-key-black:#14181D; --roll-key-label:#2A3038;
+  --roll-key:#8E98A3; --roll-key-edge:#727C87; --roll-key-black:#14181D; --roll-key-label:#2A3038;
   --roll-row:#252B33; --roll-row-edge:#1F242B; --roll-row-black:#1D2228; --roll-bar:#3E4752; --roll-beat:#2A3038; --roll-out:rgba(5,8,12,.42);
   --lcd-bg:#14181D; --lcd-hi:#56C8F5; --lcd-lo:#3FA3CF; --lcd-dim:#3D5566; --lcd-line:#252D36;
   --font-head:"DIN Condensed","Avenir Next Condensed","Bahnschrift","Hiragino Sans","Yu Gothic UI",sans-serif;
@@ -666,7 +687,7 @@ body.grabbing,body.grabbing *{cursor:grabbing!important}
 [data-skin=cyber] #muteBtn[aria-pressed=true]{background:#B8467A!important;color:#22081A!important;box-shadow:none!important}
 /* 入力欄・表示面は暗い窓 */
 [data-skin=cyber] select,[data-skin=cyber] input[type=number],[data-skin=cyber] input[type=text],[data-skin=cyber] .title{
-  background:#1A1F25;border:1px solid #14181C;border-radius:2px;color:#D2DAE2}
+  background:#1A1F25;border:1px solid #4A5562;border-radius:2px;color:#D2DAE2}   /* 枠は明るめに（背景に溶けないように） */
 [data-skin=cyber] .lcd{border:1px solid #0B0E11;border-radius:2px;
   background:linear-gradient(rgba(64,190,240,.05) 1px,transparent 1px) 0 0/100% 6px,#14181D;box-shadow:inset 0 1px 4px rgba(0,0,0,.6)}
 [data-skin=cyber] .lcd .l1,[data-skin=cyber] .lcd .r1{text-shadow:0 0 6px rgba(86,200,245,.35)}
@@ -692,7 +713,7 @@ body.grabbing,body.grabbing *{cursor:grabbing!important}
 :root[data-skin=old]{
   --page:#3A2A1E; --bg:#C4C6C4; --panel:#D3D5D2; --card:#E6E6E1; --ink:#2B2E30; --ink2:#44494C; --muted:#61676B; --line:#A7ABAB;
   --faint:#868C8F; --faint2:#A3A8A9; --grid:#C3C6C4; --grid2:#CBCDCA;
-  --root:#E4962A; --tone:#2E7F8F; --chord:#C2483E; --chord-tint:#EBCDC6;
+  --root:#E4962A; --tone:#4E8A4F; --chord:#C2483E; --chord-tint:#EBCDC6;   /* スケールの緑は、音・カーソルの青緑と分ける */
   --wheel-outer:#3D4448; --wheel-inner:#566065;
   --sel:rgba(46,127,143,.14); --live:#2E7F8F; --pick:#6A5A90; --pressed-bg:#E89A30; --pressed-fg:#3A2208;
   --note:#2E7F8F; --note-edge:#1E5A66; --note-hi:#4A9AAA;
@@ -823,7 +844,7 @@ body.grabbing,body.grabbing *{cursor:grabbing!important}
 [data-skin=modern] #muteBtn{color:#DC2626!important;background:#FEE2E2!important}
 [data-skin=modern] #muteBtn[aria-pressed=true]{background:#DC2626!important;color:#fff!important}
 [data-skin=modern] select,[data-skin=modern] input[type=number],[data-skin=modern] input[type=text],[data-skin=modern] .title{
-  background:#FFFFFF;border:0;border-radius:6px;box-shadow:inset 0 0 0 1px #E4E4E7}
+  background:#F4F4F5;border:0;border-radius:6px;box-shadow:inset 0 0 0 1px #D4D4D8}   /* 白い面の上でも見えるよう、うすい灰色の塗りと縁 */
 [data-skin=modern] .lcd{background:#FFFFFF;border:0;border-radius:8px;box-shadow:inset 0 0 0 1px #E4E4E7}
 [data-skin=modern] .lcd .r1{color:#2563EB}
 [data-skin=modern] .lcd button:hover{color:#2563EB}
@@ -841,3 +862,9 @@ body.grabbing,body.grabbing *{cursor:grabbing!important}
 [data-skin=modern] .pchip{background:#FFFFFF;border:0;border-radius:6px;box-shadow:0 0 0 1px #E4E4E7}
 [data-skin=modern] .footer{border-top:1px solid #F4F4F5;background:#FAFAFA;border-radius:0 0 10px 10px}
 [data-skin=modern] .menu-pop{border:0;border-radius:10px;box-shadow:0 0 0 1px rgba(0,0,0,.06),0 10px 30px rgba(0,0,0,.12)}
+:root[data-theme=dark] .roll .note.playing{box-shadow:0 0 0 2px var(--root)}   /* 再生中の光り方は、コードの音の印より優先 */
+/* ガイドの「コードトーン｜度数」：ひとつの枠で、両方オンでも境目が見えるように */
+.tg-pair button+button{box-shadow:inset 1px 0 0 color-mix(in srgb,var(--pressed-fg) 35%,transparent)}
+
+/* 暗い土台の入力欄・選択欄：枠を一段明るく（背景に溶けないように。スキンが枠を決めていればそちら） */
+:root[data-theme=dark]:not([data-skin]) :is(select,input[type=number],input[type=text],.title){border-color:#4E5878}

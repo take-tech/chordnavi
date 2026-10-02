@@ -218,6 +218,8 @@ juce::WebBrowserComponent::Options SketchEditor::makeOptions()
         .withNativeFunction ("setScaleMode", [this] (const auto& args, auto completion)
                              {
                                  expandMode = ! args.isEmpty() && args[0].toString() == "expand";
+                                 // 「広げる」のときの大きさ（1〜1.75。その倍率までは拡大し、それより大きいウィンドウでは広げる）
+                                 uiSize = args.size() > 1 ? juce::jlimit (1.0, 1.75, (double) args[1]) : 1.0;
                                  updateZoom();
                                  completion (juce::var (true));
                              })
@@ -301,7 +303,7 @@ void SketchEditor::updateZoom()
 {
     auto zoom = juce::jmin (getWidth() / (double) baseWidth, getHeight() / (double) baseHeight);
     if (expandMode)
-        zoom = juce::jmin (zoom, 1.0);   // 「広げる」：基準より大きいウィンドウでは拡大せず、画面を広げる（JS の fit()）
+        zoom = juce::jmin (zoom, uiSize);   // 「広げる」：選んだ大きさまでは拡大し、それより大きいウィンドウでは画面を広げる（JS の fit()）
     WebViewZoom::apply (*this, zoom);
     // 画面に出た直後は WKWebView がまだできていないことがあるので、少し後にもう一度
     juce::Component::SafePointer<SketchEditor> self (this);

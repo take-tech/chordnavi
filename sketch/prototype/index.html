@@ -66,7 +66,8 @@
         <div class="menu-sep" role="separator"></div>
         <span class="menu-lbl">ウィンドウを広げたとき</span>
         <button data-scale="zoom" aria-checked="false" role="menuitemradio" title="画面全体を拡大する（文字やボタンも大きくなる）">全体を拡大</button>
-        <button data-scale="expand" aria-checked="false" role="menuitemradio" title="文字の大きさはそのままで広げる">広げる（大きさはそのまま）</button>
+        <button data-scale="expand" aria-checked="false" role="menuitemradio" title="文字の大きさは下の「大きさ」のままで広げる">広げる</button>
+        <div class="menu-size" id="uiSizeRow" title="「広げる」のときの文字やボタンの大きさ"><span>大きさ</span><button data-size="1">100%</button><button data-size="1.25">125%</button><button data-size="1.5">150%</button><button data-size="1.75">175%</button></div>
       </div>
     </div>
     <input id="fileInput" type="file" accept=".chordsketch,.json" hidden>
@@ -144,7 +145,8 @@
       <button id="hearMelody" class="tg small" aria-pressed="true" title="メロディーも鳴らす（オフで伴奏だけ）">メロディー</button>
       <span class="sep"></span>
       <span class="lbl" title="メロディービューの行に色を付ける">ガイド</span>
-      <button id="guideChord" class="tg small" aria-pressed="true" title="コードの構成音の行に色（ルートは濃く）">コードの音</button>
+      <div class="seg small tg-pair" role="group" aria-label="コードトーン">
+        <button id="guideChord" aria-pressed="true" title="コードトーンの行に色（ルートは濃く）">コードトーン</button><button id="rollDeg" aria-pressed="true" title="度数（R・3・5…）を出す・消す">度数</button></div>
       <button id="guideScale" class="tg small" aria-pressed="true" title="キーのスケールの音の行に色を付ける">スケール</button>
     </div>
     <div class="sheet" id="sheet" tabindex="0" aria-label="コードビュー"></div>
