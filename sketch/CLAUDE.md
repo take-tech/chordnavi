@@ -11,7 +11,7 @@
 
 ## JUCE 版（Standalone のみ）
 
-- CMake のターゲット `ChordSketch`（`ChordSketch_Standalone`）。プラグインのコード `Cdsk`（メーカー `Rnze`）、表示名「ChordSketch」、バンドル ID `com.ranze.chordsketch`、バージョン 0.9.0（ベータ版。タグ `sketch-v0.9.0`、リリースはプレリリース）、アイコンは `sketch/assets/icon/ChordSketch.png`（案 B：五度圏＋タイムライン。全面（1024 の正方形いっぱい、余白・角丸なし。角は macOS が丸める。macOS 26 で白い枠に入れられないように）の元データは `icon_B_full.svg`、角丸の板の版は `icon_B.svg`、ほかの案 A・C も同じフォルダ）。アイコンを変えたら CMake の設定をやり直す（icns は設定のときに作られる）。設定ファイルは `~/Library/Application Support/ChordSketch.settings`、Windows の WebView2 のデータは AppData の `ChordSketch/WebView2`。
+- CMake のターゲット `ChordSketch`（`ChordSketch_Standalone`）。プラグインのコード `Cdsk`（メーカー `Rnze`）、表示名「ChordSketch」、バンドル ID `com.ranze.chordsketch`、バージョン 0.9.1（ベータ版。タグ `sketch-v0.9.x`、リリースはプレリリース）、アイコンは `sketch/assets/icon/ChordSketch.png`（案 B：五度圏＋タイムライン。全面（1024 の正方形いっぱい、余白・角丸なし。角は macOS が丸める。macOS 26 で白い枠に入れられないように）の元データは `icon_B_full.svg`、角丸の板の版は `icon_B.svg`、ほかの案 A・C も同じフォルダ）。アイコンを変えたら CMake の設定をやり直す（icns は設定のときに作られる）。設定ファイルは `~/Library/Application Support/ChordSketch.settings`、Windows の WebView2 のデータは AppData の `ChordSketch/WebView2`。
 - UI は `sketch/prototype/` の html・js・css をそのまま埋め込む（`ChordSketchUIData`。共通の `shared/ui/` と JUCE の JS も）。プロトタイプを正とするのでコピーしない。
 - C++ は `sketch/Source/`：`SketchProcessor`（今は無音。画面の状態 JSON を `PluginState` で預かる）、`SketchEditor`（WebView。`WebResources` で配信）、`SketchStandaloneApp`（ChordNavi と同じネイティブのタイトルバー、メニュー「オプション → オーディオ／MIDI の設定…」）。
 - 「ウィンドウを広げたとき」（テーマのメニュー。`ui.scaleMode`）：「全体を拡大」（既定、下の拡大縮小）か「広げる」（ページのズームを「大きさ」（`ui.uiSize`：100・125・150・175%。メニューの「広げる」の下。大きなモニターで五度圏や文字が小さくならないように）より大きくしない。その倍率までは全体を拡大し、基準より大きいウィンドウでは画面を横にも縦にも広げ、左のパネルの幅はそのままでシート・ピアノロールが広がる。基準より小さいときは全体を縮める）。JS の `fit()` と C++ の `updateZoom()`（`setScaleMode(mode, size)`）で同じ決まり。
