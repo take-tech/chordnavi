@@ -404,7 +404,7 @@ body.grabbing,body.grabbing *{cursor:grabbing!important}
 #mSnap{width:78px}
 .midi-box{display:flex;align-items:center;gap:5px;border:1px solid var(--line);border-radius:6px;padding:2px 4px 2px 8px;background:var(--grid2)}
 .midi-lbl{font-size:11px;font-weight:700;color:var(--ink2);letter-spacing:.04em}
-#dragLabel{display:inline-block;max-width:120px;overflow:hidden;text-overflow:ellipsis;vertical-align:bottom}.zoom-bar{width:96px;accent-color:var(--ink2)}#mLen{width:86px}#midiParts{width:108px}
+#dragLabel{display:inline-block;max-width:120px;overflow:hidden;text-overflow:ellipsis;vertical-align:bottom}.zoom-bar{width:96px;accent-color:var(--ink2)}.row-bar{width:72px}#mLen{width:86px}#midiParts{width:108px}
 .roll{flex:1;min-height:0;position:relative;outline:none;overflow:hidden}
 .roll[hidden]{display:none}
 .roll .rs{position:absolute;inset:0;overflow:auto}
@@ -940,14 +940,18 @@ body.grabbing,body.grabbing *{cursor:grabbing!important}
 .touch .tb-pop .sep{display:none}
 .touch .tb-more[hidden]{display:none}
 
-/* 指の操作：選んだ音の両端のつまみ（縦の点々。音の外側まで広げて押しやすく） */
-.touch .roll .note.sel{overflow:visible}
-.touch .roll .note .hd{position:absolute;top:-3px;bottom:-3px;width:18px;display:flex;align-items:center;justify-content:center;z-index:2}
+/* 選んだ音の両端のつまみ（縦の点々。左で頭、右で終わりを動かす。音の外側まで広げて押しやすく） */
+.roll .note.sel{overflow:visible}
+.roll .note .hd{position:absolute;top:-2px;bottom:-2px;width:12px;display:flex;align-items:center;justify-content:center;z-index:2;cursor:ew-resize}
+.roll .note .hd.l{left:-8px}
+.roll .note .hd.r{right:-8px}
+.roll .note .hd::before{content:'';width:5px;height:80%;max-height:22px;border-radius:3px;background:#fff;
+  box-shadow:0 0 0 1.5px var(--chord),0 1px 3px rgba(0,0,0,.35);
+  background-image:radial-gradient(circle,var(--chord) 1px,transparent 1.3px);background-size:5px 4px;background-position:center}
+.touch .roll .note .hd{top:-3px;bottom:-3px;width:18px}
 .touch .roll .note .hd.l{left:-12px}
 .touch .roll .note .hd.r{right:-12px}
-.touch .roll .note .hd::before{content:'';width:6px;height:70%;max-height:22px;border-radius:3px;background:#fff;
-  box-shadow:0 0 0 1.5px var(--chord),0 1px 3px rgba(0,0,0,.35);
-  background-image:radial-gradient(circle,var(--chord) 1.1px,transparent 1.4px);background-size:6px 5px;background-position:center}
+.touch .roll .note .hd::before{width:6px;height:70%;background-size:6px 5px}
 .touch .roll .note::after{display:none}   /* 右端の長さの当たり（マウス用）は使わない */
 
 /* タッチ用のサイドパネル：中身をパネルの高さに収める（五度圏が残りの高さに合わせて縮む。はみ出すときだけスクロール） */

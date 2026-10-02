@@ -22,8 +22,9 @@ export const ZOOM_MIN=10, ZOOM_MAX=150, ZOOM_DEFAULT=COARSE?70:34;
 export const clampZoom=z=>Math.max(ZOOM_MIN,Math.min(ZOOM_MAX,+z||ZOOM_DEFAULT));
 export const zoomToSlider=z=>Math.round(Math.log(clampZoom(z)/ZOOM_MIN)/Math.log(ZOOM_MAX/ZOOM_MIN)*100);
 export const sliderToZoom=v=>ZOOM_MIN*Math.pow(ZOOM_MAX/ZOOM_MIN,v/100);
-// 行の高さ（縦の大きさ）：ui.mRow（s・m・l・xl）。auto は端末に合わせる（指は大きめ）
-export const ROW_SIZES={s:14,m:20,l:28,xl:36};
+// 行の高さ（縦の大きさ）：ui.mRow（px の数の文字列。12〜40、縦のつまみ）。auto は端末に合わせる（指は大きめ）。前の s・m・l・xl も読む
+export const ROW_SIZES={s:14,m:20,l:28,xl:36}, ROW_MIN=12, ROW_MAX=40;
+export const rowOf=v=>{const n=parseFloat(v);return Number.isFinite(n)?Math.max(ROW_MIN,Math.min(ROW_MAX,Math.round(n))):ROW_SIZES[v]||(COARSE?28:14);};
 let ROW=COARSE?28:14;
 const KEYW=46, HEAD=62, LOW=MELODY_LOW, HIGH=MELODY_HIGH, ROWS=HIGH-LOW+1;
 const BLACK=new Set([1,3,6,8,10]);
@@ -59,7 +60,7 @@ export function createRoll(root,ctx){
   function render(){
     if(scroller){scrollX=scroller.scrollLeft;scrollY=scroller.scrollTop;}
     // 縦の大きさが変わったら、見えている真ん中の音がずれないようにスクロールを合わせる
-    const want=ROW_SIZES[ctx.ui.mRow]||(COARSE?28:14);
+    const want=rowOf(ctx.ui.mRow);
     if(want!==ROW){const vh=scroller?scroller.clientHeight-HEAD:0;scrollY=Math.max(0,(scrollY+vh/2)*want/ROW-vh/2);ROW=want;}
     const song=ctx.song(), tl=ctx.tl(), px=ppt(), W=X(tl.total), H=ROWS*ROW;
     clearTimeout(zoomTimer);
@@ -164,8 +165,8 @@ export function createRoll(root,ctx){
       e.dataset.id=x.m.id;
       if(w>=30)e.append(h('span','',midiName(x.midi,flat)));
       if(deg!=null&&ctx.ui.rollDeg&&w>=44)e.append(h('b','deg',deg));
-      // 指の操作：選んだ音の両端につまみ（左は頭、右は終わりを動かす）
-      if(COARSE&&nsel.has(x.m.id))e.append(h('i','hd l'),h('i','hd r'));
+      // 選んだ音の両端につまみ（左は頭、右は終わりを動かす。マウス・指とも）
+      if(nsel.has(x.m.id)&&w>=8)e.append(h('i','hd l'),h('i','hd r'));
       e.title=`${midiName(x.midi,flat)}・${ctx.fmtPos(x.start)}`+(deg!=null?`・コードトーン（${deg}）`:'');
       grid.appendChild(e);
     }
