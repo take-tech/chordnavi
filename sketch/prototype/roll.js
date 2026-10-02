@@ -40,6 +40,7 @@ export function createRoll(root,ctx){
   const snapFloor=abs=>{const b=barAt(abs);if(!b)return 0;const st=snapT();return b.start+Math.floor((abs-b.start)/st)*st;};
   const snapRound=abs=>{const b=barAt(abs);if(!b)return 0;const st=snapT();return b.start+Math.round((abs-b.start)/st)*st;};
   const h=(tag,cls,text)=>{const e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;};
+  const BKW=30;   // 黒鍵の幅（style.css の .roll .rkey.black と同じ）
   const box=(cls,x,yy,w,hh)=>{const e=h('div',cls);e.style.cssText=`left:${x}px;top:${yy}px;width:${w}px;height:${hh}px`;return e;};
   // 横の位置・幅は tick で持ち、1 tick あたりの px（root の --ppt）を掛けて CSS が並べる。拡大を変えるときは --ppt を変えるだけで済む（描き直さない）
   const X=t=>`calc(var(--ppt) * ${t}px)`;
@@ -95,12 +96,20 @@ export function createRoll(root,ctx){
       if(m%12===0)k.append(h('span','',midiName(m,flat)));
       k.dataset.m=m;keys.appendChild(k);
     }
+    // スケールのガイドがオンなら、鍵盤の右端のスケールの音に緑の帯（Synthesizer V のように。行の高さいっぱいでつながる）。鍵盤の形は変えない（白鍵を暗くすると黒鍵に見える）。キーはカーソルのある小節のもの
+    if(ctx.ui.guideScale){
+      const at=ctx.cursorAbs(), b=tl.bars.find(x=>at>=x.start&&at<x.start+x.ticks)||tl.bars[0];
+      if(b){const t=tonicOf(b.key.idx,b.key.mode), iv=new Set(scaleById(keyScale(b.key)).iv.map(x=>mod12(t+x)));
+        // 白鍵は鍵盤の右端、黒鍵は黒鍵の右端（黒鍵の幅は CSS の .rkey.black と同じ 30px）
+        for(let m=HIGH;m>=LOW;m--)if(iv.has(m%12)){const bk=BLACK.has(m%12);
+          keys.appendChild(box('rscale'+(m%12===t?' tonic':''),(bk?BKW:KEYW)-6,y(m),6,ROW));}}
+    }
     keys.addEventListener('pointerdown',e=>{const k=e.target.closest('.rkey');if(k)ctx.preview(+k.dataset.m);});
     inner.appendChild(keys);
 
     /* ピアノロール */
     grid=h('div','rg');grid.style.width=W;grid.style.height=H+'px';
-    // 行：スケールのガイドがオフなら黒鍵の行を少し暗く。オンならスケールの外の行を灰色にする（スケールの音の行は白いまま）
+    // 行：スケールのガイドがオフなら黒鍵の行を少し暗く。オンならスケールの外の行を暗く、主音の行に細い緑の線（左の鍵盤もスケールの外を暗くしてそろえる）
     const gs=ctx.ui.guideScale;
     for(let m=HIGH;m>=LOW;m--){const e=box('rrow'+(!gs&&BLACK.has(m%12)?' black':''),0,y(m),0,ROW);e.style.width='100%';grid.appendChild(e);}
     if(gs){
@@ -112,20 +121,22 @@ export function createRoll(root,ctx){
         const t0=tl.bars[i].start, t1=tl.bars[j-1].start+tl.bars[j-1].ticks;
         for(let m=LOW;m<=HIGH;m++){
           if(!iv.has(m%12))grid.appendChild(tbox('gout',t0,y(m),t1-t0,ROW));
-          else if(m%12===t)grid.appendChild(tbox('gtonic',t0,y(m),t1-t0,ROW));
+          else grid.appendChild(tbox(m%12===t?'gin gtonic':'gin',t0,y(m),t1-t0,ROW));   // スケールの中の行はうすい緑（オフの灰色の縞と見分ける）
         }
         i=j;
       }
     }
+    // コードごとの構成音（音の高さ 0〜11 → 度数の表記）。ガイドの行と、音の印（下）で使う
+    const toneMap=ch=>{const t=new Map((CHORD[ch.q]?.iv||[]).map(x=>[mod12(ch.root+x),TONE_LABEL[mod12(x)]]));
+      if(ch.bass!=null&&!t.has(ch.bass))t.set(ch.bass,'B');return t;};
     // ガイド：そこで鳴っているコードの構成音（ルートは濃く）。コードの頭に、ルートからの度数（R・3・5・♭7…）を書く
     if(ctx.ui.guideChord)for(const p of pcs){
-      const ch=p.ch, tones=new Map((CHORD[ch.q]?.iv||[]).map(x=>[mod12(ch.root+x),TONE_LABEL[mod12(x)]]));
-      if(ch.bass!=null&&!tones.has(ch.bass))tones.set(ch.bass,'B');
+      const ch=p.ch, tones=toneMap(ch);
       const w=(p.end-p.start)*px;
       for(let m=LOW;m<=HIGH;m++){
         const lb=tones.get(m%12);if(lb==null)continue;
         const e=tbox('gtone'+(m%12===ch.root?' root':''),p.start,y(m),p.end-p.start,ROW);
-        if(w>=22)e.append(h('span','',lb));
+        if(w>=22&&ctx.ui.rollDeg)e.append(h('span','',lb));
         grid.appendChild(e);
       }
     }
@@ -135,13 +146,17 @@ export function createRoll(root,ctx){
       e.style.setProperty('--beat',X(PPQ*4/b.meter[1]));
       grid.appendChild(e);
     }
-    // 音
+    // 音。ガイドの「コードトーン」がオンなら、音が始まる位置のコードの構成音に印（右端に度数。短くて入らない音はマウスを乗せたときの説明だけ）。
+    // 音を置くと行の色が隠れて、あとからコードの音かどうかわからなくなるため
     for(const x of placedNotes(song,tl)){
       const w=Math.max(3,(x.end-x.start)*px-1);
-      const e=tbox('note'+(nsel.has(x.m.id)?' sel':''),x.start,y(x.midi),x.end-x.start,ROW-1,1,3);
+      const p=ctx.ui.guideChord?pcs.find(q=>q.start<=x.start&&x.start<q.end):null;
+      const deg=p?toneMap(p.ch).get(mod12(x.midi)):null;
+      const e=tbox('note'+(nsel.has(x.m.id)?' sel':'')+(deg!=null?' ct':''),x.start,y(x.midi),x.end-x.start,ROW-1,1,3);
       e.dataset.id=x.m.id;
       if(w>=30)e.append(h('span','',midiName(x.midi,flat)));
-      e.title=`${midiName(x.midi,flat)}・${ctx.fmtPos(x.start)}`;
+      if(deg!=null&&ctx.ui.rollDeg&&w>=44)e.append(h('b','deg',deg));
+      e.title=`${midiName(x.midi,flat)}・${ctx.fmtPos(x.start)}`+(deg!=null?`・コードトーン（${deg}）`:'');
       grid.appendChild(e);
     }
     // 選んでいる小節の範囲

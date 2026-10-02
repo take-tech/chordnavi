@@ -14,8 +14,9 @@ import {hasNative,nativeFn,onNative} from '../../shared/ui/juce-bridge.js';
 const STORE='chordsketch.v1';
 const UI_DEFAULT={snap:'beat',perRow:4,insLen:'bar',dia:'7',timbre:'piano',metro:'click',metroOn:true,countIn:false,countBars:1,loop:false,keepNames:false,step:false,theme:'light',prog:{major:0,minor:13},progVar:0,
   // メロディー（ピアノロール）：表示・スナップ・入力の長さ・横の拡大・音色・鳴らすもの・ガイド、MIDI に入れるもの
-  view:'chords',mSnap:'8',mLen:'8',mZoom:ZOOM_DEFAULT,mTimbre:'square',hearChords:true,hearMelody:true,guideChord:true,guideScale:true,midiParts:'both',mTimbreSet:false,mTool:'draw',
-  scaleMode:'zoom'};   // ウィンドウを広げたとき：zoom＝全体を拡大、expand＝大きさはそのままで広げる
+  view:'chords',mSnap:'8',mLen:'8',mZoom:ZOOM_DEFAULT,mTimbre:'square',hearChords:true,hearMelody:true,guideChord:true,guideScale:true,rollDeg:true,midiParts:'both',mTimbreSet:false,mTool:'draw',
+  scaleMode:'zoom',   // ウィンドウを広げたとき：zoom＝全体を拡大、expand＝大きさはそのままで広げる
+  uiSize:1};   // 「広げる」のときの画面の大きさ（1〜1.75。その倍率までは全体を拡大し、それより大きいウィンドウでは広げる）
 let song, ui={...UI_DEFAULT};
 let tl;                     // timeline(song) のキャッシュ（changed() で更新）
 let sel=null;               // 選択中のコード {si,id}
@@ -62,6 +63,7 @@ try{
 }catch{}
 // 前の保存形式：metro が 'off' ならメトロノームはオフ（種類はクリック）
 if(ui.metro==='off'){ui.metro='click';ui.metroOn=false;}
+if(![1,1.25,1.5,1.75].includes(ui.uiSize))ui.uiSize=1;
 // メロディーの既定の音色をリードから矩形波に変えた（2026-10-01）。前の既定のままなら矩形波にする（一度だけ）
 if(!ui.mTimbreSet){if(ui.mTimbre==='lead')ui.mTimbre='square';ui.mTimbreSet=true;}
 // 前の保存形式：横の拡大が 小・中・大（0・1・2）だったら px に
@@ -1889,7 +1891,7 @@ document.querySelectorAll('#viewSeg button').forEach(b=>b.onclick=()=>{
   if(ui.view==='melody'){roll.reveal(roll?(tl.bars[cursor.gi]?.start??0)+cursor.pos:0);$('roll').focus({preventScroll:true});}else sheet.focus({preventScroll:true});
 });
 for(const id of ['hearChords','hearMelody'])$(id).onclick=()=>{uiSet(id,!ui[id]);player.refresh();};
-for(const id of ['guideChord','guideScale'])$(id).onclick=()=>uiSet(id,!ui[id]);
+for(const id of ['guideChord','guideScale','rollDeg'])$(id).onclick=()=>uiSet(id,!ui[id]);
 document.querySelectorAll('#toolSeg button').forEach(b=>b.onclick=()=>uiSet('mTool',b.dataset.v));
 // ⌘（Windows は Ctrl）を押しているあいだは、描く⇔選ぶを入れ替えて見せる（押したときの動きは roll.js の toolOf）
 let toolFlip=false;
@@ -1943,6 +1945,7 @@ function applyTheme(){
   $('themeBtn').title='設定（テーマ・ウィンドウの広げ方）';
   document.querySelectorAll('#themeMenu button[data-v]').forEach(b=>b.setAttribute('aria-checked',b.dataset.v===ui.theme));
   document.querySelectorAll('#themeMenu button[data-scale]').forEach(b=>b.setAttribute('aria-checked',b.dataset.scale===ui.scaleMode));
+  document.querySelectorAll('#uiSizeRow button').forEach(b=>{b.setAttribute('aria-pressed',+b.dataset.size===ui.uiSize);b.disabled=ui.scaleMode!=='expand';});
 }
 // テーマはメニューから選ぶ（ライト／ダーク／自動／スキン）
 const themeMenu=$('themeMenu');
@@ -1951,6 +1954,8 @@ themeMenu.addEventListener('click',e=>{
   // data-theme は使わない（[data-theme=dark] の配色がその要素に効いてしまう）
   const sc=e.target.closest('[data-scale]')?.dataset.scale;
   if(sc){ui.scaleMode=sc;applyScaleMode();persist();themeMenu.hidden=true;return;}
+  const sz=e.target.closest('[data-size]')?.dataset.size;
+  if(sz){ui.uiSize=+sz;applyScaleMode();persist();return;}   // 大きさはメニューを開いたまま（続けて選び直せる）
   const v=e.target.closest('[data-v]')?.dataset.v;if(!v)return;
   ui.theme=v;applyTheme();persist();themeMenu.hidden=true;
   // スキンで書体・文字の幅が変わるので、入りきらない文字の縮め方を測り直す（Modern の C♯m7 が省略されないように）
@@ -2003,7 +2008,7 @@ function render(){
   $('mSnap').value=ui.mSnap;$('mLen').value=ui.mLen;$('mTimbre').value=ui.mTimbre;$('midiParts').value=ui.midiParts;
   $('zoomBar').value=zoomToSlider(ui.mZoom);
   renderTool();
-  pressed('hearChords',ui.hearChords);pressed('hearMelody',ui.hearMelody);pressed('guideChord',ui.guideChord);pressed('guideScale',ui.guideScale);
+  pressed('hearChords',ui.hearChords);pressed('hearMelody',ui.hearMelody);pressed('guideChord',ui.guideChord);pressed('guideScale',ui.guideScale);pressed('rollDeg',ui.rollDeg);
   renderPalette();renderProg();
   if(mel)roll.render();else renderSheet();
   renderVoicing();
@@ -2015,13 +2020,13 @@ function render(){
 // 余った高さの分だけ画面を縦に伸ばす（シートが広がる）。横長なら縦に合わせて左右に余白を出す。
 // 文字がにじまないよう、拡大率が 1 にほぼ等しいときはちょうど 1 にし、位置は整数のピクセルにそろえる
 // （JUCE 版の macOS は WebView のページのズームで拡大縮小するので、ここでは倍率 1 になる）
-// 「広げる」（ui.scaleMode='expand'）では 1 より大きくしない：基準より大きいウィンドウでは、画面を横にも縦にも広げる
+// 「広げる」（ui.scaleMode='expand'）では ui.uiSize（100〜175%）より大きくしない：基準より大きいウィンドウでは、画面を横にも縦にも広げる
 // （左のパネルの幅はそのまま、シート・ピアノロールが広がる）。JUCE 版の macOS は C++ のページのズームも同じ決まり（setScaleMode）
 const BASE_W=1280, BASE_H=780;
 function fit(){
   const expand=ui.scaleMode==='expand';
   let s=Math.min(innerWidth/BASE_W,innerHeight/BASE_H);
-  if(expand)s=Math.min(1,s);
+  if(expand)s=Math.min(ui.uiSize,s);   // 「広げる」：選んだ大きさまでは拡大し、それより大きいウィンドウでは広げる
   if(Math.abs(s-1)<.015)s=1;
   const w=expand?Math.max(BASE_W,Math.floor(innerWidth/s)):BASE_W;
   const h=Math.max(BASE_H,Math.floor(innerHeight/s));
@@ -2032,11 +2037,11 @@ function fit(){
 }
 const nScale=nativeFn('setScaleMode');
 function applyScaleMode(){
-  nScale?.(ui.scaleMode).catch(e=>console.error(e));
+  nScale?.(ui.scaleMode,ui.uiSize).catch(e=>console.error(e));
   applyTheme();fit();if(ui.view==='melody')roll.render();else renderSheet();
 }
 addEventListener('resize',()=>{fit();if(ui.view==='melody')roll.render();else renderSheet();});
-nScale?.(ui.scaleMode).catch(e=>console.error(e));
+nScale?.(ui.scaleMode,ui.uiSize).catch(e=>console.error(e));
 /* ---------- マウスを乗せた部品の説明を、下のバーの右に出す ----------
    title の付いた部品（ボタン・選択欄・チップ・小節番号など）と五度圏の扇形。乗せているあいだは title を外して吹き出しを出さない（二重にしない）。
    離したら title を戻し、下のバーは元の操作のヒントに戻す */
