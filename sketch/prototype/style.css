@@ -427,7 +427,7 @@ body.grabbing,body.grabbing *{cursor:grabbing!important}
 .roll .rkey{position:absolute;background:var(--card);border-bottom:1px solid var(--grid);cursor:pointer}
 .roll .rkey.black{background:var(--ink2);width:30px!important;border-bottom-color:var(--ink2)}
 .roll .rkey.c{border-bottom-color:var(--line)}
-.roll .rkey span{position:absolute;right:3px;top:0;font-size:9px;line-height:13px;color:var(--muted)}
+.roll .rkey span{position:absolute;right:9px;top:50%;transform:translateY(-50%);font-size:9px;line-height:13px;color:var(--muted)}   /* 右端のスケールの緑の帯に隠れないように少し内側 */
 .roll .rkey:active{background:var(--root)}
 /* スケールのガイド：鍵盤の右端のスケールの音に緑の帯（鍵盤の形・色は変えない） */
 .roll .rscale{position:absolute;background:var(--tone);pointer-events:none;z-index:1}
@@ -868,3 +868,95 @@ body.grabbing,body.grabbing *{cursor:grabbing!important}
 
 /* 暗い土台の入力欄・選択欄：枠を一段明るく（背景に溶けないように。スキンが枠を決めていればそちら） */
 :root[data-theme=dark]:not([data-skin]) :is(select,input[type=number],input[type=text],.title){border-color:#4E5878}
+
+/* 指で操作する端末（iPad・iPhone）：細い部品を押しやすく、メロディービューは指で編集（2本指でスクロール） */
+@media (pointer: coarse){
+  .sec-grip{left:-14px;width:24px}
+  .blk .rs{width:16px}
+  .blk.narrow .rs{width:10px}
+  .roll .note::after{width:14px}
+  .roll .rg{touch-action:none}
+  .oct button{min-width:22px;min-height:14px}
+}
+
+/* サイドパネルを隠したとき：メインが横いっぱい */
+.stage.noside{grid-template-columns:minmax(0,1fr)}
+.stage.noside>.left{display:none}
+.side-btn{margin-right:2px}
+
+/* ---------- タッチ用のレイアウト（html.touch：iPad・iPhone） ----------
+   画面の大きさで並べ（拡大縮小しない）、ボタン・選択欄を指で押せる大きさに。デスクトップ版は変えない */
+.touch body{font-size:14px}
+.touch :is(button,select,input[type=number],input[type=text],.title):not(.lcd button):not(.tclose):not(.x):not(.rs):not(.oct button):not(.sec-sw){min-height:32px;font-size:14px}
+.touch .seg button,.touch .seg.small button{min-height:32px;font-size:13px;padding:0 12px}
+.touch .stage{grid-template-rows:58px minmax(0,1fr);gap:8px;padding:8px}
+.touch .top{gap:6px;padding:0 8px}
+.touch .top h1{display:none}   /* アプリ名は出さない（幅を空ける） */
+.touch .title{width:130px;font-size:15px}
+.touch .transport button,.touch .top>button.ic,.touch .top .menu>button.ic{min-width:40px;min-height:38px}
+.touch .clickgrp{grid-template-columns:40px 22px 40px 22px;grid-template-rows:38px;gap:2px}   /* 1段に並べる */
+.touch .clickgrp .ic2{height:38px;min-height:38px}
+.touch .sec-head .sec-sw{min-height:0}
+.touch #midiParts{min-width:130px}
+.touch .oct span{min-width:30px;font-size:14px}
+.touch .oct-arrows button{min-height:0;height:17px;line-height:17px;font-size:10px;padding:0 9px}
+.touch .toolbar{padding:6px 10px;gap:8px;flex-wrap:wrap;row-gap:6px}   /* 入りきらないときは2段に（サイドパネルを固定したときなど） */
+.touch .toolbar::-webkit-scrollbar{display:none}
+.touch .toolbar.out{padding:5px 10px}
+.touch #dragSel{display:none}   /* iOS では MIDI を DAW へドラッグできない（「保存…」で書き出す・共有） */
+.touch .footer{min-height:50px}
+.touch .footer button{min-height:36px;font-size:14px;padding:0 12px}
+.touch .tabs{min-height:38px}
+.touch .tab{min-height:32px;font-size:14px}
+.touch .tab .tclose{min-width:28px;min-height:28px;font-size:18px}
+.touch .sec-head{gap:8px;margin-bottom:6px}
+.touch .sec-head button,.touch .sec-head select,.touch .sec-head input{min-height:32px;font-size:14px;line-height:normal}
+.touch .sec-head .sec-name{font-size:16px}
+.touch .sec-more{position:relative}
+.touch .sec-more .more-btn{min-width:44px;font-size:18px;font-weight:700}
+.touch .sec-more .menu-pop{left:0;right:auto;top:38px;min-width:160px}
+.touch .sec-more .menu-pop button{min-height:40px;text-align:left}
+.touch .menu-pop button{min-height:40px}
+.touch .chip-edit select,.touch .chip-edit button{height:auto;min-height:34px}
+/* サイドパネル：上に重なる引き出し（左のボタンで開く・外を押すと閉じる） */
+.touch .stage{grid-template-columns:minmax(0,1fr)}
+.touch .stage>.left{position:absolute;left:8px;top:74px;bottom:8px;width:340px;z-index:30;display:none;overflow-y:auto;
+  box-shadow:0 12px 40px rgba(0,0,0,.35)}
+.touch .stage.drawer-open>.left{display:flex}
+
+/* サイドパネルの固定（タッチ用だけ。デスクトップ版はいつも左に並ぶのでボタンを出さない） */
+.side-pin{display:none}
+.touch .side-pin{display:flex;align-items:center;justify-content:center;position:absolute;right:8px;top:8px;z-index:2;min-width:36px;padding:0}
+.touch .stage.side-pinned{grid-template-columns:320px minmax(0,1fr)}
+.touch .stage.side-pinned>.left{position:relative;left:auto;top:auto;bottom:auto;width:auto;box-shadow:none}
+
+/* タッチ用：バーの「…」のメニュー（右端） */
+.touch .tb-more{position:relative;margin-left:auto}
+.touch .tb-more .more-btn{min-width:44px;font-size:18px;font-weight:700}
+.touch .tb-pop{right:0;left:auto;top:40px;min-width:260px;padding:10px;gap:10px;z-index:40}
+.touch .tb-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.touch .tb-pop .midi-box{border:0;background:none;padding:0}
+.touch .tb-pop .midi-box #dragSel{display:none}
+.touch .tb-pop .sep{display:none}
+.touch .tb-more[hidden]{display:none}
+
+/* 指の操作：選んだ音の両端のつまみ（縦の点々。音の外側まで広げて押しやすく） */
+.touch .roll .note.sel{overflow:visible}
+.touch .roll .note .hd{position:absolute;top:-3px;bottom:-3px;width:18px;display:flex;align-items:center;justify-content:center;z-index:2}
+.touch .roll .note .hd.l{left:-12px}
+.touch .roll .note .hd.r{right:-12px}
+.touch .roll .note .hd::before{content:'';width:6px;height:70%;max-height:22px;border-radius:3px;background:#fff;
+  box-shadow:0 0 0 1.5px var(--chord),0 1px 3px rgba(0,0,0,.35);
+  background-image:radial-gradient(circle,var(--chord) 1.1px,transparent 1.4px);background-size:6px 5px;background-position:center}
+.touch .roll .note::after{display:none}   /* 右端の長さの当たり（マウス用）は使わない */
+
+/* タッチ用のサイドパネル：中身をパネルの高さに収める（五度圏が残りの高さに合わせて縮む。はみ出すときだけスクロール） */
+.touch .stage>.left #wheel{flex:1 1 0;min-height:110px;max-height:230px;width:100%;height:auto;margin:0 auto}
+.touch .left{gap:4px}
+.touch .left .pchip{min-height:40px}
+.touch .left .live{flex-shrink:0}
+.touch .left>*:not(#wheel){flex-shrink:0}
+/* Old：左右の木のサイド板（16px）に部品が重ならないように */
+:root.touch[data-skin=old] .stage{padding:8px 24px}
+
+.touch .menu-pop kbd{display:none}   /* キーボードのショートカットの書き添え */

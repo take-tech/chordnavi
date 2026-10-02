@@ -67,6 +67,11 @@ public:
         : DocumentWindow (name, Colour (0xffE7EAF0), DocumentWindow::allButtons),
           holder (holderToUse)
     {
+       #if JUCE_IOS
+        // iOS：タイトルバー・大きさの制限なしで画面いっぱい
+        setTitleBarHeight (0);
+        setResizable (false, false);
+       #else
         setUsingNativeTitleBar (true);
         setResizable (true, false);
 
@@ -74,6 +79,7 @@ public:
         constrainer.setMinimumSize (960, 585);
         constrainer.setMaximumSize (SketchEditor::maxWidth, SketchEditor::maxHeight);
         setConstrainer (&constrainer);
+       #endif
 
         updateContent();
     }
@@ -173,6 +179,12 @@ public:
         openSongFiles (std::exchange (pendingFiles, {}));
 
         window = std::make_unique<MainWindow> (getApplicationName(), *holder);
+       #if JUCE_IOS
+        window->setFullScreen (true);   // iOS：画面いっぱい（メニューバー・オーディオの設定の画面は使わない）
+        window->setVisible (true);
+        Desktop::getInstance().setKioskModeComponent (window.get(), false);   // ステータスバーも隠す
+        return;
+       #endif
         window->setVisible (true);
         // 画面に出した直後にネイティブのタイトルバーの分だけ中身が縮むので、中身を基準サイズに合わせ直す
         window->centreWithSize (SketchEditor::baseWidth, SketchEditor::baseHeight);
@@ -196,7 +208,7 @@ public:
     {
        #if JUCE_MAC
         MenuBarModel::setMacMainMenu (nullptr);
-       #else
+       #elif ! JUCE_IOS
         if (window != nullptr)
             window->setMenuBar (nullptr);
        #endif
@@ -235,5 +247,11 @@ private:
 
 juce::JUCEApplicationBase* juce_CreateApplication();
 juce::JUCEApplicationBase* juce_CreateApplication() { return new ChordSketchStandaloneApp(); }
+
+#if JUCE_IOS
+// 自前の Standalone アプリ（JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP）では iOS のアプリのデリゲートも返す必要がある（使わないので null）
+void* juce_GetIOSCustomDelegateClass();
+void* juce_GetIOSCustomDelegateClass() { return nullptr; }
+#endif
 
 #endif
