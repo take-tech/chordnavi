@@ -23,9 +23,12 @@ export const clampZoom=z=>Math.max(ZOOM_MIN,Math.min(ZOOM_MAX,+z||ZOOM_DEFAULT))
 export const zoomToSlider=z=>Math.round(Math.log(clampZoom(z)/ZOOM_MIN)/Math.log(ZOOM_MAX/ZOOM_MIN)*100);
 export const sliderToZoom=v=>ZOOM_MIN*Math.pow(ZOOM_MAX/ZOOM_MIN,v/100);
 // 行の高さ（縦の大きさ）：ui.mRow（px の数の文字列。12〜40、縦のつまみ）。auto は端末に合わせる（指は大きめ）。前の s・m・l・xl も読む
+// iPhone（画面の短いほうが 600 より小さい指の端末）は縦が狭いので、行を少し低く始める
+const PHONE_ROLL=COARSE&&typeof screen!=='undefined'&&(Math.min(screen.width,screen.height)<600||/[?&]phone\b/.test(location.search));
+const ROW_AUTO=PHONE_ROLL?22:COARSE?28:14;
 export const ROW_SIZES={s:14,m:20,l:28,xl:36}, ROW_MIN=12, ROW_MAX=40;
-export const rowOf=v=>{const n=parseFloat(v);return Number.isFinite(n)?Math.max(ROW_MIN,Math.min(ROW_MAX,Math.round(n))):ROW_SIZES[v]||(COARSE?28:14);};
-let ROW=COARSE?28:14;
+export const rowOf=v=>{const n=parseFloat(v);return Number.isFinite(n)?Math.max(ROW_MIN,Math.min(ROW_MAX,Math.round(n))):ROW_SIZES[v]||ROW_AUTO;};
+let ROW=ROW_AUTO;
 const KEYW=46, HEAD=62, LOW=MELODY_LOW, HIGH=MELODY_HIGH, ROWS=HIGH-LOW+1;
 const BLACK=new Set([1,3,6,8,10]);
 // コードの構成音の、ルートからの度数の書き方（半音の数 → 表記）。分数コードのベースは B

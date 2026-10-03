@@ -10,8 +10,11 @@ import {createRoll,rowOf,M_SNAPS,M_LENS,ZOOM_DEFAULT,clampZoom,zoomToSlider,slid
 import * as player from './player.js';
 import {hasNative,nativeFn,onNative} from '../../shared/ui/juce-bridge.js';
 // 指で操作する端末（iPad・iPhone）：タッチ用のレイアウト（html.touch。部品を大きく、拡大縮小せず画面の大きさで並べる）。確かめるときは ?touch
-const TOUCH=matchMedia('(pointer: coarse)').matches||/[?&]touch\b/.test(location.search);
+const TOUCH=matchMedia('(pointer: coarse)').matches||/[?&](touch|phone)\b/.test(location.search);
 if(TOUCH)document.documentElement.classList.add('touch');
+// iPhone（画面の短いほうが 600 より小さい指の端末）：下にコードのパッドを置く専用の並べ方（html.phone）。確かめるときは ?phone
+const PHONE=TOUCH&&(Math.min(screen.width,screen.height)<600||/[?&]phone\b/.test(location.search));
+if(PHONE)document.documentElement.classList.add('phone');
 // タッチ用：説明の言葉を指の操作に合わせる（クリック → タップ、キーボードのショートカットの書き添えは外す）。
 // 説明（title）・インフォバーのヒント・ポップアップの注意書きを、出るたびに書き換える
 const touchText=s=>s.replace(/。?⌘＋クリックでその位置/g,'').replace(/（[^（）]*(⌘|⇧|⌥|Space|Tab)[^（）]*）/g,'').replace(/（[A-Z]）/g,'')
@@ -213,6 +216,34 @@ scaleSel.addEventListener('change',()=>{
 });
 
 /* ---------- パレット（ダイアトニック・コードを作る） ---------- */
+/* ---------- iPhone の下のパッド ----------
+   コード：ダイアトニックを大きなパッドで（タップで試聴・2回タップでカーソルに入れる・シートへドラッグ）。
+   プリセット・キー：サイドパネルの部品をここに借りてきて並べる（タブを変えると元の場所に戻す） */
+let ppTab='chords';
+const ppHomes=new Map();
+function ppBorrow(el,body){if(!el)return;if(!ppHomes.has(el)){const m=document.createComment('');el.before(m);ppHomes.set(el,m);}body.appendChild(el);}
+function ppGiveBack(){for(const [el,m] of ppHomes)m.after(el);}
+function renderPhonePads(){
+  if(!PHONE)return;
+  $('phonePads').hidden=ui.view==='melody';
+  document.querySelectorAll('#ppTabs button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.t===ppTab));
+  const body=$('ppBody');ppGiveBack();body.innerHTML='';body.dataset.t=ppTab;
+  if(ppTab==='chords'){diaItems().forEach(it=>body.appendChild(paletteChip(it)));const fitPads=()=>body.querySelectorAll('.pchip .n').forEach(n=>fitText(n,9));requestAnimationFrame(fitPads);setTimeout(fitPads,120);document.fonts?.ready.then(fitPads);}
+  else if(ppTab==='prog'){const rows=document.querySelectorAll('.left .prog-row');ppBorrow(rows[0],body);ppBorrow($('progNames'),body);ppBorrow(rows[1],body);}
+  else{document.querySelectorAll('.left .keyrow').forEach(r=>ppBorrow(r,body));}
+}
+if(PHONE){
+  document.querySelectorAll('#ppTabs button').forEach(b=>b.onclick=()=>{ppTab=b.dataset.t;renderPhonePads();});
+  $('phoneView').onclick=()=>$('viewSeg').querySelector(`[data-v=${ui.view==='melody'?'chords':'melody'}]`).click();
+  // 1行4小節（横向きの幅に合わせる）。サイドパネルは固定しない（引き出しだけ）
+  ui.perRow=4;ui.sidePinned=false;
+  // メロディーのスナップ・長さはサウンドバーへ（編集バーは出さない）。MIDI の書き出し・コード譜は設定のメニューへ
+  const sm=document.querySelector('.toolbar.out.only-melody'), ts=$('toolSeg');
+  ts.after($('mSnap'),$('mLen').closest('.fld'));
+  const tm=$('themeMenu');
+  tm.prepend(Object.assign(h('div','menu-sep'),{role:'separator'}));
+  tm.prepend($('printBtn'));tm.prepend(document.querySelector('.midi-box'));
+}
 let lastPalTap={k:'',t:0};
 function paletteChip(item){
   const b=h('button','pchip'+(outOfScale(item)?' out':''));
@@ -617,11 +648,21 @@ function sectionHead(s,si){
     const more=h('div','menu sec-more'), mb=h('button','more-btn','…'), pop=h('div','menu-pop');
     mb.title='セクションの操作';mb.setAttribute('aria-haspopup','true');pop.hidden=true;
     up.textContent='↑ 前へ';down.textContent='↓ 後ろへ';
+    if(PHONE){
+      // iPhone：見出しは左の細い列に、セクション名を縦に（横文字を寝かせて）出すだけ。押すとメニュー（色・名前・小節数・範囲・パターンと操作）
+      mb.className='sec-vname';mb.textContent=s.name||'（名前なし）';mb.title=`「${s.name}」の設定と操作`;
+      const r1=h('div','tb-row'), r2=h('div','tb-row'), r3=h('div','tb-row');
+      r1.append(sw,name);r2.append(nb,h('span','n','小節'),pick);r3.append(pat);
+      pop.append(r1,r2,r3);
+    }
     pop.append(dup,split,merge,up,down,del);
-    pop.addEventListener('click',()=>{pop.hidden=true;});
+    pop.addEventListener('click',e=>{if(e.target.closest('button')&&!e.target.closest('.sec-sw'))pop.hidden=true;});
     mb.onclick=e=>{e.stopPropagation();const open=pop.hidden;document.querySelectorAll('.sec-more .menu-pop').forEach(p=>p.hidden=true);pop.hidden=!open;};
+    // iPhone：メニューは画面に固定して、押したセクション名の右に出す（シートの下で切れないように、画面の中に収める）
+    if(PHONE)mb.addEventListener('click',()=>{if(pop.hidden)return;const r=mb.getBoundingClientRect();
+      pop.style.left=r.right+6+'px';pop.style.top=Math.max(8,Math.min(r.top,innerHeight-pop.offsetHeight-8))+'px';});
     more.append(mb,pop);
-    head.append(sw,name,nb,h('span','n','小節'),pat,pick,more);
+    if(PHONE)head.append(more);else head.append(sw,name,nb,h('span','n','小節'),pat,pick,more);
     return head;
   }
   head.append(sw,name,nb,h('span','n','小節'),pat,pick,drag,dup,split,merge,up,down,del);
@@ -2112,7 +2153,8 @@ function render(){
   if(TOUCH)requestAnimationFrame(updateMoreBars);
   $('sidePin').setAttribute('aria-pressed',ui.sidePinned);$('sidePin').title=ui.sidePinned?'固定を外す（上に重ねて出す）':'左に固定する';
   $('sideBtn').setAttribute('aria-pressed',TOUCH?ui.sideOpen:!ui.sideHidden);
-  renderPalette();renderProg();
+  renderPalette();renderProg();renderPhonePads();
+  if(PHONE)$('phoneView').textContent=mel?'▦ コード':'♪ メロ';
   if(mel)roll.render();else renderSheet();
   renderVoicing();
   renderFooter();renderTabs();
@@ -2127,6 +2169,7 @@ function render(){
 // （左のパネルの幅はそのまま、シート・ピアノロールが広がる）。JUCE 版の macOS は C++ のページのズームも同じ決まり（setScaleMode）
 const BASE_W=1280, BASE_H=780;
 function fit(){
+  if(PHONE){const st=$('stage');st.style.width=innerWidth+'px';st.style.height=innerHeight+'px';st.style.transform='none';return;}
   if(TOUCH){   // タッチ用：拡大縮小しないで画面の大きさで並べる（小さい画面だけ縮める）
     const s=Math.min(1,innerWidth/1000,innerHeight/680), st=$('stage');
     st.style.width=Math.floor(innerWidth/s)+'px';st.style.height=Math.floor(innerHeight/s)+'px';st.style.transform=`scale(${s})`;return;
