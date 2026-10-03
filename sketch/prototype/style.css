@@ -243,7 +243,7 @@ body.grabbing,body.grabbing *{cursor:grabbing!important}
 .cursor{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--live);pointer-events:none;z-index:3}
 .cursor::before{content:'';position:absolute;top:-4px;left:-4px;border:5px solid transparent;border-top-color:var(--live)}
 .playhead{position:absolute;top:0;bottom:0;width:2px;background:var(--chord);pointer-events:none;z-index:4}
-.drop{position:absolute;top:3px;bottom:3px;border:2px dashed var(--chord);border-radius:4px;background:rgba(196,69,106,.08);pointer-events:none;z-index:2}
+.drop{position:absolute;top:3px;bottom:3px;border:2px dashed var(--chord);border-radius:4px;background:rgba(196,69,106,.08);pointer-events:none;z-index:6}
 .add-sec{margin:14px 0 0 12px;display:flex;gap:4px;flex-wrap:wrap;align-items:center}
 .add-sec .lbl{margin-right:4px}
 .add-sec input.add-name{width:260px;font-size:12px}
@@ -971,10 +971,10 @@ body.grabbing,body.grabbing *{cursor:grabbing!important}
 .phone .phone-pads[hidden]{display:none!important}
 .phone .stage{padding:6px max(env(safe-area-inset-right),10px) 6px max(env(safe-area-inset-left),10px);gap:6px;grid-template-rows:42px minmax(0,1fr)}
 .phone .top{padding:0 4px;gap:5px}
-.phone #toStart,.phone #muteBtn,.phone .clickgrp,.phone #redo,.phone #fileState{display:none!important}
-.phone .title{width:110px}
+.phone #muteBtn,.phone #redo,.phone #fileState{display:none!important}
+
 .phone .top .transport button,.phone .top>button,.phone .top .menu>button{min-height:34px}
-.phone .lcd{grid-template-columns:80px 80px}
+.phone .lcd{grid-template-columns:72px 72px}
 .phone .main>.tabs,.phone .main>.toolbar:not(.out),.phone .main>.toolbar.out.only-chords{display:none!important}
 .phone .main{gap:0}
 .phone .sheet{padding:4px 8px 8px}
@@ -1026,3 +1026,60 @@ body.grabbing,body.grabbing *{cursor:grabbing!important}
 .phone .sec-more .menu-pop .sec-sw{background:var(--c)!important;border-radius:50%!important;padding:0!important}
 .phone .sec-more .menu-pop .tb-row button:not(.sec-sw){border:1px solid var(--line);background:var(--card);text-align:center;padding:0 12px}
 .phone .sec-vname{transform:rotate(180deg)}   /* 下から上へ読む向き */
+/* iPhone：トップバーにはメトロノームと ▾ だけ。カウントインは ▾ のメニューの下に */
+.phone .clickgrp{grid-template-columns:34px 18px;grid-template-rows:34px}
+.phone .clickgrp .ic2{height:34px;min-height:34px!important}
+.phone .title{width:80px!important}
+.phone #metroMenu{top:38px;min-width:170px}
+.phone #metroMenu #countIn{display:flex;width:auto;height:auto;min-height:34px!important;gap:8px;justify-content:flex-start;padding:0 10px}
+.phone #metroMenu #countMenu{display:flex!important;position:static;flex-direction:row;gap:4px;padding:0 4px 2px;border:0;box-shadow:none;background:none;min-width:0}
+.phone #metroMenu #countMenu button{flex:1}
+.phone #phoneView{padding:0 7px}
+/* 指の端末：長押しでつかんだコード（ここから動かせる） */
+.touch .blk.lift{transform:scale(1.04);box-shadow:0 4px 14px rgba(0,0,0,.25);z-index:5}
+/* 選んだコードの両端に、つかんで伸ばす点々のつまみ（メロディービューのノートと同じ形） */
+.blk.sel .rs{display:flex;align-items:center;justify-content:center}
+.blk.sel .rs::before{content:'';width:5px;height:70%;max-height:22px;border-radius:3px;background:#fff;
+  box-shadow:0 0 0 1.5px var(--chord),0 1px 3px rgba(0,0,0,.35);
+  background-image:radial-gradient(circle,var(--chord) 1px,transparent 1.3px);background-size:5px 4px;background-position:center}
+.touch .blk.sel .rs::before{width:6px;background-size:6px 5px}
+/* つまみはコードの外側にはみ出させて、コード名に重ねない（メロディービューのノートと同じ） */
+.blk.sel{overflow:visible;z-index:3}
+.blk.sel .rs{right:-8px;width:14px}
+.blk.sel .rs.rsl{right:auto;left:-8px}
+.touch .blk.sel .rs{right:-11px;width:20px}
+.touch .blk.sel .rs.rsl{right:auto;left:-11px}
+/* 下の安全域（ホームバー）。下から上へのドラッグが iOS の「ホームへ戻る」に取られないよう、部品を上げる */
+.touch .stage{padding-bottom:max(env(safe-area-inset-bottom),8px)}
+.phone .stage{padding-bottom:max(env(safe-area-inset-bottom),6px)}
+.phone .chip-edit{bottom:max(env(safe-area-inset-bottom),6px)!important}
+/* ピンチ・ダブルタップで画面全体が拡大しないように */
+.touch,.touch body{touch-action:pan-x pan-y}
+/* プリセットの進行のドラッグを、引き出しのスクロールに取られないように */
+#progNames{touch-action:none}
+/* 短いコードは、つまみを細くして本体をつかめるだけ残す */
+.touch .blk.sel.narrow .rs{right:-6px;width:10px}
+.touch .blk.sel.narrow .rs.rsl{right:auto;left:-6px}
+.touch .blk.sel.narrow .rs::before{width:4px;background-size:4px 4px}
+/* iPhone のメロディービュー：上の帯は1段（26px） */
+.phone .roll .rh,.phone .roll .rc,.phone .roll .rhg{height:26px}
+.phone .roll .rg{top:26px}
+.phone .roll .rsec{padding:0;border-left:0;background:var(--c)}
+.phone .roll .rbar{font-size:9px;line-height:12px;padding-left:2px}
+.phone .roll .rchord{background:none;padding-left:14px;line-height:20px;font-size:12px;pointer-events:none}
+.phone .roll .rchord.playing{background:color-mix(in srgb,var(--chord-tint) 70%,transparent)}
+/* iPhone のメロディービュー：下のバーは音を選んだとき・範囲のときだけ、下に重ねて出す */
+.phone .main:has(> .roll:not([hidden])) .footer{position:absolute;left:6px;right:6px;bottom:6px;z-index:20;border:1px solid var(--line);border-radius:10px;
+  background:var(--panel);box-shadow:0 4px 18px rgba(0,0,0,.18);overflow-x:auto}
+.phone .main:has(> .roll:not([hidden])) .footer.idle{display:none}
+/* 全画面（html.mel-full） */
+.mel-float{display:none}
+.mel-full .stage>.top,.mel-full .main>.toolbar.out.only-melody{display:none!important}
+.mel-full .stage{grid-template-rows:minmax(0,1fr)!important}
+.mel-full .mel-float{display:flex;position:absolute;top:2px;right:6px;z-index:25;gap:4px;padding:3px;border-radius:10px;
+  background:color-mix(in srgb,var(--panel) 88%,transparent);border:1px solid var(--line);box-shadow:0 2px 10px rgba(0,0,0,.15)}
+.mel-full .mel-float button{min-height:30px!important;min-width:38px;padding:0 8px;font-size:14px!important;display:flex;align-items:center;justify-content:center}
+.mel-full-btn{display:none}
+.phone .mel-full-btn{display:inline-flex;margin-left:auto;min-width:44px;justify-content:center;font-size:16px!important}
+.phone .tb-more:not([hidden])+.mel-full-btn{margin-left:0}
+.phone .toolbar.out.only-melody>.lbl[title^="メロディービューの行"]{display:none}   /* iPhone：「ガイド」の見出しは外す（全画面のボタンを1段に入れる） */

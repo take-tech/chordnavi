@@ -33,6 +33,12 @@ public:
     void resized() override;
     void parentHierarchyChanged() override { updateZoom(); }
 
+    // iOS：アプリが裏に回るとき（JS に "flush" を送って、待たずに自動保存させる）・戻ったとき
+    // （裏にいるあいだに iOS が WebView のプロセスを終わらせていたら白い画面のままになるので、返事が無ければページを読み直す。
+    //   JS は起動時に session.json から曲を戻す）
+    void appSuspended();
+    void appResumed();
+
 private:
     // WebView のページのズームをウィンドウの大きさに合わせる（macOS。文字がにじまないように）
     void updateZoom();

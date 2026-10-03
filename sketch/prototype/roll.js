@@ -17,7 +17,7 @@ export const M_LENS=[{id:'1',name:'全音符',t:1920},{id:'2',name:'2分',t:960}
   {id:'8.',name:'付点8分',t:360},{id:'8',name:'8分',t:240},{id:'8t',name:'3連8分',t:160},{id:'16',name:'16分',t:120}];
 // 横の拡大：4分音符あたりの横幅（px）。表示のスライダー（0〜100）とは対数でつなぐ
 // 指で操作する端末（iPad・iPhone）は、音が押しやすいよう行を高く・横を広く始める
-export const COARSE=typeof matchMedia!=='undefined'&&(matchMedia('(pointer: coarse)').matches||/[?&]touch\b/.test(location.search));
+export const COARSE=typeof matchMedia!=='undefined'&&(matchMedia('(pointer: coarse)').matches||/[?&](touch|phone)\b/.test(location.search));
 export const ZOOM_MIN=10, ZOOM_MAX=150, ZOOM_DEFAULT=COARSE?70:34;
 export const clampZoom=z=>Math.max(ZOOM_MIN,Math.min(ZOOM_MAX,+z||ZOOM_DEFAULT));
 export const zoomToSlider=z=>Math.round(Math.log(clampZoom(z)/ZOOM_MIN)/Math.log(ZOOM_MAX/ZOOM_MIN)*100);
@@ -29,7 +29,8 @@ const ROW_AUTO=PHONE_ROLL?22:COARSE?28:14;
 export const ROW_SIZES={s:14,m:20,l:28,xl:36}, ROW_MIN=12, ROW_MAX=40;
 export const rowOf=v=>{const n=parseFloat(v);return Number.isFinite(n)?Math.max(ROW_MIN,Math.min(ROW_MAX,Math.round(n))):ROW_SIZES[v]||ROW_AUTO;};
 let ROW=ROW_AUTO;
-const KEYW=46, HEAD=62, LOW=MELODY_LOW, HIGH=MELODY_HIGH, ROWS=HIGH-LOW+1;
+// 上の帯の高さ。iPhone は1段（セクションは上の細い色の線、小節番号は小さく左上、その上にコード名）にまとめて、音を置くところを広く取る
+const KEYW=46, HEAD=PHONE_ROLL?26:62, LOW=MELODY_LOW, HIGH=MELODY_HIGH, ROWS=HIGH-LOW+1;
 const BLACK=new Set([1,3,6,8,10]);
 // コードの構成音の、ルートからの度数の書き方（半音の数 → 表記）。分数コードのベースは B
 const TONE_LABEL=['R','♭9','9','♭3','3','11','♭5','5','♯5','6','♭7','7'];
@@ -79,18 +80,18 @@ export function createRoll(root,ctx){
     tl.secRanges.forEach(({from,to},si)=>{
       if(from===to)return;
       const s=song.sections[si], t0=tl.bars[from].start, t1=tl.bars[to-1].start+tl.bars[to-1].ticks;
-      const e=tbox('rsec',t0,0,t1-t0,18);e.style.setProperty('--c',SECTION_COLORS[s.color]||SECTION_COLORS[0]);
-      e.append(h('span','',s.name));e.title=s.name;hg.appendChild(e);
+      const e=tbox('rsec',t0,0,t1-t0,PHONE_ROLL?3:18);e.style.setProperty('--c',SECTION_COLORS[s.color]||SECTION_COLORS[0]);
+      if(!PHONE_ROLL)e.append(h('span','',s.name));e.title=s.name;hg.appendChild(e);
     });
     const rg0=ctx.range();
     for(const b of tl.bars){
       const on=rg0&&b.gi>=rg0.from&&b.gi<rg0.to;
-      const e=tbox('rbar'+(on?' on':''),b.start,18,b.ticks,16);e.append(h('span','',String(b.gi+1)));
+      const e=tbox('rbar'+(on?' on':''),b.start,PHONE_ROLL?3:18,b.ticks,PHONE_ROLL?23:16);e.append(h('span','',String(b.gi+1)));
       e.dataset.gi=b.gi;e.title='押してカーソル・横にドラッグで範囲';hg.appendChild(e);
     }
     const pcs=placedChords(song,tl);
     for(const p of pcs){
-      const e=tbox('rchord',p.start,36,p.end-p.start,24,2,2);e.dataset.id=p.c.id;
+      const e=PHONE_ROLL?tbox('rchord',p.start,3,p.end-p.start,22,2,2):tbox('rchord',p.start,36,p.end-p.start,24,2,2);e.dataset.id=p.c.id;
       e.append(h('span','',ctx.chordName(p)));e.title=ctx.chordName(p);hg.appendChild(e);
     }
     hg.addEventListener('pointerdown',e=>{
@@ -210,7 +211,7 @@ export function createRoll(root,ctx){
   },{passive:false});
   let gestureZ=null;
   root.addEventListener('gesturestart',e=>{e.preventDefault();gestureZ=clampZoom(ctx.ui.mZoom);});
-  root.addEventListener('gesturechange',e=>{e.preventDefault();if(gestureZ!=null)setZoom(gestureZ*e.scale,e.clientX);});
+  root.addEventListener('gesturechange',e=>{e.preventDefault();if(gestureZ!=null&&touches.size<2)setZoom(gestureZ*e.scale,e.clientX);});   // 指2本は下の自前の処理（縦・横を別に）
   root.addEventListener('gestureend',e=>{e.preventDefault();gestureZ=null;});
 
   // 画面上の点 → 曲の tick・音の高さ（画面の拡大縮小を戻す）
@@ -245,13 +246,22 @@ export function createRoll(root,ctx){
 
   /* 指の操作：1本は編集（マウスと同じ）、2本でスクロール。押した直後は少し待って、2本目が来たら編集しない */
   const touches=new Map();
-  let pend=null, pan=null;
+  let pend=null, pan=null, rowRaf=0;
+  // 縦の大きさ（行の高さ）を変える。真ん中に見えている音がずれないよう render が合わせる
+  function setRow(r){
+    r=Math.max(ROW_MIN,Math.min(ROW_MAX,Math.round(r)));
+    if(String(r)===String(ctx.ui.mRow))return;
+    ctx.ui.mRow=String(r);ctx.rowChanged?.();
+    cancelAnimationFrame(rowRaf);rowRaf=requestAnimationFrame(render);
+  }
   function onTouchDown(e){
     touches.set(e.pointerId,{x:e.clientX,y:e.clientY});
     if(touches.size>=2){
       if(pend){clearTimeout(pend.t);pend=null;}
       const pts=[...touches.values()];
-      pan={x:(pts[0].x+pts[1].x)/2,y:(pts[0].y+pts[1].y)/2};
+      // 2本指：動かすとスクロール、指の間を横に広げる・つまむと横の拡大、縦に広げる・つまむと行の高さ
+      pan={x:(pts[0].x+pts[1].x)/2,y:(pts[0].y+pts[1].y)/2,sx:Math.abs(pts[0].x-pts[1].x),sy:Math.abs(pts[0].y-pts[1].y),
+        z:clampZoom(ctx.ui.mZoom),row:ROW,zx:false,zy:false};
       return;
     }
     e.preventDefault();
@@ -267,7 +277,13 @@ export function createRoll(root,ctx){
     if(!pan||touches.size<2||!scroller)return;
     const pts=[...touches.values()], m={x:(pts[0].x+pts[1].x)/2,y:(pts[0].y+pts[1].y)/2};
     const r=scroller.getBoundingClientRect(), k=r.width/(scroller.offsetWidth||1);
-    scroller.scrollLeft-=(m.x-pan.x)/k;scroller.scrollTop-=(m.y-pan.y)/k;pan=m;
+    // 指の間の幅が 40px 以上あり、12% 以上変わったら、その向きの拡大を始める（スクロールだけのときに揺れないように）
+    const sx=Math.abs(pts[0].x-pts[1].x), sy=Math.abs(pts[0].y-pts[1].y);
+    if(!pan.zx&&pan.sx>=40&&Math.abs(sx/pan.sx-1)>.12)pan.zx=true;
+    if(!pan.zy&&pan.sy>=40&&Math.abs(sy/pan.sy-1)>.12)pan.zy=true;
+    if(pan.zx)setZoom(pan.z*sx/pan.sx,m.x);
+    if(pan.zy)setRow(pan.row*sy/pan.sy);
+    scroller.scrollLeft-=(m.x-pan.x)/k;scroller.scrollTop-=(m.y-pan.y)/k;pan.x=m.x;pan.y=m.y;
   });
   const touchEnd=e=>{touches.delete(e.pointerId);if(touches.size<2)pan=null;};
   addEventListener('pointerup',touchEnd);addEventListener('pointercancel',touchEnd);

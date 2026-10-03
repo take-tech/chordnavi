@@ -34,9 +34,15 @@ if(TOUCH){
 /* ---------- タッチ（iPad・iPhone） ----------
    指の操作は、押した要素にポインタが自動でつかまれる（暗黙のキャプチャ）。ドラッグ中に描き直して押した要素が消えると、
    指を離した pointerup が届かず、ドラッグが終わらない。押した直後にキャプチャを外して、window の pointermove・pointerup で受ける。
-   ジェスチャーに取られた（pointercancel）ときも、pointerup として終わらせる */
+   ジェスチャーに取られた（pointercancel）ときも、pointerup として終わらせる（ev.cancelled＝true。タップとして扱わず後始末だけにする） */
 addEventListener('pointerdown',e=>{if(e.pointerType==='touch'&&e.target.hasPointerCapture?.(e.pointerId))e.target.releasePointerCapture(e.pointerId);},true);
-addEventListener('pointercancel',e=>{if(e.pointerType!=='mouse')dispatchEvent(new PointerEvent('pointerup',{bubbles:true,clientX:e.clientX,clientY:e.clientY,pointerId:e.pointerId,pointerType:e.pointerType,button:0}));},true);
+addEventListener('pointercancel',e=>{if(e.pointerType==='mouse')return;
+  const up=new PointerEvent('pointerup',{bubbles:true,clientX:e.clientX,clientY:e.clientY,pointerId:e.pointerId,pointerType:e.pointerType,button:0});
+  up.cancelled=true;dispatchEvent(up);},true);
+// iOS（iPhone・iPad。iPad は Mac と名乗るので指の数で見分ける）
+const IOS=/iPhone|iPad|iPod/.test(navigator.userAgent)||(/Macintosh/.test(navigator.userAgent)&&navigator.maxTouchPoints>1);
+// キーボードを閉じたあと、WebView が入力欄を見せるためにずらした表示を戻す
+if(TOUCH)visualViewport?.addEventListener('resize',()=>{if(visualViewport.height>=innerHeight-1)scrollTo(0,0);});
 
 /* ---------- 状態 ---------- */
 const STORE='chordsketch.v1';
@@ -104,11 +110,22 @@ tl=timeline(song);
 
 let saveTimer=0;
 // 自動保存：開いているタブを全部（表示中のタブは今の song・ファイル名）
-function persist(){clearTimeout(saveTimer);saveTimer=setTimeout(()=>{
+function persist(){clearTimeout(saveTimer);saveTimer=setTimeout(saveNow,300);}
+function saveNow(){
+  saveTimer=0;
   const all=docs.map((d,i)=>i===active?{song,file:songFile,path:pathOf(fileHandle),dirty}:{song:d.song,file:d.file||'',path:pathOf(d.handle),dirty:!!d.dirty});
   const json=JSON.stringify({docs:all,active,ui});
   if(nativeSession.save)nativeSession.save(json).catch(e=>console.error(e));else localStorage.setItem(STORE,json);
-},300);}
+}
+// アプリが裏に回る・閉じるとき（iOS は裏のアプリを知らせずに終わらせる）：入力中の欄を確定して、待たずに保存する。
+// ネイティブ（JUCE の suspended）からも "flush" で呼ぶ（WebView に visibilitychange が届かないときの保険）
+function flushPersist(){
+  const a=document.activeElement;if(a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName))a.blur();
+  if(saveTimer){clearTimeout(saveTimer);saveNow();}
+}
+document.addEventListener('visibilitychange',()=>{if(document.hidden)flushPersist();});
+addEventListener('pagehide',flushPersist);
+onNative('flush',flushPersist);
 function snapshot(){undoStack.push(JSON.stringify(song));if(undoStack.length>300)undoStack.shift();redoStack.length=0;}
 function commit(mut){snapshot();mut();changed();}
 function changed(){tl=timeline(song);fixSelection();render();persist();player.refresh();markDirty();}   // 再生中ならすぐ反映
@@ -223,6 +240,7 @@ let ppTab='chords';
 const ppHomes=new Map();
 function ppBorrow(el,body){if(!el)return;if(!ppHomes.has(el)){const m=document.createComment('');el.before(m);ppHomes.set(el,m);}body.appendChild(el);}
 function ppGiveBack(){for(const [el,m] of ppHomes)m.after(el);}
+function setMelFull(on){document.documentElement.classList.toggle('mel-full',!!on);requestAnimationFrame(()=>roll.render());}
 function renderPhonePads(){
   if(!PHONE)return;
   $('phonePads').hidden=ui.view==='melody';
@@ -234,7 +252,18 @@ function renderPhonePads(){
 }
 if(PHONE){
   document.querySelectorAll('#ppTabs button').forEach(b=>b.onclick=()=>{ppTab=b.dataset.t;renderPhonePads();});
-  $('phoneView').onclick=()=>$('viewSeg').querySelector(`[data-v=${ui.view==='melody'?'chords':'melody'}]`).click();
+  $('phoneView').onclick=()=>{setMelFull(false);$('viewSeg').querySelector(`[data-v=${ui.view==='melody'?'chords':'melody'}]`).click();};
+  // メロディービューの全画面：トップバーとサウンドバーを隠し、先頭へ・再生・元に戻す・戻るだけを右上に浮かせる（html.mel-full）
+  const full=Object.assign(h('button','mel-full-btn','⤢'),{title:'メロディービューを全画面に'});
+  full.onclick=()=>setMelFull(true);
+  setTimeout(()=>document.querySelector('.toolbar.out.only-melody').append(full));   // 右端（「…」より後ろ。全画面をやめるボタンと同じ右側に）
+  const fl=h('div','mel-float');fl.id='melFloat';
+  const fb=(id,label,title)=>{const b=Object.assign(h('button','',label),{title});b.onclick=()=>$(id).click();return b;};
+  const fPlay=fb('playBtn','▶','再生／停止');
+  fl.append(fb('toStart','⏮','先頭へ'),fPlay,fb('undo','↶','元に戻す'),Object.assign(h('button','x','⤡'),{title:'全画面をやめる',onclick:()=>setMelFull(false)}));
+  document.querySelector('.main').appendChild(fl);
+  new MutationObserver(()=>{fPlay.innerHTML=$('playBtn').innerHTML;fPlay.className=$('playBtn').className;}).observe($('playBtn'),{childList:true,subtree:true,attributes:true});
+  fPlay.innerHTML=$('playBtn').innerHTML;
   // 1行4小節（横向きの幅に合わせる）。サイドパネルは固定しない（引き出しだけ）
   ui.perRow=4;ui.sidePinned=false;
   // メロディーのスナップ・長さはサウンドバーへ（編集バーは出さない）。MIDI の書き出し・コード譜は設定のメニューへ
@@ -243,6 +272,10 @@ if(PHONE){
   const tm=$('themeMenu');
   tm.prepend(Object.assign(h('div','menu-sep'),{role:'separator'}));
   tm.prepend($('printBtn'));tm.prepend(document.querySelector('.midi-box'));
+  // メトロノームの ▾ のメニューに、カウントイン（オン／オフ・小節数）もまとめて上に置く（トップバーはメトロノームと ▾ だけ）
+  const ci=$('countIn'), cm=$('countMenu'), cw=cm.parentElement;
+  ci.append(h('span','ci-l','カウントイン'));
+  $('metroMenu').append(ci,cm,Object.assign(h('div','menu-sep'),{role:'separator'}));cw.style.display='none';   // 種類はこの後に並ぶ
 }
 let lastPalTap={k:'',t:0};
 function paletteChip(item){
@@ -379,11 +412,15 @@ $('progNames').addEventListener('pointerdown',e=>{
   const x0=e.clientX,y0=e.clientY, bars=curBars(), label=`${curProg().name}（${bars.length}小節）`;
   let dragging=false,target=null,last=null;
   const addSec=()=>sheet.querySelector('.add-sec');
-  // シートの上下の端に近いあいだは自動でスクロール（下の何もないところ・「セクションを追加」まで届くように）
+  // シートの上下の端に近いあいだは自動でスクロール（下の何もないところ・「セクションを追加」まで届くように）。
+  // 端の帯より内側に一度入ってから（iPhone の下のパッドのように、シートの下から持ち上げてくる途中では動かさない）。下はシートの中だけ
+  let inside=false;
   const timer=setInterval(()=>{
     if(!dragging||!last)return;
     const r=sheet.getBoundingClientRect(), k=r.height/(sheet.offsetHeight||1), edge=40*k;
-    const d=last.clientY>r.bottom-edge?14:last.clientY<r.top+edge&&last.clientY>r.top-60?-14:0;
+    if(last.clientY>r.top+edge&&last.clientY<r.bottom-edge)inside=true;
+    if(!inside)return;
+    const d=last.clientY>r.bottom-edge&&last.clientY<r.bottom?14:last.clientY<r.top+edge&&last.clientY>r.top-60?-14:0;
     if(d&&last.clientX>r.left&&last.clientX<r.right){const t0=sheet.scrollTop;sheet.scrollTop+=d;if(sheet.scrollTop!==t0)move(last);}
   },30);
   const clear=()=>{showDrop(null);addSec()?.classList.remove('drop-new');};
@@ -469,9 +506,14 @@ const barEl=gi=>sheet.querySelector(`.bar[data-gi="${gi}"]`);
 function showDrop(gi,pos,len){
   sheet.querySelectorAll('.drop').forEach(x=>x.remove());
   if(gi==null)return;
-  const b=tl.bars[gi], lane=barEl(gi)?.querySelector('.lane');if(!lane)return;
-  const d=h('div','drop');d.style.left=pos/b.ticks*100+'%';d.style.width=Math.min(len,b.ticks-pos)/b.ticks*100+'%';
-  lane.appendChild(d);
+  // 置く先の枠：小節をまたぐ長さは次の小節にも続けて出す（動かしているコードの上にも重ねて見せる）
+  const end=tl.secRanges[tl.bars[gi]?.si]?.to??tl.bars.length;   // セクションの終わりまで（そこで切れる）
+  for(let g=gi,at=pos,rest=len;rest>0&&g<end&&tl.bars[g];g++,at=0){
+    const b=tl.bars[g], lane=barEl(g)?.querySelector('.lane'), w=Math.min(rest,b.ticks-at);rest-=w;
+    if(!lane)continue;
+    const d=h('div','drop');d.style.left=at/b.ticks*100+'%';d.style.width=w/b.ticks*100+'%';
+    lane.appendChild(d);
+  }
 }
 function scrollToBar(gi){
   const e=barEl(gi);if(!e)return;
@@ -704,6 +746,19 @@ function startRangeDrag(e,gi,onNumber){
     lastNo={gi,t:now};
   }
   const hit=hitBar(e.clientX,e.clientY);
+  // 指で空いたところ：シートのスクロールと区別するため、カーソルは動かさずに離したとき（ドラッグで範囲は取らない。範囲は小節番号から）
+  if(e.pointerType==='touch'&&!onNumber&&hit){
+    const pid=e.pointerId;let far=false;
+    const mv=ev=>{if(ev.pointerId===pid&&Math.hypot(ev.clientX-e.clientX,ev.clientY-e.clientY)>8)far=true;};
+    const end=ev=>{
+      if(ev.pointerId!==pid)return;
+      removeEventListener('pointermove',mv);removeEventListener('pointerup',end);
+      if(far||ev.cancelled)return;
+      const st=snapOf(hit.b.meter);sel=null;range=null;cursor={gi,pos:Math.min(hit.b.ticks-st,Math.round(hit.tick/st)*st)};render();
+    };
+    addEventListener('pointermove',mv);addEventListener('pointerup',end);
+    return;
+  }
   const anchor=e.shiftKey&&(range||cursor)?(range?range.anchor??range.from:cursor.gi):gi;
   sel=null;
   if(!onNumber&&hit&&!e.shiftKey){
@@ -810,16 +865,28 @@ function startBlockDrag(e,blkEl){
   const p=placedChords(song,tl).find(x=>x.c.id===id);if(!p)return;
   const resizing=e.target.classList.contains('rs'), fromLeft=e.target.classList.contains('rsl');   // 右端＝長さ、左端＝頭の位置
   const hit0=hitBar(e.clientX,e.clientY), grab=hit0?hit0.b.start+hit0.tick-p.start:0;
-  const x0=e.clientX,y0=e.clientY;let moved=false,target=null;
+  const x0=e.clientX,y0=e.clientY, pid=e.pointerId;let moved=false,target=null;
   // 選ぶと同時に、クリックした位置（スナップ）にカーソルを置く
-  sel={si,id};range=null;editOpen=false;
-  if(hit0){const st=snapOf(hit0.b.meter);cursor={gi:hit0.b.gi,pos:Math.min(hit0.b.ticks-st,Math.round(hit0.tick/st)*st)};}
-  render();
+  // 指：1回目のタップは選ぶだけ。選んであるコードをもう一度すぐ離すとコードメニュー。動かすのは長押ししてから（長押しの前に指を動かすとシートのスクロール。
+  // スクロールだけのときは選択・カーソルを変えないよう、選ぶのはタップを離したとき・長押しが決まったとき）。iPad のトラックパッド・マウスは PC と同じ
+  const touch=e.pointerType==='touch', wasSel=sel&&sel.si===si&&sel.id===id;
+  const pick=()=>{
+    sel={si,id};range=null;editOpen=false;
+    if(hit0){const st=snapOf(hit0.b.meter);cursor={gi:hit0.b.gi,pos:Math.min(hit0.b.ticks-st,Math.round(hit0.tick/st)*st)};}
+    render();
+  };
+  const lp=touch&&!resizing;
+  if(!lp)pick();
   // 長さの変更：伸ばした先のコードは上書きするので、動かすたびにドラッグ前の状態からやり直す（縮め直すと戻る）
   const base=resizing?JSON.stringify(song):null, maxLen=maxLenAt(p.start);
   if(resizing)snapshot();
+  const sy=sheet.scrollTop;let armed=!lp, pan=false, py=0;
+  const lift=on=>sheet.querySelectorAll(`.blk[data-id="${id}"]`).forEach(b=>b.classList.toggle('lift',on));
+  const lpT=lp?setTimeout(()=>{if(!pan){armed=true;pick();lift(true);}},400):0;
   const move=ev=>{
-    if(!moved&&Math.hypot(ev.clientX-x0,ev.clientY-y0)<4)return;
+    if(ev.pointerId!==pid)return;   // ほかの指は見ない
+    if(!moved&&!pan&&Math.hypot(ev.clientX-x0,ev.clientY-y0)<(lp?8:4))return;
+    if(!armed){if(!pan){pan=true;py=ev.clientY;clearTimeout(lpT);}sheet.scrollTop=sy-(ev.clientY-py);return;}
     moved=true;
     const hit=hitBar(ev.clientX,ev.clientY);
     if(resizing){
@@ -846,11 +913,15 @@ function startBlockDrag(e,blkEl){
     if(pos>=b.ticks){if(tl.bars[b.gi+1]){b=tl.bars[b.gi+1];pos=0;}else pos=b.ticks-st;}
     target={gi:b.gi,pos,copy:ev.altKey};showDrop(b.gi,pos,p.end-p.start);
   };
-  const up=()=>{
+  const up=ev=>{
+    if(ev.pointerId!==pid)return;
     removeEventListener('pointermove',move);removeEventListener('pointerup',up);
-    ghost.hidden=true;showDrop(null);
+    ghost.hidden=true;showDrop(null);clearTimeout(lpT);lift(false);
+    if(pan)return;
+    // iOS のジェスチャーに取られた（pointercancel）：タップにも移動にもしない（長さの変更は元に戻す）
+    if(ev.cancelled){if(resizing){if(moved){song=JSON.parse(base);tl=timeline(song);}undoStack.pop();render();}return;}
     if(resizing){if(moved){changed();previewSel();}else undoStack.pop();return;}
-    if(!moved){previewItem(c,p.key);editOpen=true;render();return;}
+    if(!moved){if(lp&&!armed)pick();previewItem(c,p.key);editOpen=!touch||(wasSel&&!armed);render();return;}   // 長押しして動かさずに離したときは開かない
     if(!target)return;
     const b=tl.bars[target.gi];
     commit(()=>{
@@ -1137,6 +1208,8 @@ function renderFooter(){
   const btn=(text,title,fn)=>{const b=h('button','',text);b.title=title;b.onclick=fn;return b;};
   if(ui.view==='melody'){
     const b=tl.bars[cursor.gi], s=roll.selection();
+    // iPhone：音を選んだとき・範囲のときだけ、メロディービューの下に重ねて出す（ほかは出さずに、音を置くところを広く）
+    f.classList.toggle('idle',PHONE&&!range&&!s.count);
     if(range)f.append(group(null,h('b','',rangeLabel(range)),h('span','fsub',`${range.to-range.from}小節を選択`)),
       group('範囲',btn('▶ ループ再生','この範囲を繰り返し再生',()=>{ui.loop=true;render();startPlay();})));
     else f.append(group(null,h('span','flbl','カーソル'),h('b','pos',b?fmtPos(cursor.gi,cursor.pos):'—')),
@@ -1634,7 +1707,8 @@ async function saveFileAs(){
   const suggested=withExtension(songFile||song.title||'song',SONG_EXT);
   if(hasNative){
     const r=await nativeFile.saveAs({name:suggested,text:songJSON(),path:pathOf(fileHandle)}).catch(e=>{console.error(e);return null;});
-    if(r?.path)setFile(r.name,r.path);else if(r!=='cancelled'){console.error(r);toast('保存できませんでした');}
+    // iOS はパスを返さない（ほかのアプリの場所は上書きできないので、次も保存先を選んで書き出す）
+    if(r?.path)setFile(r.name,r.path);else if(r?.name){setFile(r.name,null);toast('保存しました');}else if(r!=='cancelled'){console.error(r);toast('保存できませんでした');}
     return;
   }
   if('showSaveFilePicker' in window){
@@ -1673,6 +1747,7 @@ async function openFile(){
 }
 // JUCE 版で読んだファイル { path, name, text }。もう開いているならそのタブへ
 function openNativeFile(r){
+  if(!r.path){loadSongText(r.text,r.name,null);return;}   // iOS（パスを返さない）
   const open=docs.findIndex((d,i)=>(i===active?fileHandle:d.handle)===r.path);
   if(open>=0){switchTab(open);toast('このファイルはもう開いています');return;}
   loadSongText(r.text,r.name,r.path);
@@ -1848,6 +1923,7 @@ $('prClose').onclick=()=>{$('printWrap').hidden=true;};
 // PDF のファイル名は document.title になる
 // 印刷。JUCE 版の macOS の WebView は print() を扱わないので、C++ から OS の印刷画面を出す（PDF もそこから保存）
 const nativePrint=nativeFn('printPage');
+if(IOS)$('prGo').hidden=true;   // iOS の WebView は印刷できない（プレビューだけ）
 $('prGo').onclick=async()=>{
   // macOS は C++ が印刷画面を出す。Windows（WebView2）は JS の print() で印刷画面が出るので、false が返ったら print() を使う
   if(nativePrint&&await nativePrint({title:song.title||'ChordSketch'}).catch(()=>false))return;
@@ -1983,6 +2059,7 @@ $('sidePin').onclick=()=>{ui.sidePinned=!ui.sidePinned;ui.sideOpen=true;uiSet('s
 $('metroBtn').onclick=()=>{uiSet('metroOn',!ui.metroOn);player.refresh();};
 $('metroKind').onclick=e=>{e.stopPropagation();fileMenu.hidden=true;$('themeMenu').hidden=true;$('countMenu').hidden=true;metroMenu.hidden=!metroMenu.hidden;};
 metroMenu.addEventListener('click',e=>{
+  if(e.target.closest('#countMenu,#countIn'))return;   // iPhone：メニューに入れたカウントインは別に扱う
   const v=e.target.closest('button')?.value;if(!v)return;
   ui.metroOn=true;uiSet('metro',v);player.refresh();metroMenu.hidden=true;   // 種類を選んだらオンにする
 });
@@ -1990,7 +2067,7 @@ addEventListener('click',e=>{if(!e.target.closest('#metroMenu'))metroMenu.hidden
 // カウントインの小節数（1小節／2小節）。選んだらオンにする
 const countMenu=$('countMenu');
 $('countKind').onclick=e=>{e.stopPropagation();fileMenu.hidden=true;metroMenu.hidden=true;$('themeMenu').hidden=true;countMenu.hidden=!countMenu.hidden;};
-countMenu.addEventListener('click',e=>{const v=+e.target.closest('button')?.value;if(!v)return;ui.countIn=true;uiSet('countBars',v);countMenu.hidden=true;});
+countMenu.addEventListener('click',e=>{const v=+e.target.closest('button')?.value;if(!v)return;ui.countIn=true;uiSet('countBars',v);countMenu.hidden=true;if(PHONE)metroMenu.hidden=true;});
 addEventListener('click',e=>{if(!e.target.closest('#countMenu'))countMenu.hidden=true;});
 $('timbre').addEventListener('change',e=>{uiSet('timbre',e.target.value);player.setLiveTimbre(liveTimbre());player.refresh();});
 $('insLen').addEventListener('change',e=>uiSet('insLen',e.target.value));
@@ -2006,6 +2083,7 @@ const roll=createRoll($('roll'),{
   fmtPos:abs=>{const b=tl.bars.find(x=>abs>=x.start&&abs<x.start+x.ticks);return b?fmtPos(b.gi,abs-b.start):'';},
   playingChord:()=>playingId,
   zoomChanged:()=>{$('zoomBar').value=zoomToSlider(ui.mZoom);persist();},
+  rowChanged:()=>{$('rowSize').value=rowOf(ui.mRow);persist();},
   range:()=>range,
   // 小節の範囲を選ぶ（null で外す）。コードの画面と同じ range なので、再生・MIDI のドラッグにも使う
   setRange:r=>{range=r?{...r,anchor:r.from}:null;if(r)cursor={gi:r.from,pos:0};sel=null;render();},
