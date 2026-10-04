@@ -44,9 +44,12 @@ const IOS=/iPhone|iPad|iPod/.test(navigator.userAgent)||(/Macintosh/.test(naviga
 // キーボードを閉じたあと、WebView が入力欄を見せるためにずらした表示を戻す
 if(TOUCH)visualViewport?.addEventListener('resize',()=>{if(visualViewport.height>=innerHeight-1)scrollTo(0,0);});
 
+// 再生・停止のアイコン（文字の ▶・■ は iOS で絵文字になるので SVG）。index.html の #playBtn と同じ形
+const ICON_PLAY='<svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M4.5 2.9v10.2a.7.7 0 0 0 1.1.6l7.6-5.1a.7.7 0 0 0 0-1.2L5.6 2.3a.7.7 0 0 0-1.1.6z" fill="currentColor"/></svg>', ICON_STOP='<svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><rect x="3" y="3" width="10" height="10" rx="1.2" fill="currentColor"/></svg>';
+
 /* ---------- 状態 ---------- */
 const STORE='chordsketch.v1';
-const UI_DEFAULT={snap:'beat',perRow:4,insLen:'bar',dia:'7',timbre:'piano',metro:'click',metroOn:true,countIn:false,countBars:1,loop:false,keepNames:false,step:false,theme:'light',prog:{major:0,minor:13},progVar:0,
+const UI_DEFAULT={snap:'beat',perRow:4,insLen:'bar',dia:'7',timbre:'piano',chordVol:100,melVol:100,metro:'click',metroOn:true,countIn:false,countBars:1,loop:false,keepNames:false,step:false,theme:'light',prog:{major:0,minor:13},progVar:0,
   // メロディー（ピアノロール）：表示・スナップ・入力の長さ・横の拡大・音色・鳴らすもの・ガイド、MIDI に入れるもの
   view:'chords',mSnap:'8',mLen:'8',mZoom:ZOOM_DEFAULT,mTimbre:'square',hearChords:true,hearMelody:true,guideChord:true,guideScale:true,rollDeg:true,mRow:'auto',sideHidden:false,sideOpen:false,sidePinned:false,midiParts:'both',mTimbreSet:false,mTool:'draw',
   scaleMode:'zoom',   // ウィンドウを広げたとき：zoom＝全体を拡大、expand＝大きさはそのままで広げる
@@ -246,8 +249,22 @@ function renderPhonePads(){
   $('phonePads').hidden=ui.view==='melody';
   document.querySelectorAll('#ppTabs button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.t===ppTab));
   const body=$('ppBody');ppGiveBack();body.innerHTML='';body.dataset.t=ppTab;
-  if(ppTab==='chords'){diaItems().forEach(it=>body.appendChild(paletteChip(it)));const fitPads=()=>body.querySelectorAll('.pchip .n').forEach(n=>fitText(n,9));requestAnimationFrame(fitPads);setTimeout(fitPads,120);document.fonts?.ready.then(fitPads);}
+  if(ppTab==='chords'){
+    // 左に3和音／4和音の切り替え（タブとは区切り線で分ける。サイドパネルの diaSeg と同じ ui.dia）
+    const dia=h('div','pp-dia');dia.setAttribute('role','group');dia.setAttribute('aria-label','ダイアトニックの和音');
+    for(const [v,t] of [['3','3和音'],['7','4和音']]){
+      const b=h('button','',t);b.setAttribute('aria-pressed',ui.dia===v);
+      b.onclick=()=>{if(ui.dia===v)return;ui.dia=v;renderPalette();persist();renderPhonePads();};
+      dia.appendChild(b);
+    }
+    body.appendChild(dia);
+    diaItems().forEach(it=>body.appendChild(paletteChip(it)));const fitPads=()=>body.querySelectorAll('.pchip .n').forEach(n=>fitText(n,9));requestAnimationFrame(fitPads);setTimeout(fitPads,120);document.fonts?.ready.then(fitPads);}
   else if(ppTab==='prog'){const rows=document.querySelectorAll('.left .prog-row');ppBorrow(rows[0],body);ppBorrow($('progNames'),body);ppBorrow(rows[1],body);}
+  else if(ppTab==='sound'){   // コードのサウンドバー（iPhone では出さない）の部品を借りる：1段目は音色・パターン、2段目は鳴らし方・上声・ベース
+    const r1=h('div','pp-row'), r2=h('div','pp-row');body.append(r1,r2);
+    ppBorrow($('timbre').closest('.fld'),r1);ppBorrow($('chordVol').closest('.fld'),r1);ppBorrow($('pattern').closest('.fld'),r1);
+    for(const el of [$('voicingSeg'),$('areaSeg'),[...document.querySelectorAll('.toolbar.out.only-chords>.lbl,.pp-row>.lbl')].find(x=>x.textContent.trim()==='上声'),$('octUp'),$('bassBtn'),$('octBass')])ppBorrow(el,r2);
+  }
   else{document.querySelectorAll('.left .keyrow').forEach(r=>ppBorrow(r,body));}
 }
 if(PHONE){
@@ -259,8 +276,9 @@ if(PHONE){
   setTimeout(()=>document.querySelector('.toolbar.out.only-melody').append(full));   // 右端（「…」より後ろ。全画面をやめるボタンと同じ右側に）
   const fl=h('div','mel-float');fl.id='melFloat';
   const fb=(id,label,title)=>{const b=Object.assign(h('button','',label),{title});b.onclick=()=>$(id).click();return b;};
-  const fPlay=fb('playBtn','▶','再生／停止');
-  fl.append(fb('toStart','⏮','先頭へ'),fPlay,fb('undo','↶','元に戻す'),Object.assign(h('button','x','⤡'),{title:'全画面をやめる',onclick:()=>setMelFull(false)}));
+  const fPlay=fb('playBtn','','再生／停止');
+  const fStart=fb('toStart','','先頭へ'), fUndo=fb('undo','','元に戻す');fStart.innerHTML=$('toStart').innerHTML;fUndo.innerHTML=$('undo').innerHTML;
+  fl.append(fStart,fPlay,fUndo,Object.assign(h('button','x','⤡'),{title:'全画面をやめる',onclick:()=>setMelFull(false)}));
   document.querySelector('.main').appendChild(fl);
   new MutationObserver(()=>{fPlay.innerHTML=$('playBtn').innerHTML;fPlay.className=$('playBtn').className;}).observe($('playBtn'),{childList:true,subtree:true,attributes:true});
   fPlay.innerHTML=$('playBtn').innerHTML;
@@ -694,7 +712,8 @@ function sectionHead(s,si){
       // iPhone：見出しは左の細い列に、セクション名を縦に（横文字を寝かせて）出すだけ。押すとメニュー（色・名前・小節数・範囲・パターンと操作）
       mb.className='sec-vname';mb.textContent=s.name||'（名前なし）';mb.title=`「${s.name}」の設定と操作`;
       const r1=h('div','tb-row'), r2=h('div','tb-row'), r3=h('div','tb-row');
-      r1.append(sw,name);r2.append(nb,h('span','n','小節'),pick);r3.append(pat);
+      const x=Object.assign(h('button','x','×'),{title:'閉じる'});   // 閉じる（外を押しても閉じる）
+      r1.append(sw,name,x);r2.append(nb,h('span','n','小節'),pick);r3.append(pat);
       pop.append(r1,r2,r3);
     }
     pop.append(dup,split,merge,up,down,del);
@@ -712,6 +731,8 @@ function sectionHead(s,si){
 }
 
 /* ---------- シートの操作 ---------- */
+// タッチ用のセクションのメニュー：外を押したら閉じる
+if(TOUCH)addEventListener('pointerdown',e=>{if(!e.target.closest?.('.sec-more'))document.querySelectorAll('.sec-more .menu-pop').forEach(p=>p.hidden=true);},true);
 sheet.addEventListener('pointerdown',e=>{
   if(e.button===0&&e.target.closest('.sec-grip')){e.preventDefault();startSectionDrag(e,+e.target.closest('.sec').dataset.si);return;}
   if(e.button!==0||e.target.closest('.sec-head,.add-sec,.chip-edit'))return;
@@ -1055,7 +1076,7 @@ function renderVoicing(){
     keys.appendChild(row);
   }
   keys.appendChild(h('div','vpad'));
-  const play=h('button','','▶ 試聴');play.title='このボイシングを鳴らす';play.onclick=()=>player.playNotes(chordVoicingNotes(song,placedChords(song,tl).find(x=>x.c.id===vedit.id)),ui.timbre,1.2);
+  const play=h('button','','▶\uFE0E 試聴');play.title='このボイシングを鳴らす';play.onclick=()=>player.playNotes(chordVoicingNotes(song,placedChords(song,tl).find(x=>x.c.id===vedit.id)),ui.timbre,1.2);
   const reset=h('button','','元に戻す（自動）');reset.title='編集した音を消して、自動のボイシングに戻す';reset.disabled=!p.c.v;
   reset.onclick=()=>{commit(()=>{const c=song.sections[p.si].chords.find(x=>x.id===p.c.id);delete c.v;});player.playNotes(chordVoicingNotes(song,placedChords(song,tl).find(x=>x.c.id===vedit.id)),ui.timbre,1.2);};
   const foot=h('div','vfoot');foot.append(play,reset);
@@ -1211,7 +1232,7 @@ function renderFooter(){
     // iPhone：音を選んだとき・範囲のときだけ、メロディービューの下に重ねて出す（ほかは出さずに、音を置くところを広く）
     f.classList.toggle('idle',PHONE&&!range&&!s.count);
     if(range)f.append(group(null,h('b','',rangeLabel(range)),h('span','fsub',`${range.to-range.from}小節を選択`)),
-      group('範囲',btn('▶ ループ再生','この範囲を繰り返し再生',()=>{ui.loop=true;render();startPlay();})));
+      group('範囲',btn('▶\uFE0E ループ再生','この範囲を繰り返し再生',()=>{ui.loop=true;render();startPlay();})));
     else f.append(group(null,h('span','flbl','カーソル'),h('b','pos',b?fmtPos(cursor.gi,cursor.pos):'—')),
       group('ステップ入力',btn('休符','カーソルを入力の長さだけ進める（ステップ入力の休み）',()=>roll.stepRest())));
     if(s.count)f.append(group(null,h('span','fsub',`${s.count}音を選択`),
@@ -1232,7 +1253,7 @@ function renderFooter(){
   if(range){
     const n=range.to-range.from;
     f.append(group(null,h('b','',rangeLabel(range)),h('span','fsub',`${n}小節を選択`)),
-      group('範囲',btn('▶ ループ再生','この範囲を繰り返し再生',()=>{ui.loop=true;render();startPlay();}),btn('コピー','コードをコピー（⌘C）',copySel),btn('コードを消す','範囲のコードを消す（⌫）',deleteSel)),
+      group('範囲',btn('▶\uFE0E ループ再生','この範囲を繰り返し再生',()=>{ui.loop=true;render();startPlay();}),btn('コピー','コードをコピー（⌘C）',copySel),btn('コードを消す','範囲のコードを消す（⌫）',deleteSel)),
       group('小節',btn('＋ 挿入',`選択範囲の前に${n}小節を入れる`,()=>insertBarsAtCursor(n)),btn('− 削除','選択範囲の小節を消す',()=>deleteRangeBars())));
   }else{
     const b=tl.bars[cursor.gi];
@@ -1394,7 +1415,7 @@ function startPlay(r=playRange(),countIn=ui.countIn?ui.countBars:0){
   playFrom=rangeTicks(tl,r).from;
   player.play({
     render:()=>audible(renderSong(song,rangeTicks(tl,r))),
-    loop:()=>ui.loop, countIn, metronome:()=>ui.metroOn?ui.metro:'off', timbre:()=>ui.timbre,melodyTimbre:()=>ui.mTimbre,
+    loop:()=>ui.loop, countIn, metronome:()=>ui.metroOn?ui.metro:'off', timbre:()=>ui.timbre,melodyTimbre:()=>ui.mTimbre,chordVol:()=>(ui.chordVol??100)/100,melodyVol:()=>(ui.melVol??100)/100,
     onPos:(t,counting,cnt)=>onPos(t==null?null:playFrom+t,counting,cnt),
     onEnd:()=>{finishRec();playTick=null;playingId=null;render();}
   });
@@ -2025,8 +2046,9 @@ if(TOUCH){
   const edit=document.querySelector('.toolbar:not(.out)'), sc=document.querySelector('.toolbar.out.only-chords'), sm=document.querySelector('.toolbar.out.only-melody');
   const tim=()=>$('timbre').closest('.fld'), mtim=()=>$('mTimbre').closest('.fld');
   add(edit,[['.midi-box']]);
-  add(sc,[[sepBefore(tim),tim],[sepBefore(lblOf(sc,'上声')),lblOf(sc,'上声'),'#octUp','#bassBtn','#octBass']]);   // ギターで Low／Mid／High が出ると幅が足りない
-  add(sm,[[sepBefore(mtim),mtim],[sepBefore(lblOf(sm,'鳴らす')),lblOf(sm,'鳴らす'),'#hearChords','#hearMelody'],[sepBefore(lblOf(sm,'縦')),lblOf(sm,'縦'),'#rowSize']]);
+  const cvol=()=>$('chordVol').closest('.fld'), mvol=()=>$('melVol').closest('.fld');
+  if(!PHONE)add(sc,[[sepBefore(tim),tim,cvol],[sepBefore(lblOf(sc,'上声')),lblOf(sc,'上声'),'#octUp','#bassBtn','#octBass']]);   // ギターで Low／Mid／High が出ると幅が足りない
+  add(sm,[[sepBefore(mtim),mtim,mvol],[sepBefore(lblOf(sm,'鳴らす')),lblOf(sm,'鳴らす'),'#hearChords','#hearMelody'],[sepBefore(lblOf(sm,'縦')),lblOf(sm,'縦'),'#rowSize']]);
   addEventListener('pointerdown',e=>{if(!e.target.closest('.tb-more'))document.querySelectorAll('.tb-pop').forEach(p=>p.hidden=true);},true);
 }
 function updateMoreBars(){
@@ -2096,6 +2118,14 @@ for(const t of player.TIMBRES)$('mTimbre').appendChild(Object.assign(h('option',
 if(!player.TIMBRES.some(t=>t.id===ui.mTimbre))ui.mTimbre='square';
 $('mSnap').addEventListener('change',e=>uiSet('mSnap',e.target.value));
 $('mLen').addEventListener('change',e=>uiSet('mLen',e.target.value));
+// コード・メロディーの再生の音量
+function sendVolumes(){player.setVolumes((ui.chordVol??100)/100,(ui.melVol??100)/100);}
+sendVolumes();
+for(const [id,key] of [['chordVol','chordVol'],['melVol','melVol']]){
+  // JUCE 版は C++ の音量だけを変える（曲を送り直さないので、動かしてもぶつぶつしない）。ブラウザは離したときに作り直す
+  $(id).addEventListener('input',e=>{ui[key]=+e.target.value;sendVolumes();});
+  $(id).addEventListener('change',()=>{if(!hasNative)player.refresh();persist();});
+}
 $('mTimbre').addEventListener('change',e=>{uiSet('mTimbre',e.target.value);player.setLiveTimbre(liveTimbre());player.refresh();player.playNotes([melodyBase(curKey())+7],ui.mTimbre,.5);});
 $('midiParts').addEventListener('change',e=>uiSet('midiParts',e.target.value));
 // 横の拡大のスライダー（見えている範囲の真ん中を中心に）
@@ -2200,7 +2230,7 @@ function render(){
   $('areaSeg').hidden=song.voicing!=='guitar';
   $('recBtn').setAttribute('aria-pressed',!!rec);$('recBtn').classList.toggle('on',!!rec);
   const playing=player.isPlaying(), pb=$('playBtn');
-  pb.textContent=playing?'■':'▶';pb.setAttribute('aria-label',playing?'停止':'再生');pb.classList.toggle('on',playing);
+  pb.innerHTML=playing?ICON_STOP:ICON_PLAY;pb.setAttribute('aria-label',playing?'停止':'再生');pb.classList.toggle('on',playing);
   if(!playing){$('posDisp').textContent=fmtPos(cursor.gi,cursor.pos)||'1.1.1';$('posDisp').classList.remove('count');lastPos='';}
   renderLcd();
   $('undo').disabled=!undoStack.length;$('redo').disabled=!redoStack.length;
@@ -2222,7 +2252,7 @@ function render(){
   $('stage').querySelector('.main').classList.toggle('melody',mel);
   document.querySelectorAll('#viewSeg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.v===ui.view));
   sheet.hidden=mel;$('roll').hidden=!mel;
-  $('mSnap').value=ui.mSnap;$('mLen').value=ui.mLen;$('mTimbre').value=ui.mTimbre;$('midiParts').value=ui.midiParts;
+  $('mSnap').value=ui.mSnap;$('mLen').value=ui.mLen;$('mTimbre').value=ui.mTimbre;$('chordVol').value=ui.chordVol??100;$('melVol').value=ui.melVol??100;$('midiParts').value=ui.midiParts;
   $('zoomBar').value=zoomToSlider(ui.mZoom);
   renderTool();
   pressed('hearChords',ui.hearChords);pressed('hearMelody',ui.hearMelody);pressed('guideChord',ui.guideChord);pressed('guideScale',ui.guideScale);pressed('rollDeg',ui.rollDeg);

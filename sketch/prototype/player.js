@@ -13,7 +13,7 @@ export const TIMBRES=hasNative?[
   {id:'piano',name:'ピアノ'},{id:'square',name:'矩形波'},{id:'lead',name:'リード'},{id:'triangle',name:'シンプル（三角波）'},{id:'organ',name:'オルガン'},{id:'pad',name:'パッド'}
 ];
 const nSongPlay=nativeFn('songPlay'), nSongUpdate=nativeFn('songUpdate'), nSongStop=nativeFn('songStop');
-const nPreview=nativeFn('previewNotes'), nMute=nativeFn('setMute'), nTimbre=nativeFn('setTimbre');
+const nPreview=nativeFn('previewNotes'), nMute=nativeFn('setMute'), nTimbre=nativeFn('setTimbre'), nVolumes=nativeFn('setVolumes');
 const DRUM_ID={kick:0,snare:1,hat:2,hatAcc:3,click:4,clickHi:5};   // C++ の SongPlayer::Drum の順
 const nativeErr=err=>console.error(err);
 export const METRONOMES=[
@@ -166,16 +166,17 @@ function drumHits(kind,r){
 /* ---------- JUCE 版の再生（C++ の SongPlayer） ---------- */
 let nativeSession=0;
 // 範囲の音（tick）→ C++ に渡す予定表（秒。数を平らに並べる：ノートは [開始, 長さ, 音, 強さ]、ドラムは [開始, 種類]）
+// 音量は C++ の組の音量（setVolumes）で変えるので、ここでは強さに掛けない
 function nativePayload(r,opts){
-  const notes=[], drums=[];
+  const notes=[], drums=[], cv=1, mv=1;
   for(const n of r.notes){
     const s=tickToSec(r.tempos,n.t), e=tickToSec(r.tempos,n.t+n.d);
-    notes.push(+s.toFixed(5),+(e-s).toFixed(5),n.n,+(n.v/127).toFixed(3));
+    notes.push(+s.toFixed(5),+(e-s).toFixed(5),n.n,+(n.v/127*cv).toFixed(3));
   }
   const melody=[];
   for(const n of r.melody||[]){
     const s=tickToSec(r.tempos,n.t), e=tickToSec(r.tempos,n.t+n.d);
-    melody.push(+s.toFixed(5),+(e-s).toFixed(5),n.n,+(n.v/127).toFixed(3));
+    melody.push(+s.toFixed(5),+(e-s).toFixed(5),n.n,+(n.v/127*mv).toFixed(3));
   }
   for(const h of drumHits(opts.metronome(),r))drums.push(+tickToSec(r.tempos,h.t).toFixed(5),DRUM_ID[h.drum]);
   return {notes,melody,drums,length:tickToSec(r.tempos,r.length),loop:!!opts.loop(),timbre:opts.timbre(),
@@ -259,7 +260,8 @@ function tick(){
 // 予約した音は止められるように覚えておく（再生中の変更で差し替えるため）
 function startVoice(e,when,end){
   const tim=e.mel?(run.opts.melodyTimbre||run.opts.timbre)():run.opts.timbre();
-  const v={end,stop:voice(e.n,e.v,when,end-when,tim,run.bus)};
+  const vol=e.mel?run.opts.melodyVol?.()??1:run.opts.chordVol?.()??1;
+  const v={end,stop:voice(e.n,e.v*vol,when,end-when,tim,run.bus)};
   run.voices.add(v);
 }
 /* 再生中の変更（音色・メトロノーム・パターン・コードの編集など）をすぐ反映する。
@@ -307,6 +309,12 @@ export function stop(){
 }
 
 // ミュート：出力をすべて無音にする（試聴・メトロノーム・MIDI 鍵盤。再生と表示は進んだまま）
+// 再生の音量（コード・メロディー。0〜1）。JUCE 版は C++ の組の音量（鳴っている音にもすぐ効く）。
+// ブラウザは鳴らす音の強さに掛けるので、変えたら作り直す（再生中なら refresh）
+export function setVolumes(chord,melody){
+  if(nVolumes){nVolumes({chord,melody}).catch(nativeErr);return true;}
+  return false;
+}
 export function setMuted(on){
   muted=!!on;
   if(nMute){nMute(muted).catch(nativeErr);return;}

@@ -58,7 +58,7 @@ void SongPlayer::chase (PreviewSynth& synth)
         if (n.start >= at) break;
         const auto end = n.start + n.length;
         if (end > at + 0.01)
-            synth.startNote (n.note, n.velocity, 0, (juce::int64) ((end - at) * sampleRate), n.melody ? current->melodyTimbre : current->timbre, synthOwner);
+            synth.startNote (n.note, n.velocity, 0, (juce::int64) ((end - at) * sampleRate), n.melody ? current->melodyTimbre : current->timbre, synthOwner, n.melody ? 2 : 1);
     }
 }
 
@@ -133,7 +133,7 @@ void SongPlayer::scheduleBlock (PreviewSynth& synth, int numSamples)
                 const auto& n = current->notes[nextNote];
                 const auto at = (juce::int64) std::llround (n.start * sampleRate);
                 synth.startNote (n.note, n.velocity, offset + juce::jmax<juce::int64> (0, at - pos),
-                                 (juce::int64) std::llround (n.length * sampleRate), n.melody ? current->melodyTimbre : current->timbre, synthOwner);
+                                 (juce::int64) std::llround (n.length * sampleRate), n.melody ? current->melodyTimbre : current->timbre, synthOwner, n.melody ? 2 : 1);
             }
             for (; nextDrum < current->drums.size() && current->drums[nextDrum].start < segEndSec; ++nextDrum)
             {

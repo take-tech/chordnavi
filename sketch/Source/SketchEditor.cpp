@@ -251,6 +251,17 @@ juce::WebBrowserComponent::Options SketchEditor::makeOptions()
                                  processorRef.setMuted (! args.isEmpty() && (bool) args[0]);
                                  completion (juce::var (true));
                              })
+        // 再生の音量：setVolumes({ chord, melody })（0〜1）。鳴っている音にもすぐ効く（曲を送り直さない）
+        .withNativeFunction ("setVolumes", [this] (const auto& args, auto completion)
+                             {
+                                 if (! args.isEmpty())
+                                 {
+                                     auto& synth = processorRef.getSynth();
+                                     synth.setPartGain (1, (float) (double) args[0].getProperty ("chord", 1.0));
+                                     synth.setPartGain (2, (float) (double) args[0].getProperty ("melody", 1.0));
+                                 }
+                                 completion (juce::var (true));
+                             })
         .withNativeFunction ("setTimbre", [this] (const auto& args, auto completion)
                              {
                                  // MIDI 鍵盤で弾く音の音色

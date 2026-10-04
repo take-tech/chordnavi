@@ -785,13 +785,15 @@ body.grabbing,body.grabbing *{cursor:grabbing!important}
 [data-skin=kawaii] .sub-head{border-top:0;margin-top:8px;padding:0;color:#B45F8A;font-weight:700;font-size:12.5px}
 [data-skin=kawaii] .sub-head::before{content:'♡';color:#F28DB2;font-size:11px;margin-right:-2px}
 [data-skin=kawaii] .top h1{font-size:19px;color:#D45A8E;letter-spacing:.03em}
-/* ぷっくりした押しボタン */
+/* ぷっくりした押しボタン（角は丸めすぎない：まん丸にせず --kw-r。指の端末はボタンが高いので少し大きく） */
+[data-skin=kawaii]{--kw-r:8px}
+.touch[data-skin=kawaii]{--kw-r:13px}
 [data-skin=kawaii] button:not(.lcd button):not(.menu-pop button):not(.tclose):not(.x):not(.rs){
-  background:#FFFDFE;border:1.5px solid #E7BCD0;border-radius:999px;color:#5A3A53;box-shadow:0 2px 0 var(--kw-btn);transform:translateY(-1px)}
+  background:#FFFDFE;border:1.5px solid #E7BCD0;border-radius:var(--kw-r);color:#5A3A53;box-shadow:0 2px 0 var(--kw-btn);transform:translateY(-1px)}
 [data-skin=kawaii] button:not(.lcd button):not(.menu-pop button):not(.tclose):not(.x):not(.rs):active{transform:translateY(1px);box-shadow:0 0 0 var(--kw-btn)}
 [data-skin=kawaii] button:not(.lcd button):not(.menu-pop button):hover{background:#FFF0F6}
-[data-skin=kawaii] .seg{border:1.5px solid #E7BCD0;border-radius:999px;background:#FFFDFE;box-shadow:0 2px 0 var(--kw-btn);overflow:hidden}
-[data-skin=kawaii] .seg button{border:0!important;border-radius:999px!important;box-shadow:none!important;transform:none!important}
+[data-skin=kawaii] .seg{border:1.5px solid #E7BCD0;border-radius:var(--kw-r);background:#FFFDFE;box-shadow:0 2px 0 var(--kw-btn);overflow:hidden}
+[data-skin=kawaii] .seg button{border:0!important;border-radius:calc(var(--kw-r) - 2px)!important;box-shadow:none!important;transform:none!important}
 [data-skin=kawaii] .tg[aria-pressed=true],[data-skin=kawaii] .seg button[aria-pressed=true],[data-skin=kawaii] .play{
   background:#F7A9C6!important;border-color:#E07FA6!important;color:#4A1830!important;box-shadow:0 2px 0 #D9789F!important}
 [data-skin=kawaii] .seg button[aria-pressed=true]{box-shadow:none!important}
@@ -809,7 +811,7 @@ body.grabbing,body.grabbing *{cursor:grabbing!important}
 [data-skin=kawaii] .tab.on{background:#FFFDFE;box-shadow:inset 0 3px 0 #F28DB2}
 [data-skin=kawaii] .toolbar{border-bottom:1.5px dashed #F1D2DF}
 [data-skin=kawaii] .toolbar.out{background:#FFF0F5}
-[data-skin=kawaii] .midi-box{border:1.5px solid #EDCBDB;border-radius:999px;background:#FFF0F5}
+[data-skin=kawaii] .midi-box{border:1.5px solid #EDCBDB;border-radius:var(--kw-r);background:#FFF0F5}
 [data-skin=kawaii] .blk{border-radius:12px;border:1.5px solid #E3B2C8;background:#FFFDFE;box-shadow:0 2px 0 #F0CFDD}
 [data-skin=kawaii] .blk.playing{background:#FCDDE9;border-color:#E2669A}
 [data-skin=kawaii] .pchip{border-radius:12px;border:1.5px solid #EDCBDB;background:#FFFDFE;box-shadow:0 2px 0 #F3D6E2}
@@ -869,7 +871,7 @@ body.grabbing,body.grabbing *{cursor:grabbing!important}
 /* 暗い土台の入力欄・選択欄：枠を一段明るく（背景に溶けないように。スキンが枠を決めていればそちら） */
 :root[data-theme=dark]:not([data-skin]) :is(select,input[type=number],input[type=text],.title){border-color:#4E5878}
 
-/* 指で操作する端末（iPad・iPhone）：細い部品を押しやすく、メロディービューは指で編集（2本指でスクロール） */
+/* 指で操作する端末（iPad・iPhone）：細い部品を押しやすく、メロディービューのスクロール・拡大は roll.js で自前に（touch-action:none） */
 @media (pointer: coarse){
   .sec-grip{left:-14px;width:24px}
   .blk .rs{width:16px}
@@ -1083,3 +1085,28 @@ body.grabbing,body.grabbing *{cursor:grabbing!important}
 .phone .mel-full-btn{display:inline-flex;margin-left:auto;min-width:44px;justify-content:center;font-size:16px!important}
 .phone .tb-more:not([hidden])+.mel-full-btn{margin-left:0}
 .phone .toolbar.out.only-melody>.lbl[title^="メロディービューの行"]{display:none}   /* iPhone：「ガイド」の見出しは外す（全画面のボタンを1段に入れる） */
+.phone #phoneView{align-items:center;justify-content:center;line-height:1}   /* 文字を上下の真ん中に */
+.phone .sec-more .menu-pop .x{flex:0 0 34px;min-width:34px;padding:0;font-size:18px!important;line-height:1}
+/* iPhone の下のパッド：タブは2×2。「音」はコードのサウンドバーの部品を2段に */
+.phone .pp-tabs{display:grid!important;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;width:118px;gap:3px}
+.phone .pp-tabs button{font-size:11px!important;padding:0 2px;letter-spacing:-.02em}
+.phone .pp-body[data-t=sound]{flex-direction:column;justify-content:center;gap:4px}
+.phone .pp-body[data-t=sound]>.pp-row{display:flex;align-items:center;gap:8px;min-width:0}
+.phone .pp-body[data-t=sound] select,.phone .pp-body[data-t=sound] button:not(.oct button){min-height:28px!important;font-size:13px!important}
+.phone .pp-body[data-t=sound] .oct-arrows button{height:14px;line-height:14px}
+.phone .pp-body[data-t=sound] .fld{display:flex;align-items:center;gap:4px;font-size:12px}
+.fld.vol{display:inline-flex;align-items:center;gap:4px}
+.vol-bar{width:70px}
+.touch .vol-bar{width:90px}
+/* iPhone の下のパッド：ダイアトニックの左の3和音／4和音（タブとは区切り線で分け、選んだ側は色の縁取り） */
+.phone .pp-dia{display:flex;flex-direction:column;gap:3px;width:52px;flex:0 0 52px;padding-left:7px;border-left:1px solid var(--line);margin-left:1px}
+.phone .pp-dia button{flex:1;min-height:0!important;padding:0 2px;border-radius:6px;font-size:11.5px!important;font-weight:700;color:var(--muted);background:none;border-color:var(--line)}
+.phone .pp-dia button[aria-pressed=true]{color:var(--live);border:1.5px solid var(--live);background:color-mix(in srgb,var(--live) 10%,var(--card))}
+/* Kawaii：ボタンの見た目がまとめて上書きされるので、iPhone の下のタブ・3和音／4和音の選んだ側をはっきりさせる */
+[data-skin=kawaii] .pp-tabs button[aria-pressed=true]{background:#F7A9C6!important;border-color:#E07FA6!important;color:#4A1830!important;box-shadow:0 2px 0 #D9789F!important}
+[data-skin=kawaii] .pp-dia button{color:#B58BA3!important}
+[data-skin=kawaii] .pp-dia button[aria-pressed=true]{background:#FFE3EE!important;border:1.5px solid #E07FA6!important;color:#B4386C!important}
+/* 3和音／4和音の選んだ側：スキンのボタンの見た目に負けないよう、内側の縁取り（outline）と文字の色で示す */
+.phone .pp-dia button[aria-pressed=true]{outline:2px solid var(--live);outline-offset:-2px;color:var(--live)!important}
+.phone .pp-dia button[aria-pressed=false]{opacity:.6}
+.touch .top button:has(> svg:only-child){display:inline-flex;align-items:center;justify-content:center;padding:0}   /* アイコンだけのボタンは、アイコンをまん中に */

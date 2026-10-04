@@ -244,7 +244,7 @@ export function createRoll(root,ctx){
   // 今の道具（⌘・Ctrl を押しているあいだは入れ替わる）
   const toolOf=e=>{const t=ctx.ui.mTool==='select'?'select':'draw';return e&&(e.metaKey||e.ctrlKey)?(t==='draw'?'select':'draw'):t;};
 
-  /* 指の操作：1本は編集（マウスと同じ）、2本でスクロール。押した直後は少し待って、2本目が来たら編集しない */
+  // 指で押しているもの（pointerId → 位置）。くわしくは下の onTouchDown
   const touches=new Map();
   let pend=null, pan=null, rowRaf=0;
   // 縦の大きさ（行の高さ）を変える。真ん中に見えている音がずれないよう render が合わせる
@@ -254,17 +254,50 @@ export function createRoll(root,ctx){
     ctx.ui.mRow=String(r);ctx.rowChanged?.();
     cancelAnimationFrame(rowRaf);rowRaf=requestAnimationFrame(render);
   }
+  /* 指の操作
+     1本：音の上は押してすぐ（110ms 待って2本目が来なければ）つかむ。空いたところは、すぐ動かすとスクロール（離すと慣性で流れる）、
+          動かさずに離すとタップ（描く道具なら音を置く）、長押し（0.3 秒）してから動かすと描く（長さ）・囲んで選ぶ。
+     2本：最初の動きで決める。指の間が先に 15% 変わればピンチ（横に広げる・つまむと横の拡大、縦なら行の高さ）、
+          指の真ん中が先に 16px 動けばスクロールだけ（そのあとピンチしない）。離すと慣性 */
+  let fling=0;
+  const stopFling=()=>{cancelAnimationFrame(fling);fling=0;};
+  // 慣性：離したときの速さ（px/ms）から、だんだん遅くしながら流す
+  function startFling(vx,vy){
+    stopFling();
+    let last=performance.now();
+    const step=now=>{
+      const dt=Math.min(32,now-last);last=now;
+      if(!scroller||Math.hypot(vx,vy)<.02){fling=0;return;}
+      scroller.scrollLeft-=vx*dt;scroller.scrollTop-=vy*dt;
+      const f=Math.pow(.995,dt);vx*=f;vy*=f;
+      fling=requestAnimationFrame(step);
+    };
+    fling=requestAnimationFrame(step);
+  }
+  // 指の動きの速さ（直近 100ms）
+  const track=()=>{const pts=[];return {add(x,y){const t=performance.now();pts.push({x,y,t});while(pts.length>2&&t-pts[0].t>100)pts.shift();},
+    v(){if(pts.length<2)return {x:0,y:0};const a=pts[0],b=pts.at(-1),dt=Math.max(1,b.t-a.t);return performance.now()-b.t>80?{x:0,y:0}:{x:(b.x-a.x)/dt,y:(b.y-a.y)/dt};}};};
+  let one=null;   // 1本指で空いたところを押しているあいだ：{id,x,y,mode:'wait'|'pan'|'edit',t,tr}
   function onTouchDown(e){
+    stopFling();
     touches.set(e.pointerId,{x:e.clientX,y:e.clientY});
     if(touches.size>=2){
       if(pend){clearTimeout(pend.t);pend=null;}
+      if(one&&one.mode!=='edit'){clearTimeout(one.t);one=null;}
+      if(one)return;   // もう描いている・囲んでいる途中は2本目を見ない
       const pts=[...touches.values()];
-      // 2本指：動かすとスクロール、指の間を横に広げる・つまむと横の拡大、縦に広げる・つまむと行の高さ
-      pan={x:(pts[0].x+pts[1].x)/2,y:(pts[0].y+pts[1].y)/2,sx:Math.abs(pts[0].x-pts[1].x),sy:Math.abs(pts[0].y-pts[1].y),
-        z:clampZoom(ctx.ui.mZoom),row:ROW,zx:false,zy:false};
+      pan={x:(pts[0].x+pts[1].x)/2,y:(pts[0].y+pts[1].y)/2,x0:(pts[0].x+pts[1].x)/2,y0:(pts[0].y+pts[1].y)/2,
+        sx:Math.abs(pts[0].x-pts[1].x),sy:Math.abs(pts[0].y-pts[1].y),z:clampZoom(ctx.ui.mZoom),row:ROW,mode:null,tr:track()};
       return;
     }
     e.preventDefault();
+    if(!e.target.closest('.note')){
+      // 空いたところ：スクロール・タップ・長押しを見分ける
+      one={id:e.pointerId,e,x:e.clientX,y:e.clientY,mode:'wait',tr:track()};
+      one.tr.add(e.clientX,e.clientY);
+      one.t=setTimeout(()=>{if(one&&one.mode==='wait'){one.mode='edit';onDown(e);}},300);
+      return;
+    }
     const fire=()=>{const p=pend;pend=null;removeEventListener('pointerup',early);if(p)onDown(p.e);};
     const early=ev=>{if(!pend||ev.pointerId!==e.pointerId)return;clearTimeout(pend.t);fire();
       dispatchEvent(new PointerEvent('pointerup',{bubbles:true,clientX:ev.clientX,clientY:ev.clientY,pointerId:ev.pointerId,pointerType:'touch',button:0}));};
@@ -273,19 +306,43 @@ export function createRoll(root,ctx){
   }
   addEventListener('pointermove',e=>{
     if(e.pointerType!=='touch'||!touches.has(e.pointerId))return;
+    const prev=touches.get(e.pointerId);
     touches.set(e.pointerId,{x:e.clientX,y:e.clientY});
-    if(!pan||touches.size<2||!scroller)return;
-    const pts=[...touches.values()], m={x:(pts[0].x+pts[1].x)/2,y:(pts[0].y+pts[1].y)/2};
+    if(!scroller)return;
     const r=scroller.getBoundingClientRect(), k=r.width/(scroller.offsetWidth||1);
-    // 指の間の幅が 40px 以上あり、12% 以上変わったら、その向きの拡大を始める（スクロールだけのときに揺れないように）
+    // 1本指のスクロール
+    if(one&&one.id===e.pointerId&&touches.size===1){
+      if(one.mode==='wait'&&Math.hypot(e.clientX-one.x,e.clientY-one.y)>8){one.mode='pan';clearTimeout(one.t);}
+      if(one.mode==='pan'){scroller.scrollLeft-=(e.clientX-prev.x)/k;scroller.scrollTop-=(e.clientY-prev.y)/k;one.tr.add(e.clientX,e.clientY);}
+      return;
+    }
+    if(!pan||touches.size<2)return;
+    const pts=[...touches.values()], m={x:(pts[0].x+pts[1].x)/2,y:(pts[0].y+pts[1].y)/2};
     const sx=Math.abs(pts[0].x-pts[1].x), sy=Math.abs(pts[0].y-pts[1].y);
-    if(!pan.zx&&pan.sx>=40&&Math.abs(sx/pan.sx-1)>.12)pan.zx=true;
-    if(!pan.zy&&pan.sy>=40&&Math.abs(sy/pan.sy-1)>.12)pan.zy=true;
-    if(pan.zx)setZoom(pan.z*sx/pan.sx,m.x);
-    if(pan.zy)setRow(pan.row*sy/pan.sy);
-    scroller.scrollLeft-=(m.x-pan.x)/k;scroller.scrollTop-=(m.y-pan.y)/k;pan.x=m.x;pan.y=m.y;
+    const chX=pan.sx>=40?Math.abs(sx/pan.sx-1):0, chY=pan.sy>=40?Math.abs(sy/pan.sy-1):0;
+    if(!pan.mode){
+      if(Math.max(chX,chY)>.15)pan.mode={zx:chX>.15||chX>chY*.6,zy:chY>.15||chY>chX*.6};
+      else if(Math.hypot(m.x-pan.x0,m.y-pan.y0)>16)pan.mode='pan';
+    }
+    if(pan.mode&&pan.mode!=='pan'){
+      if(pan.mode.zx)setZoom(pan.z*sx/pan.sx,m.x);
+      if(pan.mode.zy)setRow(pan.row*sy/pan.sy);
+    }
+    scroller.scrollLeft-=(m.x-pan.x)/k;scroller.scrollTop-=(m.y-pan.y)/k;pan.x=m.x;pan.y=m.y;pan.tr.add(m.x,m.y);
   });
-  const touchEnd=e=>{touches.delete(e.pointerId);if(touches.size<2)pan=null;};
+  const touchEnd=e=>{
+    if(!touches.has(e.pointerId))return;
+    touches.delete(e.pointerId);
+    if(one&&one.id===e.pointerId){
+      const o=one;one=null;clearTimeout(o.t);
+      if(o.mode==='pan'){const v=o.tr.v();startFling(v.x,v.y);}
+      else if(o.mode==='wait'&&!e.cancelled&&e.type==='pointerup'){   // タップ：押したところで1回分の操作（描く道具なら音を置く）
+        onDown(o.e);
+        dispatchEvent(new PointerEvent('pointerup',{bubbles:true,clientX:e.clientX,clientY:e.clientY,pointerId:e.pointerId,pointerType:'touch',button:0}));
+      }
+    }
+    if(touches.size<2&&pan){if(pan.mode==='pan'&&!touches.size){const v=pan.tr.v();startFling(v.x,v.y);}pan=null;}
+  };
   addEventListener('pointerup',touchEnd);addEventListener('pointercancel',touchEnd);
 
   function onDown(e){

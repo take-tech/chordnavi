@@ -395,3 +395,20 @@ test('テンポの小数（0.1 単位）：秒への換算と MIDI のテンポ'
   assert.deepEqual([smf[i+3],smf[i+4],smf[i+5]],[us>>16&255,us>>8&255,us&255]);
 });
 console.log(`${n} tests passed`);
+test('パターンは拍子の種類に合わせた中身で鳴らす（6/8・3/4・4/4）',()=>{
+  const mk=(meter,pat)=>{const s=newSong();s.meter=meter;s.pattern=pat;s.sections=[newSection('A',1,1)];
+    placeChord(s,0,newChord(0,0,timeline(s).bars[0].ticks,0,''));return renderSong(s).notes.filter(x=>x.n<48);};   // ベース（C2〜B2）
+  // 8分刻み：6/8 は8分×6で、1拍目と4拍目（付点4分の頭）に強さ
+  const e68=mk([6,8],'eighth');
+  assert.deepEqual(e68.map(x=>x.t),[0,240,480,720,960,1200]);
+  assert.deepEqual(e68.filter(x=>x.v>e68[1].v).map(x=>x.t),[0,720]);
+  // 3/4 は8分×6で、4分の頭に強さ
+  const e34=mk([3,4],'eighth');
+  assert.deepEqual(e34.filter(x=>x.v>e34[1].v).map(x=>x.t),[0,480,960]);
+  // 4/4 は今までどおり8分×8
+  assert.equal(mk([4,4],'eighth').length,8);
+  // ワルツ：3/4 はベース1つ、4/4 はブン・チャッ・ブン・チャッでベース2つ
+  assert.equal(mk([3,4],'waltz').length,1);assert.equal(mk([4,4],'waltz').length,2);
+  // 12/8 は6/8の中身を2周
+  assert.deepEqual(mk([12,8],'eighth').map(x=>x.t).slice(6,8),[1440,1680]);
+});
