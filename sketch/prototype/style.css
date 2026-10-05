@@ -1110,3 +1110,20 @@ body.grabbing,body.grabbing *{cursor:grabbing!important}
 .phone .pp-dia button[aria-pressed=true]{outline:2px solid var(--live);outline-offset:-2px;color:var(--live)!important}
 .phone .pp-dia button[aria-pressed=false]{opacity:.6}
 .touch .top button:has(> svg:only-child){display:inline-flex;align-items:center;justify-content:center;padding:0}   /* アイコンだけのボタンは、アイコンをまん中に */
+/* iPhone：コード編集パネルは画面の右に高さいっぱいで出す（鍵盤を広く）。見出しと説明は出さず、× はコード名の行の右。
+   開いているあいだ、下のコードメニューは隠す（パネルと重なるので） */
+.phone .vpanel{position:fixed;top:6px;bottom:max(env(safe-area-inset-bottom),6px);right:max(env(safe-area-inset-right),10px);width:300px;z-index:45;
+  border:1px solid var(--line);border-radius:12px;overflow:hidden;box-shadow:-6px 0 24px rgba(30,39,66,.25)}
+.phone .vtitle,.phone .vhint{display:none}
+.phone .vhead{position:absolute;top:4px;right:4px;border:0;padding:0;z-index:2}
+.phone .vhead .x{min-width:36px;min-height:34px!important;font-size:20px!important}
+.phone .vname{padding:8px 46px 6px 12px}
+.phone .vrow{height:24px}
+.phone .vrow .vlbl{font-size:12px}
+.phone .vfoot{padding:6px 8px}
+.phone .main:has(#vpanel:not([hidden])) .chip-edit{display:none!important}
+/* iPad：行を少し高くして押しやすく */
+.touch:not(.phone) .vrow{height:20px}
+/* 指：コード編集パネルの鍵盤。鳴らしていない行はふつうにスクロール（慣性つき）、鳴らしている行はつかんで上下に動かす */
+.touch .vkeys .vrow{touch-action:pan-y}
+.touch .vkeys .vrow.on{touch-action:none}
