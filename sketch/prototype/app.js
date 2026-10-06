@@ -527,6 +527,12 @@ function hitBar(x,y){
   return {b,tick:Math.max(0,Math.min(.9999,(x-r.left)/r.width))*b.ticks,el:bar};
 }
 const barEl=gi=>sheet.querySelector(`.bar[data-gi="${gi}"]`);
+// ポインタと同じ高さの段の、いちばん右の小節（段の右端より右へ引いたときに使う）
+function rowEndBar(ev){
+  let best=null,right=-1e9;
+  for(const el of sheet.querySelectorAll('.bar')){const r=el.getBoundingClientRect();if(ev.clientY>=r.top&&ev.clientY<=r.bottom&&r.right>right){right=r.right;best=el;}}
+  return best?tl.bars[+best.dataset.gi]:null;
+}
 function showDrop(gi,pos,len){
   sheet.querySelectorAll('.drop').forEach(x=>x.remove());
   if(gi==null)return;
@@ -942,6 +948,19 @@ function startBlockDrag(e,blkEl){
     moved=true;
     const hit=hitBar(ev.clientX,ev.clientY);
     if(resizing){
+      // 段の右端のコードを右へ伸ばす：段の最後の小節より右へ引いたら、はみ出した分を次の小節（次の段の頭）へ続けて伸ばす
+      if(!fromLeft&&(!hit||hit.b.gi===rowEndBar(ev)?.gi&&ev.clientX>barEl(hit.b.gi).getBoundingClientRect().right)){
+        const lb=rowEndBar(ev);
+        if(lb){
+          const r=barEl(lb.gi).querySelector('.lane').getBoundingClientRect();
+          if(ev.clientX>r.right){
+            const nb=tl.bars[lb.gi+1], st=snapOf((nb||lb).meter);
+            const over=(ev.clientX-r.right)/r.width*lb.ticks, end=lb.start+lb.ticks+Math.max(0,Math.round(over/st)*st);
+            song=JSON.parse(base);stretchChord(song,si,id,Math.max(st,end-p.start),st,maxLen);tl=timeline(song);render();
+            return;
+          }
+        }
+      }
       if(!hit)return;
       const st=snapOf(hit.b.meter);
       song=JSON.parse(base);
@@ -1986,8 +2005,27 @@ function buildPrint(){
     pr.querySelector('.meta').after(lg);
   }
 }
-$('printBtn').onclick=()=>{buildPrint();$('printWrap').hidden=false;layoutPrint();};
-$('prDeg').onchange=()=>{buildPrint();layoutPrint();};
+// コード譜のプレビュー。メロディー：五線譜なら、リードシート（leadsheet.js。VexFlow を初めて使うときに読む）
+async function refreshPrint(){
+  const hasMel=placedNotes(song,tl).length>0, sel=$('prMel');
+  sel.disabled=!hasMel;sel.title=hasMel?'メロディーを五線譜（リードシート）で書く':'メロディーが無いので、五線譜は使えません';
+  if(!hasMel)sel.value='off';
+  if(sel.value!=='staff'){$('print').classList.remove('lead');buildPrint();layoutPrint();return;}
+  const pr=$('print');pr.classList.add('lead');pr.innerHTML='';
+  pr.appendChild(h('div','pwait','楽譜を作っています…'));
+  try{
+    const {loadLeadSheet,renderLeadSheet}=await import('./leadsheet.js');
+    await loadLeadSheet();
+    pr.innerHTML='';pr.classList.toggle('with-deg',$('prDeg').checked);
+    pr.appendChild(h('h2','',song.title));
+    pr.appendChild(h('div','meta',`Key: ${songKeyLabel()}（${song.key.mode==='major'?'メジャー':'マイナー'}）　♩=${song.bpm}　${song.meter.join('/')}`));
+    const cs=getComputedStyle(pr), w=pr.clientWidth-parseFloat(cs.paddingLeft)-parseFloat(cs.paddingRight);
+    renderLeadSheet(pr,song,tl,{withDeg:$('prDeg').checked,width:w});
+  }catch(e){console.error(e);pr.innerHTML='';buildPrint();layoutPrint();toast('五線譜を作れませんでした');}
+}
+$('printBtn').onclick=()=>{$('printWrap').hidden=false;refreshPrint();};
+$('prDeg').onchange=()=>refreshPrint();
+$('prMel').onchange=()=>refreshPrint();
 $('prClose').onclick=()=>{$('printWrap').hidden=true;};
 // PDF のファイル名は document.title になる
 // 印刷。JUCE 版の macOS の WebView は print() を扱わないので、C++ から OS の印刷画面を出す（PDF もそこから保存）

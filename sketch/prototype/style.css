@@ -1127,3 +1127,8 @@ body.grabbing,body.grabbing *{cursor:grabbing!important}
 /* 指：コード編集パネルの鍵盤。鳴らしていない行はふつうにスクロール（慣性つき）、鳴らしている行はつかんで上下に動かす */
 .touch .vkeys .vrow{touch-action:pan-y}
 .touch .vkeys .vrow.on{touch-action:none}
+/* コード譜の五線譜（リードシート）：段ごとの SVG。ページは段の切れ目で分ける */
+.print.lead .psec{break-inside:auto;margin-bottom:3mm}
+.print .lrow{break-inside:avoid;margin-bottom:1mm}
+.print .lrow svg{display:block;overflow:visible}
+.print .pwait{text-align:center;color:#888;padding:20mm 0}
