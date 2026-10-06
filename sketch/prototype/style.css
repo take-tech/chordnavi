@@ -435,8 +435,9 @@ body.grabbing,body.grabbing *{cursor:grabbing!important}
 .roll .rg{position:absolute;left:46px;top:62px;cursor:crosshair}
 .roll .rg>div{position:absolute}
 .roll .rrow{background:var(--card);border-bottom:1px solid var(--grid2)}
-.roll .rrow.black{background:var(--grid2)}
-.roll .gout{background:rgba(30,39,66,.10)}   /* スケールの外の行：暗く（左の鍵盤のスケールの外の鍵も暗くしてそろえる） */
+.roll{--roll-dim:color-mix(in srgb,var(--card),#1E2742 10%)}   /* 暗くする行の色（オフの黒鍵の行・オンのスケールの外の行で同じ） */
+.roll .rrow.black{background:var(--roll-dim)}
+.roll .gout{background:var(--roll-dim)}   /* スケールの外の行：オフのときの黒鍵の行と同じ色（切り替えても灰色の濃さが変わらないように） */
 .roll .gin{background:color-mix(in srgb,var(--tone) 9%,transparent)}   /* スケールの中の行（Synthesizer V のように、うすい緑） */
 .roll .gtonic{background:color-mix(in srgb,var(--tone) 16%,transparent);box-shadow:inset 0 -1.5px 0 color-mix(in srgb,var(--tone) 55%,transparent)}   /* 主音：ごくうすい緑と下の細い線 */
 .roll .gtone{background:color-mix(in srgb,var(--root) 30%,transparent);box-shadow:inset 0 1px 0 color-mix(in srgb,var(--root) 50%,transparent)}
@@ -462,9 +463,10 @@ body.grabbing,body.grabbing *{cursor:grabbing!important}
 :root[data-theme=dark] .roll .rkey.black{background:var(--roll-key-black);border-bottom-color:var(--roll-key-black)}
 :root[data-theme=dark] .roll .rkey span{color:var(--roll-key-label)}
 :root[data-theme=dark] .roll .rrow{background:var(--roll-row);border-bottom-color:var(--roll-row-edge)}
-:root[data-theme=dark] .roll .rrow.black{background:var(--roll-row-black)}
+:root[data-theme=dark] .roll{--roll-dim:color-mix(in srgb,var(--roll-row),#000 35%)}
+:root[data-theme=dark] .roll .rrow.black{background:var(--roll-dim)}
 :root[data-theme=dark] .roll .gbar{border-left-color:var(--roll-bar);background-image:repeating-linear-gradient(to right,transparent 0 calc(var(--beat) - 1px),var(--roll-beat) calc(var(--beat) - 1px) var(--beat))}
-:root[data-theme=dark] .roll .gout{background:rgba(0,0,0,.5)}
+:root[data-theme=dark] .roll .gout{background:var(--roll-dim);box-shadow:inset 0 -1px 0 var(--roll-row-edge)}   /* オフの黒鍵の行と同じ（行の境の線も）*/
 :root[data-theme=dark] .roll .gin{background:color-mix(in srgb,var(--tone) 10%,transparent)}
 :root[data-theme=dark] .roll .gtonic{background:color-mix(in srgb,var(--tone) 18%,transparent);box-shadow:inset 0 -1.5px 0 color-mix(in srgb,var(--tone) 60%,transparent)}
 /* 暗い土台のコードの音のガイド：面はうすく塗るだけ（全オクターブに出るので濃いと縞だらけになる）。
