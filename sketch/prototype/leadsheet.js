@@ -115,11 +115,14 @@ function buildBar(V,b,mi,q,flat,shift){
     first:firstEv&&firstEv.s===0&&firstEv.tieIn?chainOf.get(firstEv)[0]:null,
     last:lastEv&&lastEv.e===b.ticks&&lastEv.tieOut?chainOf.get(lastEv).at(-1):null};
 }
-// メロディーの無い小節：拍の数だけスラッシュ
+// メロディーの無い小節：拍の数だけスラッシュ（符尾なし）
 function slashBar(V,b,mi){
   const notes=[], at=[];
   const n=Math.round(b.ticks/mi.beat), dur=mi.compound?'qd':mi.beat===Q?'q':mi.beat===240?'8':'h';
-  for(let k=0;k<n;k++){const s=new V.StaveNote({keys:['b/4'],duration:dur,type:'s'});if(dur.includes('d'))V.Dot.buildAndAttach([s],{all:true});notes.push(s);at.push(k*mi.beat);}
+  // 符尾・旗は描かない（斜めの線だけ。音符に見えないように）
+  const none={strokeStyle:'transparent',fillStyle:'transparent'};
+  for(let k=0;k<n;k++){const s=new V.StaveNote({keys:['b/4'],duration:dur,type:'s'});s.setStemStyle(none);s.setFlagStyle?.(none);
+    if(dur.includes('d'))V.Dot.buildAndAttach([s],{all:true});notes.push(s);at.push(k*mi.beat);}
   return {notes,at,tieChains:[],tuplets:[],first:null,last:null,slash:true};
 }
 
