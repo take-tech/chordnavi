@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>ChordSketch</title>
 <link rel="stylesheet" href="style.css">
 </head>
@@ -13,8 +13,8 @@
     <h1>ChordSketch</h1>
     <input id="title" class="title" maxlength="60" aria-label="曲名"><span id="fileState" class="file-state" hidden title="保存していない変更があります">●</span>
     <div class="transport" role="group" aria-label="トランスポート">
-      <button id="toStart" title="先頭へ（Home）">⏮</button>
-      <button id="playBtn" class="play" title="再生／停止（Space キー）" aria-label="再生">▶</button>
+      <button id="toStart" title="先頭へ（Home）" aria-label="先頭へ"><svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><rect x="2.5" y="3" width="2" height="10" rx=".5" fill="currentColor"/><path d="M13.5 3.6v8.8a.6.6 0 0 1-.9.5L6.2 8.5a.6.6 0 0 1 0-1l6.4-4.4a.6.6 0 0 1 .9.5z" fill="currentColor"/></svg></button>
+      <button id="playBtn" class="play" title="再生／停止（Space キー）" aria-label="再生"><svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M4.5 2.9v10.2a.7.7 0 0 0 1.1.6l7.6-5.1a.7.7 0 0 0 0-1.2L5.6 2.3a.7.7 0 0 0-1.1.6z" fill="currentColor"/></svg></button>
       <button id="recBtn" class="tg rec" aria-pressed="false" aria-label="録音" title="録音（R）：1小節前から再生して、弾いた音を録る"><svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><circle cx="8" cy="8" r="5.5" fill="currentColor"/></svg></button>
       <button id="loopBtn" class="tg loop" aria-pressed="false" aria-label="ループ" title="ループ：選択範囲（なければ曲全体）を繰り返す"><svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><path d="M5 7h8.5a3 3 0 0 1 0 6H12M15 13H6.5a3 3 0 0 1 0-6H8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M11 4.5 13.8 7 11 9.5M9 10.5 6.2 13 9 15.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
       <button id="muteBtn" class="tg mute" aria-pressed="false" title="ミュート（M）" aria-label="ミュート">M</button>
@@ -42,6 +42,7 @@
       </div>
     </div>
     <span class="spacer"></span>
+    <button id="phoneView" class="phone-only" title="コードビュー／メロディービューの切り替え">♪ メロ</button>
     <button id="undo" class="ic" title="元に戻す（⌘Z）">↶</button><button id="redo" class="ic" title="やり直し（⇧⌘Z）">↷</button>
     <div class="menu">
       <button id="fileBtn" class="ic" aria-label="ファイル" aria-haspopup="true" title="ファイル（新規・開く・保存）"><svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><path d="M5 2.5h6.5L15.5 6.5V17.5H5z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M11.5 2.5V6.5H15.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M7.5 10.5h5M7.5 13.5h5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg></button>
@@ -53,7 +54,7 @@
     </div>
     <button id="printBtn" title="コード譜のプレビュー（印刷／PDF に保存）">コード譜</button>
     <div class="menu">
-      <button id="themeBtn" class="ic" title="設定（テーマ・ウィンドウを広げたとき）" aria-label="設定" aria-haspopup="true"><svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><path d="M8.6 2.5h2.8l.4 2.1 1.5.7 1.8-1.2 2 2-1.2 1.8.7 1.5 2.1.4v2.8l-2.1.4-.7 1.5 1.2 1.8-2 2-1.8-1.2-1.5.7-.4 2.1H8.6l-.4-2.1-1.5-.7-1.8 1.2-2-2 1.2-1.8-.7-1.5-2.1-.4V8.6l2.1-.4.7-1.5-1.2-1.8 2-2 1.8 1.2 1.5-.7z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><circle cx="10" cy="10" r="2.6" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
+      <button id="themeBtn" class="ic" title="設定（テーマ・ウィンドウを広げたとき）" aria-label="設定" aria-haspopup="true"><svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><path d="M8.61 3.75 L8.98 1.66 L11.02 1.66 L11.39 3.75 L13.44 4.60 L15.17 3.38 L16.62 4.83 L15.40 6.56 L16.25 8.61 L18.34 8.98 L18.34 11.02 L16.25 11.39 L15.40 13.44 L16.62 15.17 L15.17 16.62 L13.44 15.40 L11.39 16.25 L11.02 18.34 L8.98 18.34 L8.61 16.25 L6.56 15.40 L4.83 16.62 L3.38 15.17 L4.60 13.44 L3.75 11.39 L1.66 11.02 L1.66 8.98 L3.75 8.61 L4.60 6.56 L3.38 4.83 L4.83 3.38 L6.56 4.60Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><circle cx="10" cy="10" r="2.6" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
       <div class="menu-pop theme-pop" id="themeMenu" hidden>
         <span class="menu-lbl">テーマ</span>
         <button data-v="light" aria-checked="false" role="menuitemradio">☀ ライト</button>
@@ -125,6 +126,7 @@
     </div>
     <div class="toolbar out only-chords" role="toolbar" aria-label="サウンドバー">
       <label class="fld" title="コードの試聴の音色（MIDI には影響しない）">音色 <select id="timbre"></select></label>
+      <label class="fld vol" title="コードの再生の音量（MIDI には影響しない）">音量 <input type="range" id="chordVol" class="zoom-bar vol-bar" min="0" max="100" step="1" aria-label="コードの音量"></label>
       <span class="sep"></span>
       <span class="lbl strong" title="MIDI の出力（パターン・鳴らし方・オクターブ・ベース）">出力</span>
       <label class="fld" title="曲全体のパターン（セクションごとに変えられます）">パターン <select id="pattern"></select></label>
@@ -141,6 +143,7 @@
         <button data-v="select" aria-label="選ぶ" title="選ぶ：ドラッグで囲んで選ぶ（⌘で描く）"><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><rect x="2.5" y="3.5" width="11" height="9" rx="1" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2.4 1.6"/></svg></button></div>
       <span class="sep"></span>
       <label class="fld" title="メロディーの試聴の音色（MIDI には影響しない）">音色 <select id="mTimbre"></select></label>
+      <label class="fld vol" title="メロディーの再生の音量（MIDI には影響しない）">音量 <input type="range" id="melVol" class="zoom-bar vol-bar" min="0" max="100" step="1" aria-label="メロディーの音量"></label>
       <span class="sep"></span>
       <span class="lbl">鳴らす</span>
       <button id="hearChords" class="tg small" aria-pressed="true" title="コード（伴奏）も鳴らす">コード</button>
@@ -158,6 +161,11 @@
     <div class="roll" id="roll" tabindex="0" aria-label="メロディービュー" hidden></div>
     <aside class="vpanel" id="vpanel" aria-label="コード編集パネル" hidden></aside>
     <div class="footer" id="footer" role="region" aria-label="インフォバー"></div>
+    <!-- iPhone：下のパッド（ダイアトニック・プリセット・キー） -->
+    <div class="phone-pads phone-only" id="phonePads" role="region" aria-label="パッド">
+      <div class="pp-tabs" id="ppTabs"><button class="tg" data-t="chords" aria-pressed="true">コード</button><button class="tg" data-t="prog" aria-pressed="false">プリセット</button><button class="tg" data-t="key" aria-pressed="false">キー</button><button class="tg" data-t="sound" aria-pressed="false" title="コードの音色・パターン・鳴らし方">音</button></div>
+      <div class="pp-body" id="ppBody"></div>
+    </div>
   </main>
 </div>
 
@@ -166,6 +174,7 @@
 <datalist id="secNames"></datalist>
 <div class="print-wrap" id="printWrap" hidden>
   <div class="print-bar"><b>コード譜のプレビュー</b><span class="spacer"></span>
+    <label class="fld" title="メロディーを五線譜（リードシート）で書く。メロディーの無い小節はスラッシュ">メロディー <select id="prMel"><option value="off">なし</option><option value="staff">五線譜</option></select></label>
     <label class="fld"><input type="checkbox" id="prDeg"> 度数も書く</label>
     <button id="prGo" class="tg" aria-pressed="true">印刷／PDF に保存</button><button id="prClose">閉じる</button></div>
   <div class="print-scroll"><div class="print" id="print"></div></div>

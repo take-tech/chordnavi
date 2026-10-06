@@ -204,6 +204,16 @@ public:
        #endif
     }
 
+    // iOS：裏に回る・戻る（SketchEditor に任せる）
+    void suspended() override { if (auto* e = editor()) e->appSuspended(); }
+    void resumed() override   { if (auto* e = editor()) e->appResumed(); }
+
+    SketchEditor* editor() const
+    {
+        return holder != nullptr && holder->processor != nullptr
+                 ? dynamic_cast<SketchEditor*> (holder->processor->getActiveEditor()) : nullptr;
+    }
+
     void shutdown() override
     {
        #if JUCE_MAC

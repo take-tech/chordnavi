@@ -129,7 +129,10 @@ target_link_libraries(ChordNavi
 file(GLOB SKETCH_UI_FILES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/sketch/prototype/*.html"
     "${CMAKE_CURRENT_SOURCE_DIR}/sketch/prototype/*.js"
-    "${CMAKE_CURRENT_SOURCE_DIR}/sketch/prototype/*.css")
+    "${CMAKE_CURRENT_SOURCE_DIR}/sketch/prototype/*.css"
+    # コード譜の五線譜（リードシート）：VexFlow（MIT）と楽譜のフォント（Bravura・Academico、SIL OFL）。ライセンスは vendor/LICENSE-*.txt
+    "${CMAKE_CURRENT_SOURCE_DIR}/sketch/prototype/vendor/*.js"
+    "${CMAKE_CURRENT_SOURCE_DIR}/sketch/prototype/vendor/*.woff2")
 set(CHORDSKETCH_UI_FILES
     ${SKETCH_UI_FILES}
     ${SHARED_UI_FILES}
@@ -145,7 +148,7 @@ juce_add_binary_data(ChordSketchUIData
 )
 
 juce_add_plugin(ChordSketch
-    VERSION                     0.9.2
+    VERSION                     0.9.3
     COMPANY_NAME                Ranze
     PLUGIN_MANUFACTURER_CODE    Rnze
     PLUGIN_CODE                 Cdsk

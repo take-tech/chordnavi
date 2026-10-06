@@ -17,16 +17,20 @@ export const M_LENS=[{id:'1',name:'全音符',t:1920},{id:'2',name:'2分',t:960}
   {id:'8.',name:'付点8分',t:360},{id:'8',name:'8分',t:240},{id:'8t',name:'3連8分',t:160},{id:'16',name:'16分',t:120}];
 // 横の拡大：4分音符あたりの横幅（px）。表示のスライダー（0〜100）とは対数でつなぐ
 // 指で操作する端末（iPad・iPhone）は、音が押しやすいよう行を高く・横を広く始める
-export const COARSE=typeof matchMedia!=='undefined'&&(matchMedia('(pointer: coarse)').matches||/[?&]touch\b/.test(location.search));
+export const COARSE=typeof matchMedia!=='undefined'&&(matchMedia('(pointer: coarse)').matches||/[?&](touch|phone)\b/.test(location.search));
 export const ZOOM_MIN=10, ZOOM_MAX=150, ZOOM_DEFAULT=COARSE?70:34;
 export const clampZoom=z=>Math.max(ZOOM_MIN,Math.min(ZOOM_MAX,+z||ZOOM_DEFAULT));
 export const zoomToSlider=z=>Math.round(Math.log(clampZoom(z)/ZOOM_MIN)/Math.log(ZOOM_MAX/ZOOM_MIN)*100);
 export const sliderToZoom=v=>ZOOM_MIN*Math.pow(ZOOM_MAX/ZOOM_MIN,v/100);
 // 行の高さ（縦の大きさ）：ui.mRow（px の数の文字列。12〜40、縦のつまみ）。auto は端末に合わせる（指は大きめ）。前の s・m・l・xl も読む
+// iPhone（画面の短いほうが 600 より小さい指の端末）は縦が狭いので、行を少し低く始める
+const PHONE_ROLL=COARSE&&typeof screen!=='undefined'&&(Math.min(screen.width,screen.height)<600||/[?&]phone\b/.test(location.search));
+const ROW_AUTO=PHONE_ROLL?22:COARSE?28:14;
 export const ROW_SIZES={s:14,m:20,l:28,xl:36}, ROW_MIN=12, ROW_MAX=40;
-export const rowOf=v=>{const n=parseFloat(v);return Number.isFinite(n)?Math.max(ROW_MIN,Math.min(ROW_MAX,Math.round(n))):ROW_SIZES[v]||(COARSE?28:14);};
-let ROW=COARSE?28:14;
-const KEYW=46, HEAD=62, LOW=MELODY_LOW, HIGH=MELODY_HIGH, ROWS=HIGH-LOW+1;
+export const rowOf=v=>{const n=parseFloat(v);return Number.isFinite(n)?Math.max(ROW_MIN,Math.min(ROW_MAX,Math.round(n))):ROW_SIZES[v]||ROW_AUTO;};
+let ROW=ROW_AUTO;
+// 上の帯の高さ。iPhone は1段（セクションは上の細い色の線、小節番号は小さく左上、その上にコード名）にまとめて、音を置くところを広く取る
+const KEYW=46, HEAD=PHONE_ROLL?26:62, LOW=MELODY_LOW, HIGH=MELODY_HIGH, ROWS=HIGH-LOW+1;
 const BLACK=new Set([1,3,6,8,10]);
 // コードの構成音の、ルートからの度数の書き方（半音の数 → 表記）。分数コードのベースは B
 const TONE_LABEL=['R','♭9','9','♭3','3','11','♭5','5','♯5','6','♭7','7'];
@@ -76,18 +80,18 @@ export function createRoll(root,ctx){
     tl.secRanges.forEach(({from,to},si)=>{
       if(from===to)return;
       const s=song.sections[si], t0=tl.bars[from].start, t1=tl.bars[to-1].start+tl.bars[to-1].ticks;
-      const e=tbox('rsec',t0,0,t1-t0,18);e.style.setProperty('--c',SECTION_COLORS[s.color]||SECTION_COLORS[0]);
-      e.append(h('span','',s.name));e.title=s.name;hg.appendChild(e);
+      const e=tbox('rsec',t0,0,t1-t0,PHONE_ROLL?3:18);e.style.setProperty('--c',SECTION_COLORS[s.color]||SECTION_COLORS[0]);
+      if(!PHONE_ROLL)e.append(h('span','',s.name));e.title=s.name;hg.appendChild(e);
     });
     const rg0=ctx.range();
     for(const b of tl.bars){
       const on=rg0&&b.gi>=rg0.from&&b.gi<rg0.to;
-      const e=tbox('rbar'+(on?' on':''),b.start,18,b.ticks,16);e.append(h('span','',String(b.gi+1)));
+      const e=tbox('rbar'+(on?' on':''),b.start,PHONE_ROLL?3:18,b.ticks,PHONE_ROLL?23:16);e.append(h('span','',String(b.gi+1)));
       e.dataset.gi=b.gi;e.title='押してカーソル・横にドラッグで範囲';hg.appendChild(e);
     }
     const pcs=placedChords(song,tl);
     for(const p of pcs){
-      const e=tbox('rchord',p.start,36,p.end-p.start,24,2,2);e.dataset.id=p.c.id;
+      const e=PHONE_ROLL?tbox('rchord',p.start,3,p.end-p.start,22,2,2):tbox('rchord',p.start,36,p.end-p.start,24,2,2);e.dataset.id=p.c.id;
       e.append(h('span','',ctx.chordName(p)));e.title=ctx.chordName(p);hg.appendChild(e);
     }
     hg.addEventListener('pointerdown',e=>{
@@ -207,7 +211,7 @@ export function createRoll(root,ctx){
   },{passive:false});
   let gestureZ=null;
   root.addEventListener('gesturestart',e=>{e.preventDefault();gestureZ=clampZoom(ctx.ui.mZoom);});
-  root.addEventListener('gesturechange',e=>{e.preventDefault();if(gestureZ!=null)setZoom(gestureZ*e.scale,e.clientX);});
+  root.addEventListener('gesturechange',e=>{e.preventDefault();if(gestureZ!=null&&touches.size<2)setZoom(gestureZ*e.scale,e.clientX);});   // 指2本は下の自前の処理（縦・横を別に）
   root.addEventListener('gestureend',e=>{e.preventDefault();gestureZ=null;});
 
   // 画面上の点 → 曲の tick・音の高さ（画面の拡大縮小を戻す）
@@ -240,18 +244,60 @@ export function createRoll(root,ctx){
   // 今の道具（⌘・Ctrl を押しているあいだは入れ替わる）
   const toolOf=e=>{const t=ctx.ui.mTool==='select'?'select':'draw';return e&&(e.metaKey||e.ctrlKey)?(t==='draw'?'select':'draw'):t;};
 
-  /* 指の操作：1本は編集（マウスと同じ）、2本でスクロール。押した直後は少し待って、2本目が来たら編集しない */
+  // 指で押しているもの（pointerId → 位置）。くわしくは下の onTouchDown
   const touches=new Map();
-  let pend=null, pan=null;
+  let pend=null, pan=null, rowRaf=0;
+  // 縦の大きさ（行の高さ）を変える。真ん中に見えている音がずれないよう render が合わせる
+  function setRow(r){
+    r=Math.max(ROW_MIN,Math.min(ROW_MAX,Math.round(r)));
+    if(String(r)===String(ctx.ui.mRow))return;
+    ctx.ui.mRow=String(r);ctx.rowChanged?.();
+    cancelAnimationFrame(rowRaf);rowRaf=requestAnimationFrame(render);
+  }
+  /* 指の操作
+     1本：音の上は押してすぐ（110ms 待って2本目が来なければ）つかむ。空いたところは、すぐ動かすとスクロール（離すと慣性で流れる）、
+          動かさずに離すとタップ（描く道具なら音を置く）、長押し（0.3 秒）してから動かすと描く（長さ）・囲んで選ぶ。
+     2本：最初の動きで決める。指の間が先に 15% 変わればピンチ（横に広げる・つまむと横の拡大、縦なら行の高さ）、
+          指の真ん中が先に 16px 動けばスクロールだけ（そのあとピンチしない）。離すと慣性 */
+  let fling=0;
+  const stopFling=()=>{cancelAnimationFrame(fling);fling=0;};
+  // 慣性：離したときの速さ（px/ms）から、だんだん遅くしながら流す
+  function startFling(vx,vy){
+    stopFling();
+    let last=performance.now();
+    const step=now=>{
+      const dt=Math.min(32,now-last);last=now;
+      if(!scroller||Math.hypot(vx,vy)<.02){fling=0;return;}
+      scroller.scrollLeft-=vx*dt;scroller.scrollTop-=vy*dt;
+      const f=Math.pow(.995,dt);vx*=f;vy*=f;
+      fling=requestAnimationFrame(step);
+    };
+    fling=requestAnimationFrame(step);
+  }
+  // 指の動きの速さ（直近 100ms）
+  const track=()=>{const pts=[];return {add(x,y){const t=performance.now();pts.push({x,y,t});while(pts.length>2&&t-pts[0].t>100)pts.shift();},
+    v(){if(pts.length<2)return {x:0,y:0};const a=pts[0],b=pts.at(-1),dt=Math.max(1,b.t-a.t);return performance.now()-b.t>80?{x:0,y:0}:{x:(b.x-a.x)/dt,y:(b.y-a.y)/dt};}};};
+  let one=null;   // 1本指で空いたところを押しているあいだ：{id,x,y,mode:'wait'|'pan'|'edit',t,tr}
   function onTouchDown(e){
+    stopFling();
     touches.set(e.pointerId,{x:e.clientX,y:e.clientY});
     if(touches.size>=2){
       if(pend){clearTimeout(pend.t);pend=null;}
+      if(one&&one.mode!=='edit'){clearTimeout(one.t);one=null;}
+      if(one)return;   // もう描いている・囲んでいる途中は2本目を見ない
       const pts=[...touches.values()];
-      pan={x:(pts[0].x+pts[1].x)/2,y:(pts[0].y+pts[1].y)/2};
+      pan={x:(pts[0].x+pts[1].x)/2,y:(pts[0].y+pts[1].y)/2,x0:(pts[0].x+pts[1].x)/2,y0:(pts[0].y+pts[1].y)/2,
+        sx:Math.abs(pts[0].x-pts[1].x),sy:Math.abs(pts[0].y-pts[1].y),z:clampZoom(ctx.ui.mZoom),row:ROW,mode:null,tr:track()};
       return;
     }
     e.preventDefault();
+    if(!e.target.closest('.note')){
+      // 空いたところ：スクロール・タップ・長押しを見分ける
+      one={id:e.pointerId,e,x:e.clientX,y:e.clientY,mode:'wait',tr:track()};
+      one.tr.add(e.clientX,e.clientY);
+      one.t=setTimeout(()=>{if(one&&one.mode==='wait'){one.mode='edit';onDown(e);}},300);
+      return;
+    }
     const fire=()=>{const p=pend;pend=null;removeEventListener('pointerup',early);if(p)onDown(p.e);};
     const early=ev=>{if(!pend||ev.pointerId!==e.pointerId)return;clearTimeout(pend.t);fire();
       dispatchEvent(new PointerEvent('pointerup',{bubbles:true,clientX:ev.clientX,clientY:ev.clientY,pointerId:ev.pointerId,pointerType:'touch',button:0}));};
@@ -260,13 +306,43 @@ export function createRoll(root,ctx){
   }
   addEventListener('pointermove',e=>{
     if(e.pointerType!=='touch'||!touches.has(e.pointerId))return;
+    const prev=touches.get(e.pointerId);
     touches.set(e.pointerId,{x:e.clientX,y:e.clientY});
-    if(!pan||touches.size<2||!scroller)return;
-    const pts=[...touches.values()], m={x:(pts[0].x+pts[1].x)/2,y:(pts[0].y+pts[1].y)/2};
+    if(!scroller)return;
     const r=scroller.getBoundingClientRect(), k=r.width/(scroller.offsetWidth||1);
-    scroller.scrollLeft-=(m.x-pan.x)/k;scroller.scrollTop-=(m.y-pan.y)/k;pan=m;
+    // 1本指のスクロール
+    if(one&&one.id===e.pointerId&&touches.size===1){
+      if(one.mode==='wait'&&Math.hypot(e.clientX-one.x,e.clientY-one.y)>8){one.mode='pan';clearTimeout(one.t);}
+      if(one.mode==='pan'){scroller.scrollLeft-=(e.clientX-prev.x)/k;scroller.scrollTop-=(e.clientY-prev.y)/k;one.tr.add(e.clientX,e.clientY);}
+      return;
+    }
+    if(!pan||touches.size<2)return;
+    const pts=[...touches.values()], m={x:(pts[0].x+pts[1].x)/2,y:(pts[0].y+pts[1].y)/2};
+    const sx=Math.abs(pts[0].x-pts[1].x), sy=Math.abs(pts[0].y-pts[1].y);
+    const chX=pan.sx>=40?Math.abs(sx/pan.sx-1):0, chY=pan.sy>=40?Math.abs(sy/pan.sy-1):0;
+    if(!pan.mode){
+      if(Math.max(chX,chY)>.15)pan.mode={zx:chX>.15||chX>chY*.6,zy:chY>.15||chY>chX*.6};
+      else if(Math.hypot(m.x-pan.x0,m.y-pan.y0)>16)pan.mode='pan';
+    }
+    if(pan.mode&&pan.mode!=='pan'){
+      if(pan.mode.zx)setZoom(pan.z*sx/pan.sx,m.x);
+      if(pan.mode.zy)setRow(pan.row*sy/pan.sy);
+    }
+    scroller.scrollLeft-=(m.x-pan.x)/k;scroller.scrollTop-=(m.y-pan.y)/k;pan.x=m.x;pan.y=m.y;pan.tr.add(m.x,m.y);
   });
-  const touchEnd=e=>{touches.delete(e.pointerId);if(touches.size<2)pan=null;};
+  const touchEnd=e=>{
+    if(!touches.has(e.pointerId))return;
+    touches.delete(e.pointerId);
+    if(one&&one.id===e.pointerId){
+      const o=one;one=null;clearTimeout(o.t);
+      if(o.mode==='pan'){const v=o.tr.v();startFling(v.x,v.y);}
+      else if(o.mode==='wait'&&!e.cancelled&&e.type==='pointerup'){   // タップ：押したところで1回分の操作（描く道具なら音を置く）
+        onDown(o.e);
+        dispatchEvent(new PointerEvent('pointerup',{bubbles:true,clientX:e.clientX,clientY:e.clientY,pointerId:e.pointerId,pointerType:'touch',button:0}));
+      }
+    }
+    if(touches.size<2&&pan){if(pan.mode==='pan'&&!touches.size){const v=pan.tr.v();startFling(v.x,v.y);}pan=null;}
+  };
   addEventListener('pointerup',touchEnd);addEventListener('pointercancel',touchEnd);
 
   function onDown(e){

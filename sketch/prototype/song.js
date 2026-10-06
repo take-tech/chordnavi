@@ -406,35 +406,82 @@ export function insertProgression(song,gi,bars){
 }
 
 /* ---------- MIDI パターン ---------- */
-// t・d は tick（4分音符＝480）。1小節ぶん（1920）を1周として小節の頭から繰り返し、小節の終わりで切る。
-// part：bass（ベース）／chord（上声すべて）／arp（上声の i 番目。数が足りなければ1オクターブ上に折り返す）。acc はアクセント
+// t・d は tick（4分音符＝480）。part：bass（ベース）／chord（上声すべて）／arp（上声の i 番目。数が足りなければ1オクターブ上に折り返す）。
+// acc はアクセント、soft は弱く。
+// パターンは弾き方ごとに1つで、中身を拍子の種類ごとに持つ（小節ごとに、その小節の拍子に合う中身で鳴らす）：
+//   ev   … 4拍子系（4/4・2/4 など。1周＝1920）
+//   ev3  … 3/4（4分×3。1周＝1440）
+//   ev68 … 6/8・9/8・12/8（付点4分の拍。1周＝1440＝6/8 の1小節）
+// 1周を小節の頭から繰り返し、小節の終わりで切る。ev3・ev68 が無ければ ev を使う
 const each=(ts,f)=>ts.flatMap(f);
+const both=(ts,d,acc=()=>false)=>each(ts,t=>[{t,d,part:'bass',acc:acc(t)},{t,d,part:'chord',acc:acc(t)}]);
+const E8=[0,240,480,720,960,1200];   // 3拍子系の1周の8分
 export const PATTERNS=[
-  {id:'whole',group:'basic',short:'全',name:'全音符',ev:[{t:0,d:1920,part:'bass'},{t:0,d:1920,part:'chord'}]},
-  {id:'half',group:'basic',short:'2分',name:'2分音符',ev:each([0,960],t=>[{t,d:940,part:'bass'},{t,d:940,part:'chord'}])},
-  {id:'quarter',group:'basic',short:'4分',name:'4分刻み',ev:[{t:0,d:1900,part:'bass'},...[0,480,960,1440].map(t=>({t,d:430,part:'chord',acc:t%960===0}))]},
-  {id:'eighth',group:'basic',short:'8分',name:'8分刻み',ev:each([0,240,480,720,960,1200,1440,1680],t=>[{t,d:210,part:'bass',acc:t%480===0},{t,d:210,part:'chord',acc:t%480===0}])},
+  {id:'whole',group:'basic',short:'全',name:'全音符',ev:both([0],1920),ev3:both([0],1440),ev68:both([0],1440)},
+  {id:'half',group:'basic',short:'2分',name:'2分音符',ev:both([0,960],940),
+    ev3:[{t:0,d:1420,part:'bass'},{t:0,d:940,part:'chord'},{t:960,d:460,part:'chord'}],ev68:both([0,720],700)},
+  {id:'quarter',group:'basic',short:'4分',name:'4分刻み',ev:[{t:0,d:1900,part:'bass'},...[0,480,960,1440].map(t=>({t,d:430,part:'chord',acc:t%960===0}))],
+    ev3:[{t:0,d:1420,part:'bass'},...[0,480,960].map(t=>({t,d:430,part:'chord',acc:t===0}))],
+    ev68:[{t:0,d:1420,part:'bass'},...[0,720].map(t=>({t,d:660,part:'chord',acc:t===0}))]},
+  {id:'eighth',group:'basic',short:'8分',name:'8分刻み',ev:both([0,240,480,720,960,1200,1440,1680],210,t=>t%480===0),
+    ev3:both(E8,210,t=>t%480===0),ev68:both(E8,210,t=>t%720===0)},
   {id:'pop',group:'band',short:'ポップ',name:'ポップ（ベース＋裏拍）',ev:[{t:0,d:900,part:'bass'},{t:960,d:900,part:'bass'},{t:0,d:440,part:'chord',acc:true},
-    ...[720,1200,1680].map(t=>({t,d:220,part:'chord'})),{t:960,d:220,part:'chord'}]},
-  {id:'sync',group:'band',short:'シンコペ',name:'シンコペーション（3・3・2）',ev:each([[0,700],[720,700],[1440,460]],([t,d])=>[{t,d,part:'bass',acc:t===0},{t,d,part:'chord',acc:t===0}])},
-  {id:'arp',group:'band',short:'アルペ',name:'アルペジオ（8分）',ev:[{t:0,d:1900,part:'bass'},...[0,1,2,3,4,3,2,1].map((i,k)=>({t:k*240,d:230,part:'arp',i,acc:k===0}))]},
+    ...[720,1200,1680].map(t=>({t,d:220,part:'chord'})),{t:960,d:220,part:'chord'}],
+    ev3:[{t:0,d:440,part:'bass',acc:true},{t:480,d:420,part:'chord'},{t:960,d:420,part:'chord'}],
+    ev68:[{t:0,d:460,part:'bass',acc:true},{t:720,d:460,part:'bass'},...[240,480,960,1200].map(t=>({t,d:220,part:'chord'}))]},
+  {id:'sync',group:'band',short:'シンコペ',name:'シンコペーション（3・3・2）',ev:each([[0,700],[720,700],[1440,460]],([t,d])=>[{t,d,part:'bass',acc:t===0},{t,d,part:'chord',acc:t===0}]),
+    ev3:both([0,720],700,t=>t===0),ev68:both([0,480,960],460,t=>t===0)},   // 3拍子系はヘミオラ（拍の取り方を入れ替える）
+  {id:'arp',group:'band',short:'アルペ',name:'アルペジオ（8分）',ev:[{t:0,d:1900,part:'bass'},...[0,1,2,3,4,3,2,1].map((i,k)=>({t:k*240,d:230,part:'arp',i,acc:k===0}))],
+    ev3:[{t:0,d:1420,part:'bass'},...[0,1,2,3,2,1].map((i,k)=>({t:k*240,d:230,part:'arp',i,acc:k===0}))],
+    ev68:[{t:0,d:1420,part:'bass'},...[0,1,2,3,2,1].map((i,k)=>({t:k*240,d:230,part:'arp',i,acc:k%3===0}))]},   // ロッカバラード風
   // バラード：音の高さの順で 1・2・4・3（ベース → 上声の低い音 → 一番上 → 間の音）。g はギターのときの上の弦の番号（低い方から）
-  {id:'ballad',group:'band',short:'バラード',name:'バラード（4分の分散）',ev:[{t:0,d:1900,part:'bass'},{t:0,d:1900,part:'chord',soft:true},...[[1,0],[3,2],[2,1]].map(([i,g],k)=>({t:480*(k+1),d:460,part:'arp',i,g}))]},
+  {id:'ballad',group:'band',short:'バラード',name:'バラード（4分の分散）',ev:[{t:0,d:1900,part:'bass'},{t:0,d:1900,part:'chord',soft:true},...[[1,0],[3,2],[2,1]].map(([i,g],k)=>({t:480*(k+1),d:460,part:'arp',i,g}))],
+    ev3:[{t:0,d:1420,part:'bass'},{t:0,d:1420,part:'chord',soft:true},...[[1,0],[3,2]].map(([i,g],k)=>({t:480*(k+1),d:460,part:'arp',i,g}))],
+    ev68:[{t:0,d:700,part:'bass'},{t:720,d:700,part:'bass'},{t:0,d:1420,part:'chord',soft:true},...[[1,0],[2,1],[3,2],[2,1]].map(([i,g],k)=>({t:[240,480,960,1200][k],d:220,part:'arp',i,g}))]},
   // バンド（続き）
   {id:'bossa',group:'band',short:'ボサ',name:'ボサノバ',ev:[{t:0,d:700,part:'bass'},{t:720,d:220,part:'bass'},{t:960,d:700,part:'bass'},{t:1680,d:220,part:'bass'},
-    ...[0,720,1200,1680].map(t=>({t,d:200,part:'chord',acc:t===0}))]},
-  {id:'waltz',group:'band',short:'ワルツ',name:'ワルツ（3拍子向け）',ev:[{t:0,d:440,part:'bass',acc:true},{t:480,d:420,part:'chord'},{t:960,d:420,part:'chord'}]},
+    ...[0,720,1200,1680].map(t=>({t,d:200,part:'chord',acc:t===0}))],
+    ev3:[{t:0,d:700,part:'bass'},{t:720,d:220,part:'bass'},...[0,480,1200].map(t=>({t,d:200,part:'chord',acc:t===0}))],
+    ev68:[{t:0,d:460,part:'bass'},{t:720,d:460,part:'bass'},...[0,480,1200].map(t=>({t,d:200,part:'chord',acc:t===0}))]},
+  // ワルツ：3/4 の「ブン・チャッ・チャッ」。4拍子系では「ブン・チャッ・ブン・チャッ」
+  {id:'waltz',group:'band',short:'ワルツ',name:'ワルツ（ブン・チャッ・チャッ）',
+    ev:[{t:0,d:440,part:'bass',acc:true},{t:480,d:420,part:'chord'},{t:960,d:440,part:'bass'},{t:1440,d:420,part:'chord'}],
+    ev3:[{t:0,d:440,part:'bass',acc:true},{t:480,d:420,part:'chord'},{t:960,d:420,part:'chord'}],
+    ev68:[{t:0,d:220,part:'bass',acc:true},{t:240,d:200,part:'chord'},{t:480,d:200,part:'chord'},{t:720,d:220,part:'bass'},{t:960,d:200,part:'chord'},{t:1200,d:200,part:'chord'}]},
+  // シャッフル：3連の「タッ・カ」（長・短）。6/8・12/8 では付点4分の拍ごとに 2:1
+  {id:'shuffle',group:'band',short:'シャッフル',name:'シャッフル（ハネ）',
+    ev:[{t:0,d:940,part:'bass'},{t:960,d:940,part:'bass'},...[0,480,960,1440].flatMap(t=>[{t,d:300,part:'chord',acc:t%960===0},{t:t+320,d:150,part:'chord',soft:true}])],
+    ev3:[{t:0,d:1420,part:'bass'},...[0,480,960].flatMap(t=>[{t,d:300,part:'chord',acc:t===0},{t:t+320,d:150,part:'chord',soft:true}])],
+    ev68:[{t:0,d:700,part:'bass'},{t:720,d:700,part:'bass'},...[0,720].flatMap(t=>[{t,d:460,part:'chord',acc:t===0},{t:t+480,d:220,part:'chord',soft:true}])]},
   // EDM
-  {id:'offbeat',group:'edm',short:'オフビ',name:'オフビート（ハウス）',ev:each([240,720,1200,1680],t=>[{t,d:200,part:'bass'},{t,d:200,part:'chord',acc:true}])},
-  {id:'pump',group:'edm',short:'パンプ',name:'パンプ（サイドチェイン風）',ev:[...[0,480,960,1440].map(t=>({t,d:220,part:'bass',acc:t===0})),...[0,480,960,1440].map(t=>({t:t+120,d:360,part:'chord'}))]},
+  {id:'offbeat',group:'edm',short:'オフビ',name:'オフビート（ハウス）',ev:both([240,720,1200,1680],200,()=>false).map(x=>x.part==='chord'?{...x,acc:true}:x),
+    ev3:both([240,720,1200],200).map(x=>x.part==='chord'?{...x,acc:true}:x),ev68:both([480,1200],200).map(x=>x.part==='chord'?{...x,acc:true}:x)},
+  {id:'pump',group:'edm',short:'パンプ',name:'パンプ（サイドチェイン風）',ev:[...[0,480,960,1440].map(t=>({t,d:220,part:'bass',acc:t===0})),...[0,480,960,1440].map(t=>({t:t+120,d:360,part:'chord'}))],
+    ev3:[...[0,480,960].map(t=>({t,d:220,part:'bass',acc:t===0})),...[0,480,960].map(t=>({t:t+120,d:360,part:'chord'}))],
+    ev68:[...[0,720].map(t=>({t,d:220,part:'bass',acc:t===0})),...[0,720].map(t=>({t:t+120,d:580,part:'chord'}))]},
   {id:'future',group:'edm',short:'フューチャー',name:'フューチャーベース（16分の 3・3・2）',ev:[{t:0,d:940,part:'bass'},{t:960,d:940,part:'bass'},
-    ...[[0,330],[360,330],[720,230],[960,330],[1320,330],[1680,230]].map(([t,d])=>({t,d,part:'chord',acc:t%960===0}))]},
+    ...[[0,330],[360,330],[720,230],[960,330],[1320,330],[1680,230]].map(([t,d])=>({t,d,part:'chord',acc:t%960===0}))],
+    ev3:[{t:0,d:1420,part:'bass'},...[[0,330],[360,330],[720,230],[960,460]].map(([t,d])=>({t,d,part:'chord',acc:t===0}))],
+    ev68:[{t:0,d:700,part:'bass'},{t:720,d:700,part:'bass'},...[[0,330],[360,330],[720,330],[1080,330]].map(([t,d])=>({t,d,part:'chord',acc:t%720===0}))]},
   {id:'trance',group:'edm',short:'トランス',name:'トランス（16分ゲート）',ev:[...[240,720,1200,1680].map(t=>({t,d:220,part:'bass'})),
-    ...[...Array(16).keys()].map(k=>({t:k*120,d:100,part:'chord',acc:k%4===0,soft:k%2===1}))]},
-  {id:'arp16',group:'edm',short:'アルペ16',name:'アルペジオ（16分・上行）',ev:[{t:0,d:1900,part:'bass'},...[...Array(16).keys()].map(k=>({t:k*120,d:110,part:'arp',i:k%8,acc:k%4===0}))]}
+    ...[...Array(16).keys()].map(k=>({t:k*120,d:100,part:'chord',acc:k%4===0,soft:k%2===1}))],
+    ev3:[...[240,720,1200].map(t=>({t,d:220,part:'bass'})),...[...Array(12).keys()].map(k=>({t:k*120,d:100,part:'chord',acc:k%4===0,soft:k%2===1}))],
+    ev68:[...[480,1200].map(t=>({t,d:220,part:'bass'})),...[...Array(12).keys()].map(k=>({t:k*120,d:100,part:'chord',acc:k%6===0,soft:k%2===1}))]},
+  {id:'arp16',group:'edm',short:'アルペ16',name:'アルペジオ（16分・上行）',ev:[{t:0,d:1900,part:'bass'},...[...Array(16).keys()].map(k=>({t:k*120,d:110,part:'arp',i:k%8,acc:k%4===0}))],
+    ev3:[{t:0,d:1420,part:'bass'},...[...Array(12).keys()].map(k=>({t:k*120,d:110,part:'arp',i:k%6,acc:k%4===0}))],
+    ev68:[{t:0,d:1420,part:'bass'},...[...Array(12).keys()].map(k=>({t:k*120,d:110,part:'arp',i:k%6,acc:k%6===0}))]}
 ];
 // パターンのまとまり（選択欄の見出し）
 export const PATTERN_GROUPS=[{id:'basic',name:'基本'},{id:'band',name:'バンド'},{id:'edm',name:'EDM'}];
+// 拍子の種類：'compound'（6/8・9/8・12/8）・'triple'（3/4）・'duple'（そのほか）
+export const meterFamily=([n,d])=>d===8&&n%3===0&&n>=6?'compound':n===3&&d===4?'triple':'duple';
+// その拍子の小節で鳴らすパターンの中身と1周の長さ
+export function patternEvents(pat,meter){
+  const f=meterFamily(meter);
+  if(f==='compound'&&pat.ev68)return {ev:pat.ev68,cycle:1440};
+  if(f==='triple'&&pat.ev3)return {ev:pat.ev3,cycle:1440};
+  return {ev:pat.ev,cycle:WHOLE};
+}
 export const patternById=id=>PATTERNS.find(p=>p.id===id)||PATTERNS[0];
 const VEL={bass:88,chord:80,arp:78}, ACC=12, SOFT=-26;
 
@@ -479,7 +526,8 @@ function chordNotes(song,tl,p,tie,voicing){
   for(const b of tl.bars){
     if(b.start+b.ticks<=s)continue;
     if(b.start>=e)break;
-    for(let cyc=0;cyc<b.ticks;cyc+=WHOLE)for(const ev of pat.ev){
+    const pv=patternEvents(pat,b.meter);
+    for(let cyc=0;cyc<b.ticks;cyc+=pv.cycle)for(const ev of pv.ev){
       const t=b.start+cyc+ev.t;
       if(cyc+ev.t>=b.ticks||t<s||t>=e)continue;
       hits.push({...ev,t,d:Math.min(ev.d,b.start+b.ticks-t)});
@@ -494,8 +542,9 @@ function chordNotes(song,tl,p,tie,voicing){
       if(h.part==='chord'&&h.soft)return false;
       if(h.part!=='arp')return true;
       const b=barAt(h.t), rel=h.t-b.start;
-      if(rel%WHOLE===0)return false;
-      const cyc=b.start+rel-rel%WHOLE, k=count.get(cyc)||0;count.set(cyc,k+1);
+      const C=patternEvents(pat,b.meter).cycle;
+      if(rel%C===0)return false;
+      const cyc=b.start+rel-rel%C, k=count.get(cyc)||0;count.set(cyc,k+1);
       h.i=h.g!=null?Math.min(h.g,upper.length-1):seq[k%seq.length];   // パターンが弦を決めていればそれ、なければ上って下る
       return true;
     });
@@ -519,7 +568,8 @@ function chordNotes(song,tl,p,tie,voicing){
   const exact=hits.filter(h=>h.t===s), bs=barAt(s);
   if(!tie&&bs){
     const chase=[];
-    for(let cyc=0;cyc<bs.ticks;cyc+=WHOLE)for(const ev of pat.ev){
+    const pvs=patternEvents(pat,bs.meter);
+    for(let cyc=0;cyc<bs.ticks;cyc+=pvs.cycle)for(const ev of pvs.ev){
       if(ev.part==='arp'||exact.some(h=>h.part===ev.part))continue;
       const t=bs.start+cyc+ev.t;
       if(cyc+ev.t>=bs.ticks||t>=s)continue;

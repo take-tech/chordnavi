@@ -94,6 +94,29 @@ namespace
         return file.loadFileAsString();
     }
 
+   #if JUCE_IOS
+    // iOS：ほかのアプリの場所（iCloud Drive など）は、選んだ URL を通してしか読み書きできない（生のパスでは sandbox に断られる）。
+    // 保存は、先に一時フォルダに中身を書いておき、それを保存先へ書き出す（ピッカーがコピーする。こちらからは書かない）。
+    // 開いた・保存したファイルのパスは JS に渡さない（上書き保存はできないので、毎回「保存先を選んで書き出す」になる）
+    juce::File writeExportTemp (const juce::String& fileName, const void* data, size_t size)
+    {
+        auto dir = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("ChordSketchExport");
+        dir.deleteRecursively();
+        if (! dir.createDirectory())
+            return {};
+        auto file = dir.getChildFile (juce::File::createLegalFileName (fileName));
+        return file.replaceWithData (data, size) ? file : juce::File();
+    }
+
+    juce::String readURLText (const juce::URL& url)
+    {
+        if (auto in = url.createInputStream (juce::URL::InputStreamOptions (juce::URL::ParameterHandling::inAddress)))
+            if (in->getTotalLength() <= maxSongBytes)
+                return in->readEntireStreamAsString();
+        return {};
+    }
+   #endif
+
     juce::var fileResult (const juce::File& file, const juce::String& text = {})
     {
         auto* o = new juce::DynamicObject();
@@ -228,6 +251,17 @@ juce::WebBrowserComponent::Options SketchEditor::makeOptions()
                                  processorRef.setMuted (! args.isEmpty() && (bool) args[0]);
                                  completion (juce::var (true));
                              })
+        // 再生の音量：setVolumes({ chord, melody })（0〜1）。鳴っている音にもすぐ効く（曲を送り直さない）
+        .withNativeFunction ("setVolumes", [this] (const auto& args, auto completion)
+                             {
+                                 if (! args.isEmpty())
+                                 {
+                                     auto& synth = processorRef.getSynth();
+                                     synth.setPartGain (1, (float) (double) args[0].getProperty ("chord", 1.0));
+                                     synth.setPartGain (2, (float) (double) args[0].getProperty ("melody", 1.0));
+                                 }
+                                 completion (juce::var (true));
+                             })
         .withNativeFunction ("setTimbre", [this] (const auto& args, auto completion)
                              {
                                  // MIDI 鍵盤で弾く音の音色
@@ -251,6 +285,26 @@ SketchEditor::SketchEditor (SketchProcessor& p)
     setSize (baseWidth, baseHeight);
     webView.goToURL (juce::WebBrowserComponent::getResourceProviderRoot());
     startTimerHz (30);   // 再生位置と押している鍵盤
+}
+
+void SketchEditor::appSuspended()
+{
+    webView.emitEventIfBrowserIsVisible ("flush", juce::var());
+}
+
+void SketchEditor::appResumed()
+{
+    auto answered = std::make_shared<bool> (false);
+    webView.evaluateJavascript ("1", [answered] (juce::WebBrowserComponent::EvaluationResult r)
+    {
+        *answered = r.getResult() != nullptr;
+    });
+    juce::Component::SafePointer<SketchEditor> self (this);
+    juce::Timer::callAfterDelay (1500, [self, answered]
+    {
+        if (self != nullptr && ! *answered)
+            self->webView.goToURL (juce::WebBrowserComponent::getResourceProviderRoot());
+    });
 }
 
 void SketchEditor::timerCallback()
@@ -346,6 +400,23 @@ void SketchEditor::saveMidiBytes (const juce::Array<juce::var>& args,
         return;
     }
 
+   #if JUCE_IOS
+    const auto temp = writeExportTemp (MidiExport::withExtensionIfMissing (juce::File::getCurrentWorkingDirectory().getChildFile (midi.name), "mid").getFileName(),
+                                       midi.data.getData(), midi.data.getSize());
+    if (temp == juce::File())
+    {
+        completion (juce::var ("error: failed to write temp file"));
+        return;
+    }
+    fileChooser = std::make_unique<juce::FileChooser> (juce::String::fromUTF8 ("MIDIファイルを保存"), temp, "*.mid");
+    fileChooser->launchAsync (juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles,
+                              [completion] (const juce::FileChooser& chooser)
+    {
+        const auto url = chooser.getURLResult();
+        completion (juce::var (url.isEmpty() ? juce::String ("cancelled") : "saved:" + url.getFileName()));
+    });
+   #else
+
     const auto initial = MidiExport::withExtensionIfMissing (
         juce::File::getSpecialLocation (juce::File::userDesktopDirectory).getChildFile (midi.name), "mid");
 
@@ -367,6 +438,7 @@ void SketchEditor::saveMidiBytes (const juce::Array<juce::var>& args,
                                    ? "saved:" + file.getFullPathName()
                                    : juce::String ("error: failed to write file")));
     });
+   #endif
 }
 
 void SketchEditor::songOpen (juce::WebBrowserComponent::NativeFunctionCompletion completion)
@@ -375,6 +447,29 @@ void SketchEditor::songOpen (juce::WebBrowserComponent::NativeFunctionCompletion
                                                        juce::File::getSpecialLocation (juce::File::userDocumentsDirectory),
                                                        "*" + songExtension + ";*.json");
     const auto flags = juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles;
+
+   #if JUCE_IOS
+    fileChooser->launchAsync (flags, [completion] (const juce::FileChooser& chooser)
+    {
+        const auto url = chooser.getURLResult();
+        if (url.isEmpty())
+        {
+            completion (juce::var ("cancelled"));
+            return;
+        }
+        const auto text = readURLText (url);
+        if (text.isEmpty())
+        {
+            completion (juce::var ("error: failed to read file"));
+            return;
+        }
+        auto* o = new juce::DynamicObject();
+        o->setProperty ("path", "");
+        o->setProperty ("name", juce::URL::removeEscapeChars (url.getFileName()));
+        o->setProperty ("text", text);
+        completion (juce::var (o));
+    });
+   #else
 
     fileChooser->launchAsync (flags, [completion] (const juce::FileChooser& chooser)
     {
@@ -387,6 +482,7 @@ void SketchEditor::songOpen (juce::WebBrowserComponent::NativeFunctionCompletion
         const auto text = readTextFile (file);
         completion (text.isEmpty() ? juce::var ("error: failed to read file") : fileResult (file, text));
     });
+   #endif
 }
 
 void SketchEditor::songSaveAs (const juce::Array<juce::var>& args,
@@ -400,6 +496,36 @@ void SketchEditor::songSaveAs (const juce::Array<juce::var>& args,
         completion (juce::var ("error: no data"));
         return;
     }
+
+   #if JUCE_IOS
+    {
+        const auto fileName = MidiExport::withExtensionIfMissing (juce::File::getCurrentWorkingDirectory().getChildFile (name.isEmpty() ? "song" : name),
+                                                                  songExtension.substring (1)).getFileName();
+        const auto utf8 = text.toUTF8();
+        const auto temp = writeExportTemp (fileName, utf8.getAddress(), utf8.sizeInBytes() - 1);
+        if (temp == juce::File())
+        {
+            completion (juce::var ("error: failed to write temp file"));
+            return;
+        }
+        fileChooser = std::make_unique<juce::FileChooser> (juce::String::fromUTF8 ("曲を保存"), temp, "*" + songExtension);
+        fileChooser->launchAsync (juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles,
+                                  [completion] (const juce::FileChooser& chooser)
+        {
+            const auto url = chooser.getURLResult();
+            if (url.isEmpty())
+            {
+                completion (juce::var ("cancelled"));
+                return;
+            }
+            auto* o = new juce::DynamicObject();
+            o->setProperty ("path", "");
+            o->setProperty ("name", juce::URL::removeEscapeChars (url.getFileName()));
+            completion (juce::var (o));
+        });
+        return;
+    }
+   #else
 
     // 前に保存したファイルがあればその隣、無ければ書類フォルダ
     const auto dir = juce::File::isAbsolutePath (path) ? juce::File (path).getParentDirectory()
@@ -423,4 +549,5 @@ void SketchEditor::songSaveAs (const juce::Array<juce::var>& args,
         file = MidiExport::withExtensionIfMissing (file, songExtension.substring (1));
         completion (writeTextSafely (file, text) ? fileResult (file) : juce::var ("error: failed to write file"));
     });
+   #endif
 }

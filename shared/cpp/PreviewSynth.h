@@ -60,7 +60,11 @@ public:
 
     // 曲の試聴（ChordSketch の SongPlayer）用。オーディオスレッドから、次の render() の前に呼ぶ。
     // 次の render() の startIn サンプル目から length サンプル鳴らす（その後リリース）。owner は止めるときの印（0 以外）
-    void startNote (int note, float velocity, juce::int64 startIn, juce::int64 length, Timbre timbre, int owner);
+    // part：音量を別に変える組（0＝そのほか、1＝コード、2＝メロディー。setPartGain）
+    void startNote (int note, float velocity, juce::int64 startIn, juce::int64 length, Timbre timbre, int owner, int part = 0);
+
+    // 組ごとの音量（0〜1。どのスレッドからでも）。鳴っている音にもすぐ効く（ブロックの中でなめらかに変える）
+    void setPartGain (int part, float gain) { if (part > 0 && part < numParts) partTarget[(size_t) part].store (juce::jlimit (0.0f, 1.0f, gain)); }
     // owner の音をフェードで止める（まだ鳴っていない音は取り消し）。オーディオスレッドから呼ぶ
     void fadeOwner (int owner);
 
@@ -95,6 +99,7 @@ private:
         Timbre timbre = Timbre::triangle;
         int midiNote = -1;            // MIDI 入力で鳴らしている音（試聴は -1）
         int owner = 0;                // startNote() で鳴らした音の印（0 は それ以外）
+        int part = 0;                 // 音量の組（setPartGain）
         bool liveRelease = false;     // 三角波を離したときもリリースで消す
         float velGain = 1.0f;
         juce::int64 startIn = 0;      // 鳴り始めまでのサンプル数
@@ -131,6 +136,10 @@ private:
     float renderSample (Voice&);
 
     double sampleRate = 44100.0;
+    static constexpr int numParts = 3;
+    std::array<std::atomic<float>, numParts> partTarget { 1.0f, 1.0f, 1.0f };
+    std::array<float, numParts> partFrom { 1.0f, 1.0f, 1.0f }, partTo { 1.0f, 1.0f, 1.0f };   // このブロックの頭と終わりの音量
+    int blockSamples = 1;
     std::array<Voice, maxVoices> voices {};
     juce::Random random;
 

@@ -191,11 +191,12 @@ void PreviewSynth::startDue (juce::int64 now)
     }
 }
 
-void PreviewSynth::startNote (int note, float velocity, juce::int64 startIn, juce::int64 length, Timbre timbre, int owner)
+void PreviewSynth::startNote (int note, float velocity, juce::int64 startIn, juce::int64 length, Timbre timbre, int owner, int part)
 {
     auto& v = findFreeVoice();
     startVoice (v, juce::jlimit (0, 127, note), juce::jmax<juce::int64> (0, startIn), juce::jmax<juce::int64> (1, length), timbre);
     v.owner   = owner;
+    v.part    = juce::jlimit (0, numParts - 1, part);
     v.velGain = std::pow (juce::jlimit (0.0f, 1.0f, velocity), 0.7f) * 1.2f;
 }
 
@@ -518,7 +519,12 @@ void PreviewSynth::renderVoices (float* out, int from, int to)
         for (int s = from; s < to && v.active; ++s)
         {
             if (v.startIn > 0) { --v.startIn; continue; }
-            const auto x = renderSample (v);
+            auto x = renderSample (v);
+            if (v.part > 0)   // 組の音量：ブロックの中で前の値から今の値へ直線で変える（つまみを動かしてもぶつぶつしない）
+            {
+                const auto p = (size_t) v.part;
+                x *= partFrom[p] + (partTo[p] - partFrom[p]) * (float) s / (float) blockSamples;
+            }
             if (out != nullptr) out[s] += x;
         }
     }
@@ -534,6 +540,8 @@ void PreviewSynth::render (juce::AudioBuffer<float>& buffer)
 
     const int numSamples = buffer.getNumSamples();
     buffer.clear();
+    blockSamples = juce::jmax (1, numSamples);
+    for (size_t p = 1; p < (size_t) numParts; ++p) { partFrom[p] = partTo[p]; partTo[p] = partTarget[p].load(); }
     auto* out = buffer.getNumChannels() > 0 ? buffer.getWritePointer (0) : nullptr;
 
     // 予約の鳴り始めの位置でブロックを区切り、サンプル単位の正確な時刻で鳴らす

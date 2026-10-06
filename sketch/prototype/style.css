@@ -243,7 +243,7 @@ body.grabbing,body.grabbing *{cursor:grabbing!important}
 .cursor{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--live);pointer-events:none;z-index:3}
 .cursor::before{content:'';position:absolute;top:-4px;left:-4px;border:5px solid transparent;border-top-color:var(--live)}
 .playhead{position:absolute;top:0;bottom:0;width:2px;background:var(--chord);pointer-events:none;z-index:4}
-.drop{position:absolute;top:3px;bottom:3px;border:2px dashed var(--chord);border-radius:4px;background:rgba(196,69,106,.08);pointer-events:none;z-index:2}
+.drop{position:absolute;top:3px;bottom:3px;border:2px dashed var(--chord);border-radius:4px;background:rgba(196,69,106,.08);pointer-events:none;z-index:6}
 .add-sec{margin:14px 0 0 12px;display:flex;gap:4px;flex-wrap:wrap;align-items:center}
 .add-sec .lbl{margin-right:4px}
 .add-sec input.add-name{width:260px;font-size:12px}
@@ -435,8 +435,9 @@ body.grabbing,body.grabbing *{cursor:grabbing!important}
 .roll .rg{position:absolute;left:46px;top:62px;cursor:crosshair}
 .roll .rg>div{position:absolute}
 .roll .rrow{background:var(--card);border-bottom:1px solid var(--grid2)}
-.roll .rrow.black{background:var(--grid2)}
-.roll .gout{background:rgba(30,39,66,.10)}   /* スケールの外の行：暗く（左の鍵盤のスケールの外の鍵も暗くしてそろえる） */
+.roll{--roll-dim:color-mix(in srgb,var(--card),#1E2742 10%)}   /* 暗くする行の色（オフの黒鍵の行・オンのスケールの外の行で同じ） */
+.roll .rrow.black{background:var(--roll-dim)}
+.roll .gout{background:var(--roll-dim)}   /* スケールの外の行：オフのときの黒鍵の行と同じ色（切り替えても灰色の濃さが変わらないように） */
 .roll .gin{background:color-mix(in srgb,var(--tone) 9%,transparent)}   /* スケールの中の行（Synthesizer V のように、うすい緑） */
 .roll .gtonic{background:color-mix(in srgb,var(--tone) 16%,transparent);box-shadow:inset 0 -1.5px 0 color-mix(in srgb,var(--tone) 55%,transparent)}   /* 主音：ごくうすい緑と下の細い線 */
 .roll .gtone{background:color-mix(in srgb,var(--root) 30%,transparent);box-shadow:inset 0 1px 0 color-mix(in srgb,var(--root) 50%,transparent)}
@@ -462,9 +463,10 @@ body.grabbing,body.grabbing *{cursor:grabbing!important}
 :root[data-theme=dark] .roll .rkey.black{background:var(--roll-key-black);border-bottom-color:var(--roll-key-black)}
 :root[data-theme=dark] .roll .rkey span{color:var(--roll-key-label)}
 :root[data-theme=dark] .roll .rrow{background:var(--roll-row);border-bottom-color:var(--roll-row-edge)}
-:root[data-theme=dark] .roll .rrow.black{background:var(--roll-row-black)}
+:root[data-theme=dark] .roll{--roll-dim:color-mix(in srgb,var(--roll-row),#000 35%)}
+:root[data-theme=dark] .roll .rrow.black{background:var(--roll-dim)}
 :root[data-theme=dark] .roll .gbar{border-left-color:var(--roll-bar);background-image:repeating-linear-gradient(to right,transparent 0 calc(var(--beat) - 1px),var(--roll-beat) calc(var(--beat) - 1px) var(--beat))}
-:root[data-theme=dark] .roll .gout{background:rgba(0,0,0,.5)}
+:root[data-theme=dark] .roll .gout{background:var(--roll-dim);box-shadow:inset 0 -1px 0 var(--roll-row-edge)}   /* オフの黒鍵の行と同じ（行の境の線も）*/
 :root[data-theme=dark] .roll .gin{background:color-mix(in srgb,var(--tone) 10%,transparent)}
 :root[data-theme=dark] .roll .gtonic{background:color-mix(in srgb,var(--tone) 18%,transparent);box-shadow:inset 0 -1.5px 0 color-mix(in srgb,var(--tone) 60%,transparent)}
 /* 暗い土台のコードの音のガイド：面はうすく塗るだけ（全オクターブに出るので濃いと縞だらけになる）。
@@ -785,13 +787,15 @@ body.grabbing,body.grabbing *{cursor:grabbing!important}
 [data-skin=kawaii] .sub-head{border-top:0;margin-top:8px;padding:0;color:#B45F8A;font-weight:700;font-size:12.5px}
 [data-skin=kawaii] .sub-head::before{content:'♡';color:#F28DB2;font-size:11px;margin-right:-2px}
 [data-skin=kawaii] .top h1{font-size:19px;color:#D45A8E;letter-spacing:.03em}
-/* ぷっくりした押しボタン */
+/* ぷっくりした押しボタン（角は丸めすぎない：まん丸にせず --kw-r。指の端末はボタンが高いので少し大きく） */
+[data-skin=kawaii]{--kw-r:8px}
+.touch[data-skin=kawaii]{--kw-r:13px}
 [data-skin=kawaii] button:not(.lcd button):not(.menu-pop button):not(.tclose):not(.x):not(.rs){
-  background:#FFFDFE;border:1.5px solid #E7BCD0;border-radius:999px;color:#5A3A53;box-shadow:0 2px 0 var(--kw-btn);transform:translateY(-1px)}
+  background:#FFFDFE;border:1.5px solid #E7BCD0;border-radius:var(--kw-r);color:#5A3A53;box-shadow:0 2px 0 var(--kw-btn);transform:translateY(-1px)}
 [data-skin=kawaii] button:not(.lcd button):not(.menu-pop button):not(.tclose):not(.x):not(.rs):active{transform:translateY(1px);box-shadow:0 0 0 var(--kw-btn)}
 [data-skin=kawaii] button:not(.lcd button):not(.menu-pop button):hover{background:#FFF0F6}
-[data-skin=kawaii] .seg{border:1.5px solid #E7BCD0;border-radius:999px;background:#FFFDFE;box-shadow:0 2px 0 var(--kw-btn);overflow:hidden}
-[data-skin=kawaii] .seg button{border:0!important;border-radius:999px!important;box-shadow:none!important;transform:none!important}
+[data-skin=kawaii] .seg{border:1.5px solid #E7BCD0;border-radius:var(--kw-r);background:#FFFDFE;box-shadow:0 2px 0 var(--kw-btn);overflow:hidden}
+[data-skin=kawaii] .seg button{border:0!important;border-radius:calc(var(--kw-r) - 2px)!important;box-shadow:none!important;transform:none!important}
 [data-skin=kawaii] .tg[aria-pressed=true],[data-skin=kawaii] .seg button[aria-pressed=true],[data-skin=kawaii] .play{
   background:#F7A9C6!important;border-color:#E07FA6!important;color:#4A1830!important;box-shadow:0 2px 0 #D9789F!important}
 [data-skin=kawaii] .seg button[aria-pressed=true]{box-shadow:none!important}
@@ -809,7 +813,7 @@ body.grabbing,body.grabbing *{cursor:grabbing!important}
 [data-skin=kawaii] .tab.on{background:#FFFDFE;box-shadow:inset 0 3px 0 #F28DB2}
 [data-skin=kawaii] .toolbar{border-bottom:1.5px dashed #F1D2DF}
 [data-skin=kawaii] .toolbar.out{background:#FFF0F5}
-[data-skin=kawaii] .midi-box{border:1.5px solid #EDCBDB;border-radius:999px;background:#FFF0F5}
+[data-skin=kawaii] .midi-box{border:1.5px solid #EDCBDB;border-radius:var(--kw-r);background:#FFF0F5}
 [data-skin=kawaii] .blk{border-radius:12px;border:1.5px solid #E3B2C8;background:#FFFDFE;box-shadow:0 2px 0 #F0CFDD}
 [data-skin=kawaii] .blk.playing{background:#FCDDE9;border-color:#E2669A}
 [data-skin=kawaii] .pchip{border-radius:12px;border:1.5px solid #EDCBDB;background:#FFFDFE;box-shadow:0 2px 0 #F3D6E2}
@@ -869,7 +873,7 @@ body.grabbing,body.grabbing *{cursor:grabbing!important}
 /* 暗い土台の入力欄・選択欄：枠を一段明るく（背景に溶けないように。スキンが枠を決めていればそちら） */
 :root[data-theme=dark]:not([data-skin]) :is(select,input[type=number],input[type=text],.title){border-color:#4E5878}
 
-/* 指で操作する端末（iPad・iPhone）：細い部品を押しやすく、メロディービューは指で編集（2本指でスクロール） */
+/* 指で操作する端末（iPad・iPhone）：細い部品を押しやすく、メロディービューのスクロール・拡大は roll.js で自前に（touch-action:none） */
 @media (pointer: coarse){
   .sec-grip{left:-14px;width:24px}
   .blk .rs{width:16px}
@@ -964,3 +968,174 @@ body.grabbing,body.grabbing *{cursor:grabbing!important}
 :root.touch[data-skin=old] .stage{padding:8px 24px}
 
 .touch .menu-pop kbd{display:none}   /* キーボードのショートカットの書き添え */
+
+/* ---------- iPhone（html.phone：横向き。上にトップバー、まん中にコードビュー、下にコードのパッド） ---------- */
+.phone-only{display:none!important}
+.phone .phone-only{display:flex!important}
+.phone .phone-pads[hidden]{display:none!important}
+.phone .stage{padding:6px max(env(safe-area-inset-right),10px) 6px max(env(safe-area-inset-left),10px);gap:6px;grid-template-rows:42px minmax(0,1fr)}
+.phone .top{padding:0 4px;gap:5px}
+.phone #muteBtn,.phone #redo,.phone #fileState{display:none!important}
+
+.phone .top .transport button,.phone .top>button,.phone .top .menu>button{min-height:34px}
+.phone .lcd{grid-template-columns:72px 72px}
+.phone .main>.tabs,.phone .main>.toolbar:not(.out),.phone .main>.toolbar.out.only-chords{display:none!important}
+.phone .main{gap:0}
+.phone .sheet{padding:4px 8px 8px}
+.phone .footer{min-height:40px;padding:3px 8px}
+.phone .footer button{min-height:30px}
+.phone .footer .fhint{display:none}
+/* 下のパッド */
+.phone .phone-pads{gap:6px;align-items:stretch;height:74px;padding:6px 8px;border-top:1px solid var(--line);flex-shrink:0}
+.phone .pp-tabs{display:flex;flex-direction:column;gap:3px;width:84px;flex-shrink:0}
+.phone .pp-tabs button{flex:1;min-height:0!important;font-size:11.5px!important;padding:0 6px;border-radius:6px}
+.phone .pp-tabs button[aria-pressed=true]{background:var(--pressed-bg);color:var(--pressed-fg);border-color:var(--pressed-bg)}
+.phone .pp-body{flex:1;display:flex;gap:6px;min-width:0;align-items:stretch}
+.phone .pp-body[data-t=chords]>.pchip{flex:1;min-width:0;border-radius:12px;padding:6px 9px;display:flex;flex-direction:column;justify-content:space-between}
+.phone .pp-body[data-t=chords] .pchip .n{font-size:17px}
+.phone .pp-body[data-t=chords] .pchip .d{font-size:11px}
+.phone .pp-body[data-t=prog]{align-items:center;gap:8px}
+.phone .pp-body[data-t=prog]>.prog-row{display:flex;gap:6px;flex-shrink:0}
+.phone .pp-body[data-t=prog]>.prog-names{flex:1;min-width:0;align-self:center}
+.phone .pp-body[data-t=key]{align-items:center;gap:10px}
+.phone .pp-body[data-t=key]>.keyrow{display:flex;gap:6px}
+/* コードメニュー：パッドの上に重ねて、画面の下に出す */
+.phone .chip-edit{position:fixed!important;left:max(env(safe-area-inset-left),10px)!important;right:max(env(safe-area-inset-right),10px)!important;top:auto!important;bottom:6px!important;
+  border-radius:12px;box-shadow:0 -6px 24px rgba(0,0,0,.2);z-index:40}
+/* 設定のメニューに入れた MIDI の書き出し・コード譜 */
+.phone #themeMenu .midi-box{border:0;background:none;padding:2px 6px}
+.phone #themeMenu .midi-box #dragSel{display:none}
+.phone #themeMenu #printBtn{text-align:left}
+
+.phone .side-pin{display:none!important}
+.phone .sec-head{gap:6px}
+.phone .sec-head .n{display:none}
+.phone .sec-more .menu-pop .pat{max-width:220px}
+.phone .stage>.left{top:54px;bottom:6px;left:max(env(safe-area-inset-left),10px);width:320px}
+/* iPhone：セクションの見出しは左の細い列。セクション名を縦に（横文字を寝かせて）出し、押すとメニュー */
+.phone .sec{display:grid;grid-template-columns:30px minmax(0,1fr);column-gap:4px;align-items:stretch;margin-top:6px}
+.phone .sec>.sec-head{margin:0;padding-top:14px;display:flex;align-items:stretch}
+.phone .sec-more{display:flex;flex:1}
+.phone .sec-vname{writing-mode:vertical-rl;text-orientation:sideways;flex:1;min-height:0!important;width:28px;padding:6px 0!important;
+  font:900 14px/1 var(--font-head,inherit);color:var(--c);background:color-mix(in srgb,var(--c) 10%,var(--card));border:1px solid color-mix(in srgb,var(--c) 40%,transparent);
+  border-radius:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:.04em}
+.phone .sec-more .menu-pop{min-width:240px;gap:6px;padding:8px}
+.phone .sec-more .menu-pop .tb-row{display:flex;align-items:center;gap:6px}
+.phone .sec-more .menu-pop .sec-name{flex:1;width:auto;border-color:var(--line);background:var(--card)}
+.phone .sec-more .menu-pop input[type=number]{width:52px}
+.phone .sec-more .menu-pop .sec-sw{width:18px!important;height:18px!important;min-height:0!important;flex:0 0 18px}
+.phone .sec-more .menu-pop .pat{flex:1;max-width:none}
+.phone .sec>.sec-head{height:100%}
+.phone .sec-more .menu-pop{position:fixed!important;max-height:calc(100vh - 16px);overflow-y:auto}
+.phone .sec-more .menu-pop .sec-sw{background:var(--c)!important;border-radius:50%!important;padding:0!important}
+.phone .sec-more .menu-pop .tb-row button:not(.sec-sw){border:1px solid var(--line);background:var(--card);text-align:center;padding:0 12px}
+.phone .sec-vname{transform:rotate(180deg)}   /* 下から上へ読む向き */
+/* iPhone：トップバーにはメトロノームと ▾ だけ。カウントインは ▾ のメニューの下に */
+.phone .clickgrp{grid-template-columns:34px 18px;grid-template-rows:34px}
+.phone .clickgrp .ic2{height:34px;min-height:34px!important}
+.phone .title{width:80px!important}
+.phone #metroMenu{top:38px;min-width:170px}
+.phone #metroMenu #countIn{display:flex;width:auto;height:auto;min-height:34px!important;gap:8px;justify-content:flex-start;padding:0 10px}
+.phone #metroMenu #countMenu{display:flex!important;position:static;flex-direction:row;gap:4px;padding:0 4px 2px;border:0;box-shadow:none;background:none;min-width:0}
+.phone #metroMenu #countMenu button{flex:1}
+.phone #phoneView{padding:0 7px}
+/* 指の端末：長押しでつかんだコード（ここから動かせる） */
+.touch .blk.lift{transform:scale(1.04);box-shadow:0 4px 14px rgba(0,0,0,.25);z-index:5}
+/* 選んだコードの両端に、つかんで伸ばす点々のつまみ（メロディービューのノートと同じ形） */
+.blk.sel .rs{display:flex;align-items:center;justify-content:center}
+.blk.sel .rs::before{content:'';width:5px;height:70%;max-height:22px;border-radius:3px;background:#fff;
+  box-shadow:0 0 0 1.5px var(--chord),0 1px 3px rgba(0,0,0,.35);
+  background-image:radial-gradient(circle,var(--chord) 1px,transparent 1.3px);background-size:5px 4px;background-position:center}
+.touch .blk.sel .rs::before{width:6px;background-size:6px 5px}
+/* つまみはコードの外側にはみ出させて、コード名に重ねない（メロディービューのノートと同じ） */
+.blk.sel{overflow:visible;z-index:3}
+.blk.sel .rs{right:-8px;width:14px}
+.blk.sel .rs.rsl{right:auto;left:-8px}
+.touch .blk.sel .rs{right:-11px;width:20px}
+.touch .blk.sel .rs.rsl{right:auto;left:-11px}
+/* 下の安全域（ホームバー）。下から上へのドラッグが iOS の「ホームへ戻る」に取られないよう、部品を上げる */
+.touch .stage{padding-bottom:max(env(safe-area-inset-bottom),8px)}
+.phone .stage{padding-bottom:max(env(safe-area-inset-bottom),6px)}
+.phone .chip-edit{bottom:max(env(safe-area-inset-bottom),6px)!important}
+/* ピンチ・ダブルタップで画面全体が拡大しないように */
+.touch,.touch body{touch-action:pan-x pan-y}
+/* プリセットの進行のドラッグを、引き出しのスクロールに取られないように */
+#progNames{touch-action:none}
+/* 短いコードは、つまみを細くして本体をつかめるだけ残す */
+.touch .blk.sel.narrow .rs{right:-6px;width:10px}
+.touch .blk.sel.narrow .rs.rsl{right:auto;left:-6px}
+.touch .blk.sel.narrow .rs::before{width:4px;background-size:4px 4px}
+/* iPhone のメロディービュー：上の帯は1段（26px） */
+.phone .roll .rh,.phone .roll .rc,.phone .roll .rhg{height:26px}
+.phone .roll .rg{top:26px}
+.phone .roll .rsec{padding:0;border-left:0;background:var(--c)}
+.phone .roll .rbar{font-size:9px;line-height:12px;padding-left:2px}
+.phone .roll .rchord{background:none;padding-left:14px;line-height:20px;font-size:12px;pointer-events:none}
+.phone .roll .rchord.playing{background:color-mix(in srgb,var(--chord-tint) 70%,transparent)}
+/* iPhone のメロディービュー：下のバーは音を選んだとき・範囲のときだけ、下に重ねて出す */
+.phone .main:has(> .roll:not([hidden])) .footer{position:absolute;left:6px;right:6px;bottom:6px;z-index:20;border:1px solid var(--line);border-radius:10px;
+  background:var(--panel);box-shadow:0 4px 18px rgba(0,0,0,.18);overflow-x:auto}
+.phone .main:has(> .roll:not([hidden])) .footer.idle{display:none}
+/* 全画面（html.mel-full） */
+.mel-float{display:none}
+.mel-full .stage>.top,.mel-full .main>.toolbar.out.only-melody{display:none!important}
+.mel-full .stage{grid-template-rows:minmax(0,1fr)!important}
+.mel-full .mel-float{display:flex;position:absolute;top:2px;right:6px;z-index:25;gap:4px;padding:3px;border-radius:10px;
+  background:color-mix(in srgb,var(--panel) 88%,transparent);border:1px solid var(--line);box-shadow:0 2px 10px rgba(0,0,0,.15)}
+.mel-full .mel-float button{min-height:30px!important;min-width:38px;padding:0 8px;font-size:14px!important;display:flex;align-items:center;justify-content:center}
+.mel-full-btn{display:none}
+.phone .mel-full-btn{display:inline-flex;margin-left:auto;min-width:44px;justify-content:center;font-size:16px!important}
+.phone .tb-more:not([hidden])+.mel-full-btn{margin-left:0}
+.phone .toolbar.out.only-melody>.lbl[title^="メロディービューの行"]{display:none}   /* iPhone：「ガイド」の見出しは外す（全画面のボタンを1段に入れる） */
+.phone #phoneView{align-items:center;justify-content:center;line-height:1}   /* 文字を上下の真ん中に */
+.phone .sec-more .menu-pop .x{flex:0 0 34px;min-width:34px;padding:0;font-size:18px!important;line-height:1}
+/* iPhone の下のパッド：タブは2×2。「音」はコードのサウンドバーの部品を2段に */
+.phone .pp-tabs{display:grid!important;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;width:118px;gap:3px}
+.phone .pp-tabs button{font-size:11px!important;padding:0 2px;letter-spacing:-.02em}
+.phone .pp-body[data-t=sound]{flex-direction:column;justify-content:center;gap:4px}
+.phone .pp-body[data-t=sound]>.pp-row{display:flex;align-items:center;gap:8px;min-width:0}
+.phone .pp-body[data-t=sound] select,.phone .pp-body[data-t=sound] button:not(.oct button){min-height:28px!important;font-size:13px!important}
+.phone .pp-body[data-t=sound] .oct-arrows button{height:14px;line-height:14px}
+.phone .pp-body[data-t=sound] .fld{display:flex;align-items:center;gap:4px;font-size:12px}
+.fld.vol{display:inline-flex;align-items:center;gap:4px}
+.vol-bar{width:70px}
+.touch .vol-bar{width:90px}
+/* iPhone の下のパッド：ダイアトニックの左の3和音／4和音（タブとは区切り線で分け、選んだ側は色の縁取り） */
+.phone .pp-dia{display:flex;flex-direction:column;gap:3px;width:52px;flex:0 0 52px;padding-left:7px;border-left:1px solid var(--line);margin-left:1px}
+.phone .pp-dia button{flex:1;min-height:0!important;padding:0 2px;border-radius:6px;font-size:11.5px!important;font-weight:700;color:var(--muted);background:none;border-color:var(--line)}
+.phone .pp-dia button[aria-pressed=true]{color:var(--live);border:1.5px solid var(--live);background:color-mix(in srgb,var(--live) 10%,var(--card))}
+/* Kawaii：ボタンの見た目がまとめて上書きされるので、iPhone の下のタブ・3和音／4和音の選んだ側をはっきりさせる */
+[data-skin=kawaii] .pp-tabs button[aria-pressed=true]{background:#F7A9C6!important;border-color:#E07FA6!important;color:#4A1830!important;box-shadow:0 2px 0 #D9789F!important}
+[data-skin=kawaii] .pp-dia button{color:#B58BA3!important}
+[data-skin=kawaii] .pp-dia button[aria-pressed=true]{background:#FFE3EE!important;border:1.5px solid #E07FA6!important;color:#B4386C!important}
+/* 3和音／4和音の選んだ側：スキンのボタンの見た目に負けないよう、内側の縁取り（outline）と文字の色で示す */
+.phone .pp-dia button[aria-pressed=true]{outline:2px solid var(--live);outline-offset:-2px;color:var(--live)!important}
+.phone .pp-dia button[aria-pressed=false]{opacity:.6}
+.touch .top button:has(> svg:only-child){display:inline-flex;align-items:center;justify-content:center;padding:0}   /* アイコンだけのボタンは、アイコンをまん中に */
+/* iPhone：コード編集パネルは画面の右に高さいっぱいで出す（鍵盤を広く）。見出しと説明は出さず、× はコード名の行の右。
+   開いているあいだ、下のコードメニューは隠す（パネルと重なるので） */
+.phone .vpanel{position:fixed;top:6px;bottom:max(env(safe-area-inset-bottom),6px);right:max(env(safe-area-inset-right),10px);width:300px;z-index:45;
+  border:1px solid var(--line);border-radius:12px;overflow:hidden;box-shadow:-6px 0 24px rgba(30,39,66,.25)}
+.phone .vtitle,.phone .vhint{display:none}
+.phone .vhead{position:absolute;top:4px;right:4px;border:0;padding:0;z-index:2}
+.phone .vhead .x{min-width:36px;min-height:34px!important;font-size:20px!important}
+.phone .vname{padding:8px 46px 6px 12px}
+.phone .vrow{height:24px}
+.phone .vrow .vlbl{font-size:12px}
+.phone .vfoot{padding:6px 8px}
+.phone .main:has(#vpanel:not([hidden])) .chip-edit{display:none!important}
+/* iPad：行を少し高くして押しやすく */
+.touch:not(.phone) .vrow{height:20px}
+/* 指：コード編集パネルの鍵盤。鳴らしていない行はふつうにスクロール（慣性つき）、鳴らしている行はつかんで上下に動かす */
+.touch .vkeys .vrow{touch-action:pan-y}
+.touch .vkeys .vrow.on{touch-action:none}
+/* コード譜の五線譜（リードシート）：段ごとの SVG。ページは段の切れ目で分ける */
+.print.lead .psec{break-inside:auto;margin-bottom:3mm}
+.print .lrow{break-inside:avoid;margin-bottom:1mm}
+.print .lrow svg{display:block;overflow:visible}
+.print .pwait{text-align:center;color:#888;padding:20mm 0}
+/* 指の端末のインフォバー：入りきらないときは横にスクロール（切らない）。iPhone は小見出し・補足を外して詰める */
+.touch .footer{overflow-x:auto;scrollbar-width:none}
+.touch .footer::-webkit-scrollbar{display:none}
+.touch .footer>*{flex-shrink:0}
+.phone .footer .fsub,.phone .footer .fgroup>.flbl{display:none}

@@ -6,7 +6,7 @@
 #define MyAppName "ChordSketch"
 #define MyAppVersion GetEnv("CHORDSKETCH_VERSION")
 #if MyAppVersion == ""
-#define MyAppVersion "0.9.2"
+#define MyAppVersion "0.9.3"
 #endif
 #define MyAppPublisher "Ranze"
 #define MyAppURL "https://github.com/take-tech/chordnavi"
