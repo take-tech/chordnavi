@@ -1134,3 +1134,8 @@ body.grabbing,body.grabbing *{cursor:grabbing!important}
 .print .lrow{break-inside:avoid;margin-bottom:1mm}
 .print .lrow svg{display:block;overflow:visible}
 .print .pwait{text-align:center;color:#888;padding:20mm 0}
+/* 指の端末のインフォバー：入りきらないときは横にスクロール（切らない）。iPhone は小見出し・補足を外して詰める */
+.touch .footer{overflow-x:auto;scrollbar-width:none}
+.touch .footer::-webkit-scrollbar{display:none}
+.touch .footer>*{flex-shrink:0}
+.phone .footer .fsub,.phone .footer .fgroup>.flbl{display:none}

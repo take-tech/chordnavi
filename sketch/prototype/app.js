@@ -1312,7 +1312,7 @@ function renderFooter(){
   }else if(range){
     const n=range.to-range.from;
     f.append(group(null,h('b','',rangeLabel(range)),h('span','fsub',`${n}小節を選択`)),
-      group('範囲',btn('▶\uFE0E ループ再生','この範囲を繰り返し再生',()=>{ui.loop=true;render();startPlay();}),btn('コピー','コードをコピー（⌘C）',copySel),btn('コードを消す','範囲のコードを消す（⌫）',deleteSel)),
+      group('範囲',btn(PHONE?'▶\uFE0E ループ':'▶\uFE0E ループ再生','この範囲を繰り返し再生',()=>{ui.loop=true;render();startPlay();}),btn('コピー','コードをコピー（⌘C）',copySel),btn('コードを消す','範囲のコードを消す（⌫）',deleteSel)),
       group('小節',btn('＋ 挿入',`選択範囲の前に${n}小節を入れる`,()=>insertBarsAtCursor(n)),btn('− 削除','選択範囲の小節を消す',()=>deleteRangeBars())));
   }else{
     const b=tl.bars[cursor.gi];
