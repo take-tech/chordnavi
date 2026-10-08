@@ -1870,9 +1870,10 @@ function switchTab(i){
 }
 // 何も入力していない新規の曲のタブ（ここに開くならタブを増やさない）
 const pristine=()=>!dirty&&!songFile&&song.title===NEW_TITLE&&song.sections.every(s=>!s.chords.length);
-function openInTab(s,name='',handle=null){
+// newTab ならいつも新しいタブ（タブの帯の ＋。何も入力していない新規の曲のタブでも増やす）
+function openInTab(s,name='',handle=null,newTab=false){
   player.stop();progPreview=false;playTick=null;playingId=null;
-  if(!TABS||!pristine()){if(TABS){stashDoc();docs.push({});active=docs.length-1;}}
+  if(!TABS||newTab||!pristine()){if(TABS){stashDoc();docs.push({});active=docs.length-1;}}
   docs[active]={song:s,file:name,handle,undo:[],redo:[],dirty:false};
   loadDoc(active);persist();
 }
@@ -1910,7 +1911,7 @@ function renderTabs(){
     t.onclick=()=>switchTab(i);
     bar.appendChild(t);
   });
-  const add=h('button','tadd','＋');add.title='新しい曲のタブを開く';add.onclick=()=>openInTab(newSong());
+  const add=h('button','tadd','＋');add.title='新しい曲のタブを開く';add.onclick=()=>openInTab(newSong(),'',null,true);
   bar.appendChild(add);
 }
 
