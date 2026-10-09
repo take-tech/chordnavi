@@ -1889,7 +1889,7 @@ async function closeTab(i){
     if(choice==='save'){await saveFile();if(dirty)return;}   // 保存を取り消したら閉じない
     i=active;
   }
-  if(i===active)stashDoc();
+  stashDoc();   // 表示中のタブの今の中身をしまってから（ほかのタブを閉じても、表示中のタブの変更・元に戻すを失わない）
   docs.splice(i,1);
   if(!docs.length)docs=[{song:newSong(),undo:[],redo:[]}];
   const next=Math.min(i<active?active-1:active,docs.length-1);
