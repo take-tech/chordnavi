@@ -59,7 +59,8 @@ function quantizeBar(notes,b,mi){
     trip.push(!mi.compound&&mi.beat===Q&&pts.length&&err(160)<err(120)-1);
   }
   const snap=p=>{const k=Math.min(nb-1,Math.floor(p/mi.beat)), g=trip[k]?160:120, lo=k*mi.beat;return Math.min(b.ticks,lo+Math.round((p-lo)/g)*g);};
-  for(const x of ev){x.s=snap(x.s);x.e=Math.max(snap(x.e),x.s+(trip[Math.min(nb-1,Math.floor(x.s/mi.beat))]?160:120));}
+  // 終わりは小節の終わりまで（小節の終わりに丸まった音は無くなる。和音の2音目以降も小節の外へ出さない）
+  for(const x of ev){x.s=snap(x.s);x.e=Math.min(b.ticks,Math.max(snap(x.e),x.s+(trip[Math.min(nb-1,Math.floor(x.s/mi.beat))]?160:120)));}
   // 同じ位置で始まる音はまとめる（和音）。重なる音は前の音を次の頭で切る
   ev.sort((a,b)=>a.s-b.s||a.midi-b.midi);
   const out=[];

@@ -83,7 +83,10 @@ function validSong(x){
   if(!GUITAR_AREAS.some(v=>v.id===s.guitarArea))s.guitarArea='low';
   s.octave=Math.max(-2,Math.min(2,s.octave|0));s.bassOctave=Math.max(-2,Math.min(2,s.bassOctave|0));
   s.sections=s.sections.filter(c=>c&&c.bars>0).map(c=>({...newSection(),...c,chords:(c.chords||[]).filter(ch=>ch&&CHORD[ch.q]&&ch.len>0),
-    melody:(c.melody||[]).filter(n=>n&&n.len>0&&Number.isFinite(n.p)&&n.bar>=0).map(n=>({...n,v:Math.max(1,Math.min(127,n.v|0||100))})),marks:(c.marks||[]).filter(m=>!m.key||(m.key.idx>=0&&m.key.idx<12&&['major','minor'].includes(m.key.mode)))}));
+    melody:(c.melody||[]).filter(n=>n&&n.len>0&&Number.isFinite(n.p)&&n.bar>=0).map(n=>({...n,v:Math.max(1,Math.min(127,n.v|0||100))})),marks:(c.marks||[]).filter(m=>m&&(!m.key||(m.key.idx>=0&&m.key.idx<12&&['major','minor'].includes(m.key.mode)))
+      &&(m.meter==null||(Array.isArray(m.meter)&&METERS.some(x=>x.join()===m.meter.join()))))   // 選べない拍子の変更点は外す（0 で割る・長さが負の小節にしない）
+      .map(m=>{const {bpm,...r}=m;return bpm?{...m,bpm:Math.min(MAX_BPM,Math.max(MIN_BPM,+bpm||120))}:r;})   // テンポは範囲に収める（0 などは外す）
+      .filter(m=>m.key||m.meter||m.bpm)}));   // 何も変えない変更点は外す
   return s;
 }
 // 自動保存の読み書き。JUCE 版はネイティブのファイル（Application Support の ChordSketch/session.json）、ブラウザは localStorage
